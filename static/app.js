@@ -154,12 +154,18 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     const avatar_color = document.getElementById('register-color').value;
     
     try {
-        await apiRequest('/api/auth/register', {
+        const user = await apiRequest('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({ name, email, password, avatar_color })
         });
         
-        showToast('Cuenta creada. Inicia sesión.', 'success');
+        if (user.is_approved) {
+            // Primer usuario (admin) - puede iniciar sesión directamente
+            showToast('¡Cuenta de administrador creada! Inicia sesión.', 'success');
+        } else {
+            // Otros usuarios - necesitan aprobación
+            showToast('Solicitud enviada. Un administrador debe aprobar tu cuenta.', 'warning');
+        }
         document.querySelector('[data-tab="login"]').click();
     } catch (error) {
         showToast(error.message, 'error');
@@ -178,6 +184,7 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 async function initApp() {
     showMainApp();
     updateUserInfo();
+    setupAdminUI();
     
     try {
         await Promise.all([
@@ -185,9 +192,44 @@ async function initApp() {
             loadUsers(),
             loadDashboard()
         ]);
+        
+        // Si es admin, cargar usuarios pendientes
+        if (currentUser && currentUser.is_admin) {
+            loadPendingUsers();
+        }
     } catch (error) {
         console.error('Error initializing:', error);
     }
+}
+
+function setupAdminUI() {
+    if (!currentUser) return;
+    
+    // Mostrar/ocultar opción de administración
+    const adminNav = document.querySelector('.nav-item[data-view="admin"]');
+    if (currentUser.is_admin) {
+        adminNav.classList.remove('hidden');
+    } else {
+        adminNav.classList.add('hidden');
+    }
+    
+    // Setup admin tabs
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            const tabName = tab.dataset.tab;
+            document.getElementById('admin-pending').classList.toggle('hidden', tabName !== 'pending');
+            document.getElementById('admin-all-users').classList.toggle('hidden', tabName !== 'all-users');
+            
+            if (tabName === 'pending') {
+                loadPendingUsers();
+            } else {
+                loadAllUsersAdmin();
+            }
+        });
+    });
 }
 
 function updateUserInfo() {
@@ -225,13 +267,15 @@ function switchView(view) {
         'kanban': 'Tablero Kanban',
         'gantt': 'Diagrama Gantt',
         'my-tasks': 'Mis Tareas',
-        'team': 'Equipo'
+        'team': 'Equipo',
+        'admin': 'Administración'
     };
     document.getElementById('page-title').textContent = titles[view] || view;
     
     if (view === 'my-tasks') loadMyTasks();
     if (view === 'team') loadTeam();
     if (view === 'gantt') renderGantt();
+    if (view === 'admin') loadPendingUsers();
 }
 
 // ===================== PROJECTS =====================
@@ -943,6 +987,178 @@ document.querySelectorAll('.modal-close').forEach(btn => {
         btn.closest('.modal-overlay').classList.remove('active');
     });
 });
+
+// ===================== ADMIN FUNCTIONS =====================
+async function loadPendingUsers() {
+    if (!currentUser || !currentUser.is_admin) return;
+    
+    try {
+        const pending = await apiRequest('/api/admin/pending-users');
+        renderPendingUsers(pending);
+        updatePendingBadge(pending.length);
+    } catch (error) {
+        console.error('Error loading pending users:', error);
+    }
+}
+
+async function loadAllUsersAdmin() {
+    if (!currentUser || !currentUser.is_admin) return;
+    
+    try {
+        const allUsers = await apiRequest('/api/admin/all-users');
+        renderAllUsersAdmin(allUsers);
+    } catch (error) {
+        console.error('Error loading users:', error);
+    }
+}
+
+function renderPendingUsers(users) {
+    const container = document.getElementById('pending-users-list');
+    
+    if (users.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <p>No hay usuarios pendientes de aprobación</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = users.map(user => `
+        <div class="user-card" data-user-id="${user.id}">
+            <div class="user-card-info">
+                <div class="avatar" style="background: ${user.avatar_color}">
+                    ${getInitials(user.name)}
+                </div>
+                <div class="user-card-details">
+                    <h4>${user.name}</h4>
+                    <p>${user.email}</p>
+                    <div class="user-card-meta">
+                        <span class="user-badge pending">Pendiente</span>
+                        <small>Registrado: ${formatDateTime(user.created_at)}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="user-card-actions">
+                <button class="btn-approve" onclick="approveUser(${user.id})">
+                    <i class="fas fa-check"></i> Aprobar
+                </button>
+                <button class="btn-reject" onclick="rejectUser(${user.id})">
+                    <i class="fas fa-times"></i> Rechazar
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderAllUsersAdmin(allUsers) {
+    const container = document.getElementById('all-users-list');
+    
+    container.innerHTML = allUsers.map(user => `
+        <div class="user-card" data-user-id="${user.id}">
+            <div class="user-card-info">
+                <div class="avatar" style="background: ${user.avatar_color}">
+                    ${getInitials(user.name)}
+                </div>
+                <div class="user-card-details">
+                    <h4>${user.name}</h4>
+                    <p>${user.email}</p>
+                    <div class="user-card-meta">
+                        ${user.is_admin ? '<span class="user-badge admin">Admin</span>' : ''}
+                        ${user.is_approved ? '<span class="user-badge approved">Aprobado</span>' : '<span class="user-badge pending">Pendiente</span>'}
+                    </div>
+                </div>
+            </div>
+            <div class="user-card-actions">
+                ${!user.is_admin && user.is_approved ? `
+                    <button class="btn-make-admin" onclick="makeAdmin(${user.id})">
+                        <i class="fas fa-crown"></i> Hacer Admin
+                    </button>
+                ` : ''}
+                ${user.id !== currentUser.id ? `
+                    <button class="btn-reject" onclick="deleteUser(${user.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function updatePendingBadge(count) {
+    const badge = document.querySelector('.nav-item[data-view="admin"] .badge');
+    const pendingBadge = document.getElementById('pending-badge');
+    
+    if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+        pendingBadge.textContent = count;
+    } else {
+        badge.classList.add('hidden');
+        pendingBadge.textContent = '0';
+    }
+}
+
+async function approveUser(userId) {
+    try {
+        await apiRequest(`/api/admin/users/${userId}/approve`, {
+            method: 'PUT',
+            body: JSON.stringify({ approved: true })
+        });
+        showToast('Usuario aprobado correctamente', 'success');
+        loadPendingUsers();
+        loadUsers();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function rejectUser(userId) {
+    if (!confirm('¿Seguro que deseas rechazar y eliminar este usuario?')) return;
+    
+    try {
+        await apiRequest(`/api/admin/users/${userId}/approve`, {
+            method: 'PUT',
+            body: JSON.stringify({ approved: false })
+        });
+        showToast('Usuario rechazado', 'warning');
+        loadPendingUsers();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function makeAdmin(userId) {
+    if (!confirm('¿Seguro que deseas hacer administrador a este usuario?')) return;
+    
+    try {
+        await apiRequest(`/api/admin/users/${userId}/make-admin`, {
+            method: 'PUT'
+        });
+        showToast('Usuario promovido a administrador', 'success');
+        loadAllUsersAdmin();
+        loadUsers();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function deleteUser(userId) {
+    if (!confirm('¿Seguro que deseas eliminar este usuario? Esta acción no se puede deshacer.')) return;
+    
+    try {
+        await apiRequest(`/api/admin/users/${userId}`, {
+            method: 'DELETE'
+        });
+        showToast('Usuario eliminado', 'success');
+        loadAllUsersAdmin();
+        loadPendingUsers();
+        loadUsers();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {

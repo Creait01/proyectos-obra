@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -11,6 +11,8 @@ class User(Base):
     email = Column(String(100), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     avatar_color = Column(String(20), default="#6366f1")
+    is_admin = Column(Boolean, default=False)  # Es administrador
+    is_approved = Column(Boolean, default=False)  # Aprobado por admin
     created_at = Column(DateTime, default=datetime.utcnow)
     
     projects = relationship("Project", back_populates="owner")

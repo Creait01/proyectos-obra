@@ -12,7 +12,7 @@ from models import Project, Task, User, Activity
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
-    UserCreate, UserResponse, UserLogin,
+    UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse,
     ActivityResponse, DashboardStats
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
@@ -75,12 +75,18 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(status_code=400, detail="Email ya registrado")
     
+    # Verificar si es el primer usuario (será admin automáticamente)
+    user_count = db.query(User).count()
+    is_first_user = user_count == 0
+    
     hashed_password = get_password_hash(user.password)
     new_user = User(
         name=user.name,
         email=user.email,
         password_hash=hashed_password,
-        avatar_color=user.avatar_color or "#6366f1"
+        avatar_color=user.avatar_color or "#6366f1",
+        is_admin=is_first_user,  # Primer usuario es admin
+        is_approved=is_first_user  # Primer usuario auto-aprobado
     )
     db.add(new_user)
     db.commit()
@@ -93,12 +99,82 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
     if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     
+    # Verificar si está aprobado
+    if not db_user.is_approved:
+        raise HTTPException(status_code=403, detail="Tu cuenta está pendiente de aprobación por un administrador")
+    
     token = create_access_token(data={"sub": str(db_user.id)})
     return {"access_token": token, "token_type": "bearer", "user": UserResponse.model_validate(db_user)}
 
 @app.get("/api/auth/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# ===================== ADMINISTRACIÓN DE USUARIOS =====================
+@app.get("/api/admin/pending-users", response_model=List[PendingUserResponse])
+async def get_pending_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver usuarios pendientes")
+    
+    pending = db.query(User).filter(User.is_approved == False).all()
+    return pending
+
+@app.get("/api/admin/all-users", response_model=List[UserResponse])
+async def get_all_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver usuarios")
+    
+    users = db.query(User).all()
+    return users
+
+@app.put("/api/admin/users/{user_id}/approve")
+async def approve_user(user_id: int, approval: UserApproval, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden aprobar usuarios")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    if approval.approved:
+        user.is_approved = True
+        db.commit()
+        return {"message": f"Usuario {user.name} aprobado correctamente"}
+    else:
+        # Rechazar = eliminar usuario
+        db.delete(user)
+        db.commit()
+        return {"message": f"Usuario {user.name} rechazado y eliminado"}
+
+@app.put("/api/admin/users/{user_id}/make-admin")
+async def make_admin(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden promover usuarios")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    user.is_admin = True
+    user.is_approved = True
+    db.commit()
+    return {"message": f"Usuario {user.name} es ahora administrador"}
+
+@app.delete("/api/admin/users/{user_id}")
+async def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar usuarios")
+    
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    db.delete(user)
+    db.commit()
+    return {"message": f"Usuario {user.name} eliminado"}
 
 # ===================== PROYECTOS =====================
 @app.get("/api/projects", response_model=List[ProjectResponse])

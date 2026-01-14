@@ -18,6 +18,21 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     id: int
     avatar_color: str
+    is_admin: bool = False
+    is_approved: bool = False
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class UserApproval(BaseModel):
+    approved: bool
+
+class PendingUserResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    avatar_color: str
     created_at: datetime
     
     class Config:
