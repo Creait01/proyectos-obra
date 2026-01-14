@@ -7,7 +7,7 @@ from typing import List, Optional
 import json
 from datetime import datetime, timedelta
 
-from database import engine, get_db, Base
+from database import engine, get_db, Base, SessionLocal
 from models import Project, Task, User, Activity
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
@@ -19,6 +19,32 @@ from auth import get_current_user, create_access_token, verify_password, get_pas
 
 # Crear tablas
 Base.metadata.create_all(bind=engine)
+
+# ===================== CREAR ADMIN POR DEFECTO =====================
+def create_default_admin():
+    db = SessionLocal()
+    try:
+        # Verificar si ya existe el admin
+        admin = db.query(User).filter(User.email == "it@corpocrea.com").first()
+        if not admin:
+            admin = User(
+                name="Administrador",
+                email="it@corpocrea.com",
+                password_hash=get_password_hash("20654142"),
+                avatar_color="#6366f1",
+                is_admin=True,
+                is_approved=True
+            )
+            db.add(admin)
+            db.commit()
+            print("✅ Usuario administrador creado: it@corpocrea.com")
+        else:
+            print("✅ Usuario administrador ya existe")
+    finally:
+        db.close()
+
+# Crear admin al iniciar
+create_default_admin()
 
 app = FastAPI(
     title="ProyectOS - Gestión de Proyectos de Obra",
