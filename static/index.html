@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProyectOS - Gestión de Proyectos de Obra</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-background">
+            <div class="gradient-sphere sphere-1"></div>
+            <div class="gradient-sphere sphere-2"></div>
+            <div class="gradient-sphere sphere-3"></div>
+        </div>
+        <div class="auth-container glass-card">
+            <div class="auth-header">
+                <div class="logo">
+                    <i class="fas fa-hard-hat"></i>
+                    <span>ProyectOS</span>
+                </div>
+                <p class="tagline">Gestión colaborativa de proyectos de obra</p>
+            </div>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Iniciar Sesión</button>
+                <button class="auth-tab" data-tab="register">Registrarse</button>
+            </div>
+            
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label><i class="fas fa-envelope"></i> Email</label>
+                    <input type="email" id="login-email" required placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> Contraseña</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">
+                    <i class="fas fa-sign-in-alt"></i> Entrar
+                </button>
+            </form>
+            
+            <form id="register-form" class="auth-form hidden">
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Nombre</label>
+                    <input type="text" id="register-name" required placeholder="Tu nombre">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-envelope"></i> Email</label>
+                    <input type="email" id="register-email" required placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> Contraseña</label>
+                    <input type="password" id="register-password" required placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-palette"></i> Color de Avatar</label>
+                    <div class="color-picker">
+                        <input type="color" id="register-color" value="#6366f1">
+                        <span class="color-preview"></span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">
+                    <i class="fas fa-user-plus"></i> Crear Cuenta
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-app" class="main-app hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-dark">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-hard-hat"></i>
+                    <span>ProyectOS</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-view="kanban">
+                    <i class="fas fa-columns"></i>
+                    <span>Kanban</span>
+                </a>
+                <a href="#" class="nav-item" data-view="gantt">
+                    <i class="fas fa-stream"></i>
+                    <span>Gantt</span>
+                </a>
+                <a href="#" class="nav-item" data-view="my-tasks">
+                    <i class="fas fa-tasks"></i>
+                    <span>Mis Tareas</span>
+                </a>
+                <a href="#" class="nav-item" data-view="team">
+                    <i class="fas fa-users"></i>
+                    <span>Equipo</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-projects">
+                <div class="sidebar-section-header">
+                    <span>Proyectos</span>
+                    <button class="btn-icon" id="add-project-btn" title="Nuevo proyecto">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div id="project-list" class="project-list"></div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-info" id="user-info">
+                    <div class="avatar"></div>
+                    <div class="user-details">
+                        <span class="user-name"></span>
+                        <span class="user-email"></span>
+                    </div>
+                </div>
+                <button class="btn-icon" id="logout-btn" title="Cerrar sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar glass">
+                <div class="topbar-left">
+                    <button class="btn-icon mobile-menu-toggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 id="page-title">Dashboard</h1>
+                </div>
+                <div class="topbar-right">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Buscar tareas..." id="search-input">
+                    </div>
+                    <div class="connection-status" id="connection-status">
+                        <i class="fas fa-wifi"></i>
+                        <span>Conectado</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Views Container -->
+            <div class="views-container">
+                <!-- Dashboard View -->
+                <section id="dashboard-view" class="view active">
+                    <div class="dashboard-grid">
+                        <div class="stats-row">
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+                                    <i class="fas fa-project-diagram"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-projects">0</span>
+                                    <span class="stat-label">Proyectos</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #06b6d4, #0ea5e9);">
+                                    <i class="fas fa-clipboard-list"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-tasks">0</span>
+                                    <span class="stat-label">Total Tareas</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #34d399);">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-completed">0</span>
+                                    <span class="stat-label">Completadas</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);">
+                                    <i class="fas fa-spinner"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-progress">0</span>
+                                    <span class="stat-label">En Progreso</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #ef4444, #f87171);">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-overdue">0</span>
+                                    <span class="stat-label">Vencidas</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-row">
+                            <div class="chart-card glass-card">
+                                <h3><i class="fas fa-chart-doughnut"></i> Progreso General</h3>
+                                <div class="progress-ring-container">
+                                    <svg class="progress-ring" width="200" height="200">
+                                        <circle class="progress-ring-bg" cx="100" cy="100" r="80"/>
+                                        <circle class="progress-ring-fill" cx="100" cy="100" r="80" id="progress-ring"/>
+                                    </svg>
+                                    <div class="progress-ring-text">
+                                        <span id="completion-rate">0%</span>
+                                        <small>Completado</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card glass-card">
+                                <h3><i class="fas fa-flag"></i> Por Prioridad</h3>
+                                <div class="priority-bars">
+                                    <div class="priority-bar">
+                                        <div class="priority-label">
+                                            <span class="priority-dot high"></span>
+                                            <span>Alta</span>
+                                        </div>
+                                        <div class="bar-container">
+                                            <div class="bar high" id="bar-high"></div>
+                                        </div>
+                                        <span class="priority-count" id="count-high">0</span>
+                                    </div>
+                                    <div class="priority-bar">
+                                        <div class="priority-label">
+                                            <span class="priority-dot medium"></span>
+                                            <span>Media</span>
+                                        </div>
+                                        <div class="bar-container">
+                                            <div class="bar medium" id="bar-medium"></div>
+                                        </div>
+                                        <span class="priority-count" id="count-medium">0</span>
+                                    </div>
+                                    <div class="priority-bar">
+                                        <div class="priority-label">
+                                            <span class="priority-dot low"></span>
+                                            <span>Baja</span>
+                                        </div>
+                                        <div class="bar-container">
+                                            <div class="bar low" id="bar-low"></div>
+                                        </div>
+                                        <span class="priority-count" id="count-low">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="activity-card glass-card">
+                                <h3><i class="fas fa-history"></i> Actividad Reciente</h3>
+                                <div id="activity-list" class="activity-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Kanban View -->
+                <section id="kanban-view" class="view">
+                    <div class="kanban-header">
+                        <select id="kanban-project-select" class="select-styled">
+                            <option value="">Seleccionar proyecto</option>
+                        </select>
+                        <button class="btn btn-primary" id="add-task-btn">
+                            <i class="fas fa-plus"></i> Nueva Tarea
+                        </button>
+                    </div>
+                    <div class="kanban-board" id="kanban-board">
+                        <div class="kanban-column" data-status="todo">
+                            <div class="column-header">
+                                <div class="column-title">
+                                    <span class="column-dot todo"></span>
+                                    <h3>Por Hacer</h3>
+                                    <span class="task-count" id="count-todo">0</span>
+                                </div>
+                            </div>
+                            <div class="column-content" id="column-todo"></div>
+                        </div>
+                        <div class="kanban-column" data-status="in_progress">
+                            <div class="column-header">
+                                <div class="column-title">
+                                    <span class="column-dot in_progress"></span>
+                                    <h3>En Progreso</h3>
+                                    <span class="task-count" id="count-in_progress">0</span>
+                                </div>
+                            </div>
+                            <div class="column-content" id="column-in_progress"></div>
+                        </div>
+                        <div class="kanban-column" data-status="review">
+                            <div class="column-header">
+                                <div class="column-title">
+                                    <span class="column-dot review"></span>
+                                    <h3>En Revisión</h3>
+                                    <span class="task-count" id="count-review">0</span>
+                                </div>
+                            </div>
+                            <div class="column-content" id="column-review"></div>
+                        </div>
+                        <div class="kanban-column" data-status="done">
+                            <div class="column-header">
+                                <div class="column-title">
+                                    <span class="column-dot done"></span>
+                                    <h3>Completado</h3>
+                                    <span class="task-count" id="count-done">0</span>
+                                </div>
+                            </div>
+                            <div class="column-content" id="column-done"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Gantt View -->
+                <section id="gantt-view" class="view">
+                    <div class="gantt-header">
+                        <select id="gantt-project-select" class="select-styled">
+                            <option value="">Seleccionar proyecto</option>
+                        </select>
+                        <div class="gantt-controls">
+                            <button class="btn btn-secondary" id="gantt-zoom-out">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button class="btn btn-secondary" id="gantt-zoom-in">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button class="btn btn-secondary" id="gantt-today">
+                                <i class="fas fa-calendar-day"></i> Hoy
+                            </button>
+                        </div>
+                    </div>
+                    <div class="gantt-container glass-card">
+                        <div class="gantt-chart" id="gantt-chart">
+                            <div class="gantt-timeline" id="gantt-timeline"></div>
+                            <div class="gantt-tasks" id="gantt-tasks"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- My Tasks View -->
+                <section id="my-tasks-view" class="view">
+                    <div class="my-tasks-header">
+                        <div class="filter-tabs">
+                            <button class="filter-tab active" data-filter="all">Todas</button>
+                            <button class="filter-tab" data-filter="todo">Por Hacer</button>
+                            <button class="filter-tab" data-filter="in_progress">En Progreso</button>
+                            <button class="filter-tab" data-filter="done">Completadas</button>
+                        </div>
+                    </div>
+                    <div class="tasks-list" id="my-tasks-list"></div>
+                </section>
+
+                <!-- Team View -->
+                <section id="team-view" class="view">
+                    <div class="team-grid" id="team-grid"></div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Project Modal -->
+    <div class="modal-overlay" id="project-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2 id="project-modal-title">Nuevo Proyecto</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="project-form">
+                <input type="hidden" id="project-id">
+                <div class="form-group">
+                    <label>Nombre del Proyecto</label>
+                    <input type="text" id="project-name" required placeholder="Ej: Construcción Edificio Norte">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="project-description" rows="3" placeholder="Descripción del proyecto..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha de Inicio</label>
+                        <input type="date" id="project-start">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Fin</label>
+                        <input type="date" id="project-end">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Color del Proyecto</label>
+                    <div class="color-options" id="project-colors">
+                        <button type="button" class="color-option" data-color="#6366f1" style="background: #6366f1;"></button>
+                        <button type="button" class="color-option" data-color="#8b5cf6" style="background: #8b5cf6;"></button>
+                        <button type="button" class="color-option" data-color="#ec4899" style="background: #ec4899;"></button>
+                        <button type="button" class="color-option" data-color="#ef4444" style="background: #ef4444;"></button>
+                        <button type="button" class="color-option" data-color="#f59e0b" style="background: #f59e0b;"></button>
+                        <button type="button" class="color-option" data-color="#10b981" style="background: #10b981;"></button>
+                        <button type="button" class="color-option" data-color="#06b6d4" style="background: #06b6d4;"></button>
+                        <button type="button" class="color-option" data-color="#3b82f6" style="background: #3b82f6;"></button>
+                    </div>
+                    <input type="hidden" id="project-color" value="#6366f1">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div class="modal-overlay" id="task-modal">
+        <div class="modal glass-card modal-large">
+            <div class="modal-header">
+                <h2 id="task-modal-title">Nueva Tarea</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                <div class="form-group">
+                    <label>Título de la Tarea</label>
+                    <input type="text" id="task-title" required placeholder="Ej: Revisar planos estructurales">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="task-description" rows="4" placeholder="Detalles de la tarea..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select id="task-status">
+                            <option value="todo">Por Hacer</option>
+                            <option value="in_progress">En Progreso</option>
+                            <option value="review">En Revisión</option>
+                            <option value="done">Completado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Prioridad</label>
+                        <select id="task-priority">
+                            <option value="low">Baja</option>
+                            <option value="medium">Media</option>
+                            <option value="high">Alta</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha de Inicio</label>
+                        <input type="date" id="task-start">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Vencimiento</label>
+                        <input type="date" id="task-due">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Asignar a</label>
+                    <select id="task-assignee">
+                        <option value="">Sin asignar</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Progreso: <span id="progress-value">0</span>%</label>
+                    <input type="range" id="task-progress" min="0" max="100" value="0">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" id="delete-task-btn" style="margin-right: auto;">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
