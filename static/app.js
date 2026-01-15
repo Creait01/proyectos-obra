@@ -362,12 +362,15 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     e.preventDefault();
     
     const projectId = document.getElementById('project-id').value;
+    const startDate = document.getElementById('project-start').value;
+    const endDate = document.getElementById('project-end').value;
+    
     const projectData = {
         name: document.getElementById('project-name').value,
-        description: document.getElementById('project-description').value,
+        description: document.getElementById('project-description').value || null,
         color: document.getElementById('project-color').value,
-        start_date: document.getElementById('project-start').value || null,
-        end_date: document.getElementById('project-end').value || null
+        start_date: startDate ? new Date(startDate).toISOString() : null,
+        end_date: endDate ? new Date(endDate).toISOString() : null
     };
     
     try {
