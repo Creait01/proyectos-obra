@@ -237,6 +237,36 @@ async def remove_admin(user_id: int, db: Session = Depends(get_db), current_user
     db.commit()
     return {"message": f"Usuario {user.name} ya no es administrador"}
 
+@app.put("/api/admin/users/{user_id}")
+async def update_user(user_id: int, user_data: schemas.UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar usuarios")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # No permitir cambiar el rol de uno mismo
+    if user_id == current_user.id and user_data.is_admin is not None and not user_data.is_admin:
+        raise HTTPException(status_code=400, detail="No puedes quitarte el rol de administrador a ti mismo")
+    
+    if user_data.name:
+        user.name = user_data.name
+    if user_data.email:
+        # Verificar que el email no esté en uso por otro usuario
+        existing = db.query(User).filter(User.email == user_data.email, User.id != user_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Este email ya está en uso")
+        user.email = user_data.email
+    if user_data.password:
+        user.password = get_password_hash(user_data.password)
+    if user_data.is_admin is not None:
+        user.is_admin = user_data.is_admin
+    
+    db.commit()
+    db.refresh(user)
+    return {"message": "Usuario actualizado correctamente"}
+
 @app.delete("/api/admin/users/{user_id}")
 async def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not current_user.is_admin:

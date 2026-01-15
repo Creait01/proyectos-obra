@@ -1855,6 +1855,25 @@ body {
     transform: translateY(-1px);
 }
 
+.btn-edit-user {
+    padding: 8px 16px;
+    background: var(--info);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-fast);
+}
+
+.btn-edit-user:hover {
+    background: #0284c7;
+    transform: translateY(-1px);
+}
+
 .admin-only.hidden {
     display: none !important;
 }

@@ -1126,6 +1126,9 @@ function renderAllUsersAdmin(allUsers) {
                 </div>
             </div>
             <div class="user-card-actions">
+                <button class="btn-edit-user" onclick="openEditUserModal(${user.id}, '${user.name.replace(/'/g, "\\'") }', '${user.email}', ${user.is_admin})">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
                 ${!isCurrentUser && user.is_approved ? `
                     ${user.is_admin ? `
                         <button class="btn-remove-admin" onclick="removeAdmin(${user.id})">
@@ -1220,6 +1223,64 @@ async function removeAdmin(userId) {
     }
 }
 
+// Editar Usuario
+function openEditUserModal(userId, name, email, isAdmin) {
+    document.getElementById('edit-user-id').value = userId;
+    document.getElementById('edit-user-name').value = name;
+    document.getElementById('edit-user-email').value = email;
+    document.getElementById('edit-user-password').value = '';
+    document.getElementById('edit-user-role').value = isAdmin ? 'admin' : 'user';
+    
+    // Si es el usuario actual, deshabilitar el cambio de rol
+    const roleSelect = document.getElementById('edit-user-role');
+    if (userId === currentUser.id) {
+        roleSelect.disabled = true;
+        roleSelect.title = 'No puedes cambiar tu propio rol';
+    } else {
+        roleSelect.disabled = false;
+        roleSelect.title = '';
+    }
+    
+    document.getElementById('edit-user-modal').classList.add('active');
+}
+
+async function saveUserChanges(e) {
+    e.preventDefault();
+    
+    const userId = document.getElementById('edit-user-id').value;
+    const name = document.getElementById('edit-user-name').value;
+    const email = document.getElementById('edit-user-email').value;
+    const password = document.getElementById('edit-user-password').value;
+    const isAdmin = document.getElementById('edit-user-role').value === 'admin';
+    
+    try {
+        const updateData = { name, email, is_admin: isAdmin };
+        if (password) {
+            updateData.password = password;
+        }
+        
+        await apiRequest(`/api/admin/users/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updateData)
+        });
+        
+        showToast('Usuario actualizado correctamente', 'success');
+        document.getElementById('edit-user-modal').classList.remove('active');
+        loadAllUsersAdmin();
+        loadUsers();
+        
+        // Si el usuario editado es el actual, actualizar la UI
+        if (parseInt(userId) === currentUser.id) {
+            currentUser.name = name;
+            currentUser.email = email;
+            document.querySelector('#user-info .user-name').textContent = name;
+            document.querySelector('#user-info .user-email').textContent = email;
+        }
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
 async function deleteUser(userId) {
     if (!confirm('¿Seguro que deseas eliminar este usuario? Esta acción no se puede deshacer.')) return;
     
@@ -1253,6 +1314,11 @@ function setupProgressForm() {
             e.preventDefault();
             await submitProgress();
         });
+    }
+    
+    const editUserForm = document.getElementById('edit-user-form');
+    if (editUserForm) {
+        editUserForm.addEventListener('submit', saveUserChanges);
     }
 }
 

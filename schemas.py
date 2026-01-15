@@ -28,6 +28,12 @@ class UserResponse(UserBase):
 class UserApproval(BaseModel):
     approved: bool
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    is_admin: Optional[bool] = None
+
 class PendingUserResponse(BaseModel):
     id: int
     name: str
