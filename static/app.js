@@ -358,9 +358,9 @@ document.getElementById('kanban-project-select').addEventListener('change', (e) 
     if (e.target.value) selectProject(parseInt(e.target.value));
 });
 
-document.getElementById('gantt-project-select').addEventListener('change', (e) => {
+document.getElementById('gantt-project-select').addEventListener('change', async (e) => {
     if (e.target.value) {
-        selectProject(parseInt(e.target.value));
+        await selectProject(parseInt(e.target.value));
         renderGantt();
     }
 });
@@ -487,13 +487,17 @@ async function loadTasks() {
     if (!currentProject) {
         tasks = [];
         renderKanban();
+        renderGantt();
         return;
     }
     
     try {
         tasks = await apiRequest(`/api/projects/${currentProject.id}/tasks`);
+        console.log('Tareas cargadas:', tasks.length, tasks);
         renderKanban();
+        renderGantt();
     } catch (error) {
+        console.error('Error cargando tareas:', error);
         showToast('Error cargando tareas', 'error');
     }
 }
@@ -827,16 +831,26 @@ function renderActivities(activities) {
 let ganttScale = 40; // pixels per day
 
 function renderGantt() {
-    if (!currentProject || tasks.length === 0) {
-        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Selecciona un proyecto con tareas para ver el Gantt</p>';
+    console.log('renderGantt llamado - Proyecto:', currentProject?.name, '- Tareas:', tasks.length);
+    
+    if (!currentProject) {
+        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Selecciona un proyecto para ver el Gantt</p>';
+        document.getElementById('gantt-tasks').innerHTML = '';
+        return;
+    }
+    
+    if (tasks.length === 0) {
+        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Este proyecto no tiene tareas</p>';
         document.getElementById('gantt-tasks').innerHTML = '';
         return;
     }
     
     // Find date range
     const tasksWithDates = tasks.filter(t => t.start_date || t.due_date);
+    console.log('Tareas con fechas:', tasksWithDates.length);
+    
     if (tasksWithDates.length === 0) {
-        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Las tareas necesitan fechas para mostrar el Gantt</p>';
+        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Las tareas necesitan fechas de inicio o fin para mostrar el Gantt</p>';
         document.getElementById('gantt-tasks').innerHTML = '';
         return;
     }
