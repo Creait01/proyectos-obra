@@ -855,19 +855,24 @@ function renderGantt() {
         return;
     }
     
-    let minDate = new Date();
-    let maxDate = new Date();
+    // Inicializar con fechas extremas para encontrar el rango real
+    let minDate = new Date('2099-12-31');
+    let maxDate = new Date('1970-01-01');
     
     tasksWithDates.forEach(t => {
         if (t.start_date) {
             const start = new Date(t.start_date);
-            if (start < minDate) minDate = start;
+            if (start < minDate) minDate = new Date(start);
+            if (start > maxDate) maxDate = new Date(start);
         }
         if (t.due_date) {
             const end = new Date(t.due_date);
-            if (end > maxDate) maxDate = end;
+            if (end > maxDate) maxDate = new Date(end);
+            if (end < minDate) minDate = new Date(end);
         }
     });
+    
+    console.log('Rango de fechas - Min:', minDate, 'Max:', maxDate);
     
     // Add padding - mostrar al menos 90 días
     minDate.setDate(minDate.getDate() - 7);

@@ -1366,21 +1366,23 @@ body {
 
 .gantt-task-bar {
     position: absolute;
-    height: 40px;
+    height: 36px;
+    top: 2px;
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    font-size: 0.85rem;
+    justify-content: flex-end;
+    padding: 0 10px;
+    font-size: 0.8rem;
     color: white;
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition-fast);
-    overflow: hidden;
+    overflow: visible;
     z-index: 10;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    min-width: 60px;
 }
 
 .gantt-task-bar:hover {
@@ -1393,20 +1395,32 @@ body {
     left: 0;
     top: 0;
     height: 100%;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.2));
-    border-radius: var(--radius-md);
-    border-right: 3px solid rgba(255, 255, 255, 0.8);
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.9), rgba(16, 185, 129, 0.6));
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+    transition: width 0.3s ease;
+}
+
+.gantt-bar-progress::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
 }
 
 .gantt-bar-text {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     font-weight: 700;
-    font-size: 0.85rem;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    background: rgba(0, 0, 0, 0.3);
-    padding: 4px 10px;
+    font-size: 0.75rem;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 3px 8px;
     border-radius: 4px;
+    white-space: nowrap;
 }
 
 /* ===================== MY TASKS ===================== */
