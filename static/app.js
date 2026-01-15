@@ -1328,7 +1328,7 @@ function renderGantt() {
                     </div>
                 </div>
                 <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
-                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"></div>` : ''}
+                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale}px;"></div>` : ''}
                     <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 36px; top: 2px; background: ${barColor}; border-radius: 6px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); overflow: hidden;" 
                          class="gantt-task-bar"
                          data-id="${task.id}" 
