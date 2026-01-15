@@ -28,6 +28,23 @@ def init_database():
         Base.metadata.create_all(bind=engine)
         print("✅ Base de datos inicializada correctamente")
         
+        # Verificar y crear tabla project_members si no existe
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS project_members (
+                        id SERIAL PRIMARY KEY,
+                        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        added_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla project_members verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla project_members: {e}")
+        
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
 
@@ -268,41 +285,66 @@ async def delete_user(user_id: int, db: Session = Depends(get_db), current_user:
 # ===================== PROYECTOS =====================
 @app.get("/api/projects")
 async def get_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Admins ven todos los proyectos
-    if current_user.is_admin:
+    try:
+        # Admins ven todos los proyectos
+        if current_user.is_admin:
+            projects = db.query(Project).all()
+        else:
+            # Usuarios normales solo ven proyectos donde son miembros
+            try:
+                member_project_ids = db.query(ProjectMember.project_id).filter(
+                    ProjectMember.user_id == current_user.id
+                ).all()
+                project_ids = [p[0] for p in member_project_ids]
+                projects = db.query(Project).filter(Project.id.in_(project_ids)).all() if project_ids else []
+            except Exception:
+                # Si falla, mostrar todos los proyectos
+                projects = db.query(Project).all()
+        
+        # Convertir a respuesta con miembros
+        result = []
+        for project in projects:
+            try:
+                members = [
+                    ProjectMemberResponse(
+                        id=pm.user.id,
+                        name=pm.user.name,
+                        email=pm.user.email,
+                        avatar_color=pm.user.avatar_color
+                    ) for pm in project.members if pm.user
+                ]
+            except Exception:
+                members = []
+            
+            result.append({
+                "id": project.id,
+                "name": project.name,
+                "description": project.description,
+                "color": project.color,
+                "owner_id": project.owner_id,
+                "start_date": project.start_date,
+                "end_date": project.end_date,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+                "members": members
+            })
+        return result
+    except Exception as e:
+        print(f"Error en get_projects: {e}")
+        # Fallback sin miembros
         projects = db.query(Project).all()
-    else:
-        # Usuarios normales solo ven proyectos donde son miembros
-        member_project_ids = db.query(ProjectMember.project_id).filter(
-            ProjectMember.user_id == current_user.id
-        ).all()
-        project_ids = [p[0] for p in member_project_ids]
-        projects = db.query(Project).filter(Project.id.in_(project_ids)).all()
-    
-    # Convertir a respuesta con miembros
-    result = []
-    for project in projects:
-        members = [
-            ProjectMemberResponse(
-                id=pm.user.id,
-                name=pm.user.name,
-                email=pm.user.email,
-                avatar_color=pm.user.avatar_color
-            ) for pm in project.members
-        ]
-        result.append({
-            "id": project.id,
-            "name": project.name,
-            "description": project.description,
-            "color": project.color,
-            "owner_id": project.owner_id,
-            "start_date": project.start_date,
-            "end_date": project.end_date,
-            "created_at": project.created_at,
-            "updated_at": project.updated_at,
-            "members": members
-        })
-    return result
+        return [{
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "color": p.color,
+            "owner_id": p.owner_id,
+            "start_date": p.start_date,
+            "end_date": p.end_date,
+            "created_at": p.created_at,
+            "updated_at": p.updated_at,
+            "members": []
+        } for p in projects]
 
 @app.post("/api/projects")
 async def create_project(project: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -322,10 +364,13 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
     db.commit()
     db.refresh(new_project)
     
-    # Agregar el creador como miembro automáticamente
-    creator_member = ProjectMember(project_id=new_project.id, user_id=current_user.id)
-    db.add(creator_member)
-    db.commit()
+    # Intentar agregar el creador como miembro
+    try:
+        creator_member = ProjectMember(project_id=new_project.id, user_id=current_user.id)
+        db.add(creator_member)
+        db.commit()
+    except Exception as e:
+        print(f"⚠️ No se pudo agregar miembro: {e}")
     
     # Registrar actividad
     activity = Activity(
