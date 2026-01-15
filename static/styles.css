@@ -1335,8 +1335,9 @@ body {
     position: relative;
     height: 40px;
     min-width: 0;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: var(--radius-sm);
+    overflow: visible;
 }
 
 .gantt-today-line {
@@ -1365,10 +1366,10 @@ body {
 }
 
 .gantt-task-bar {
-    position: absolute;
-    height: 36px;
-    top: 2px;
-    border-radius: var(--radius-md);
+    position: absolute !important;
+    height: 36px !important;
+    top: 2px !important;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -1377,12 +1378,12 @@ body {
     color: white;
     font-weight: 600;
     cursor: pointer;
-    transition: var(--transition-fast);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     overflow: visible;
     z-index: 10;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     border: 2px solid rgba(255, 255, 255, 0.3);
-    min-width: 60px;
+    min-width: 80px;
 }
 
 .gantt-task-bar:hover {

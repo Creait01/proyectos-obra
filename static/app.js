@@ -921,13 +921,21 @@ function renderGantt() {
     };
     
     const totalDays = dayIndex;
+    console.log('Total días:', totalDays, 'Scale:', ganttScale);
     
     taskRows.innerHTML = tasksWithDates.map(task => {
         const start = task.start_date ? new Date(task.start_date) : new Date(task.due_date);
         const end = task.due_date ? new Date(task.due_date) : new Date(task.start_date);
         
-        const startOffset = Math.floor((start - minDate) / (1000 * 60 * 60 * 24)) * ganttScale;
-        const duration = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1) * ganttScale;
+        // Calcular posición y duración
+        const startDayOffset = Math.floor((start - minDate) / (1000 * 60 * 60 * 24));
+        const endDayOffset = Math.floor((end - minDate) / (1000 * 60 * 60 * 24));
+        const durationDays = Math.max(1, endDayOffset - startDayOffset + 1);
+        
+        const startOffset = startDayOffset * ganttScale;
+        const duration = durationDays * ganttScale;
+        
+        console.log(`Tarea: ${task.title}, Start: ${start.toDateString()}, End: ${end.toDateString()}, Offset: ${startOffset}px, Duration: ${duration}px`);
         
         // Get assignee name
         const assignee = task.assignee_id ? users.find(u => u.id === task.assignee_id) : null;
@@ -936,6 +944,9 @@ function renderGantt() {
         // Formatear fechas para mostrar
         const startDateStr = task.start_date ? new Date(task.start_date).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'}) : '';
         const endDateStr = task.due_date ? new Date(task.due_date).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'}) : '';
+        
+        // Color según estado
+        const barColor = colors[task.status] || '#64748b';
         
         return `
             <div class="gantt-task-row">
@@ -947,10 +958,13 @@ function renderGantt() {
                         <span class="gantt-task-dates"><i class="fas fa-calendar"></i> ${startDateStr} - ${endDateStr}</span>
                     </div>
                 </div>
-                <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
+                <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px; position: relative;">
                     ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"></div>` : ''}
-                    <div class="gantt-task-bar" style="left: ${startOffset}px; width: ${duration}px; background: ${colors[task.status]};" data-id="${task.id}" title="${task.title} - ${task.progress}%">
-                        <div class="gantt-bar-progress" style="width: ${task.progress}%"></div>
+                    <div class="gantt-task-bar" 
+                         style="position: absolute; left: ${startOffset}px; width: ${duration}px; background-color: ${barColor}; height: 36px; top: 2px;" 
+                         data-id="${task.id}" 
+                         title="${task.title} (${startDateStr} - ${endDateStr}) - ${task.progress}%">
+                        <div class="gantt-bar-progress" style="width: ${task.progress}%;"></div>
                         <span class="gantt-bar-text">${task.progress}%</span>
                     </div>
                 </div>
