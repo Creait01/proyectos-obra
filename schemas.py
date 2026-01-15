@@ -61,12 +61,23 @@ class ProjectUpdate(BaseModel):
     color: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    member_ids: Optional[List[int]] = None  # Lista de IDs de usuarios miembros
+
+class ProjectMemberResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    avatar_color: str
+    
+    class Config:
+        from_attributes = True
 
 class ProjectResponse(ProjectBase):
     id: int
     owner_id: int
     created_at: datetime
     updated_at: datetime
+    members: List[ProjectMemberResponse] = []
     
     class Config:
         from_attributes = True

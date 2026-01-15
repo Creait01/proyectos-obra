@@ -10,12 +10,13 @@ import os
 from datetime import datetime, timedelta
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity, TaskProgress
+from models import Project, Task, User, Activity, TaskProgress, ProjectMember
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
     UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse, UserUpdate,
-    ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse
+    ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse,
+    ProjectMemberResponse
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
 
@@ -265,12 +266,45 @@ async def delete_user(user_id: int, db: Session = Depends(get_db), current_user:
     return {"message": f"Usuario {user.name} eliminado"}
 
 # ===================== PROYECTOS =====================
-@app.get("/api/projects", response_model=List[ProjectResponse])
+@app.get("/api/projects")
 async def get_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    projects = db.query(Project).all()
-    return projects
+    # Admins ven todos los proyectos
+    if current_user.is_admin:
+        projects = db.query(Project).all()
+    else:
+        # Usuarios normales solo ven proyectos donde son miembros
+        member_project_ids = db.query(ProjectMember.project_id).filter(
+            ProjectMember.user_id == current_user.id
+        ).all()
+        project_ids = [p[0] for p in member_project_ids]
+        projects = db.query(Project).filter(Project.id.in_(project_ids)).all()
+    
+    # Convertir a respuesta con miembros
+    result = []
+    for project in projects:
+        members = [
+            ProjectMemberResponse(
+                id=pm.user.id,
+                name=pm.user.name,
+                email=pm.user.email,
+                avatar_color=pm.user.avatar_color
+            ) for pm in project.members
+        ]
+        result.append({
+            "id": project.id,
+            "name": project.name,
+            "description": project.description,
+            "color": project.color,
+            "owner_id": project.owner_id,
+            "start_date": project.start_date,
+            "end_date": project.end_date,
+            "created_at": project.created_at,
+            "updated_at": project.updated_at,
+            "members": members
+        })
+    return result
 
-@app.post("/api/projects", response_model=ProjectResponse)
+@app.post("/api/projects")
 async def create_project(project: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Solo admins pueden crear proyectos
     if not current_user.is_admin:
@@ -288,6 +322,11 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
     db.commit()
     db.refresh(new_project)
     
+    # Agregar el creador como miembro automáticamente
+    creator_member = ProjectMember(project_id=new_project.id, user_id=current_user.id)
+    db.add(creator_member)
+    db.commit()
+    
     # Registrar actividad
     activity = Activity(
         action="created",
@@ -299,9 +338,20 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
     db.add(activity)
     db.commit()
     
-    return new_project
+    return {
+        "id": new_project.id,
+        "name": new_project.name,
+        "description": new_project.description,
+        "color": new_project.color,
+        "owner_id": new_project.owner_id,
+        "start_date": new_project.start_date,
+        "end_date": new_project.end_date,
+        "created_at": new_project.created_at,
+        "updated_at": new_project.updated_at,
+        "members": [{"id": current_user.id, "name": current_user.name, "email": current_user.email, "avatar_color": current_user.avatar_color}]
+    }
 
-@app.put("/api/projects/{project_id}", response_model=ProjectResponse)
+@app.put("/api/projects/{project_id}")
 async def update_project(project_id: int, project: ProjectUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Solo admins pueden editar proyectos
     if not current_user.is_admin:
@@ -311,12 +361,42 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
     if not db_project:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     
-    for key, value in project.model_dump(exclude_unset=True).items():
+    # Actualizar campos básicos
+    update_data = project.model_dump(exclude_unset=True, exclude={"member_ids"})
+    for key, value in update_data.items():
         setattr(db_project, key, value)
+    
+    # Actualizar miembros si se proporcionaron
+    if project.member_ids is not None:
+        # Eliminar miembros actuales
+        db.query(ProjectMember).filter(ProjectMember.project_id == project_id).delete()
+        
+        # Agregar nuevos miembros
+        for user_id in project.member_ids:
+            member = ProjectMember(project_id=project_id, user_id=user_id)
+            db.add(member)
     
     db.commit()
     db.refresh(db_project)
-    return db_project
+    
+    # Preparar respuesta con miembros
+    members = [
+        {"id": pm.user.id, "name": pm.user.name, "email": pm.user.email, "avatar_color": pm.user.avatar_color}
+        for pm in db_project.members
+    ]
+    
+    return {
+        "id": db_project.id,
+        "name": db_project.name,
+        "description": db_project.description,
+        "color": db_project.color,
+        "owner_id": db_project.owner_id,
+        "start_date": db_project.start_date,
+        "end_date": db_project.end_date,
+        "created_at": db_project.created_at,
+        "updated_at": db_project.updated_at,
+        "members": members
+    }
 
 @app.delete("/api/projects/{project_id}")
 async def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

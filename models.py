@@ -34,6 +34,19 @@ class Project(Base):
     
     owner = relationship("User", back_populates="projects")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
+
+class ProjectMember(Base):
+    """Miembros asignados a un proyecto"""
+    __tablename__ = "project_members"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    added_at = Column(DateTime, default=datetime.utcnow)
+    
+    project = relationship("Project", back_populates="members")
+    user = relationship("User")
 
 class Task(Base):
     __tablename__ = "tasks"

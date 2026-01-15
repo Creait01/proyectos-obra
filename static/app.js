@@ -308,10 +308,19 @@ async function loadProjects() {
 
 function renderProjectList() {
     const list = document.getElementById('project-list');
+    const isAdmin = currentUser && currentUser.is_admin;
+    
     list.innerHTML = projects.map(p => `
         <div class="project-item ${currentProject?.id === p.id ? 'active' : ''}" data-id="${p.id}">
-            <span class="project-dot" style="background: ${p.color}"></span>
-            <span>${p.name}</span>
+            <div class="project-item-main">
+                <span class="project-dot" style="background: ${p.color}"></span>
+                <span class="project-name">${p.name}</span>
+            </div>
+            ${isAdmin ? `
+                <button class="btn-edit-project" onclick="event.stopPropagation(); editProject(${p.id})" title="Editar proyecto">
+                    <i class="fas fa-pen"></i>
+                </button>
+            ` : ''}
         </div>
     `).join('');
     
@@ -357,6 +366,36 @@ document.getElementById('gantt-project-select').addEventListener('change', (e) =
 });
 
 // ===================== PROJECT MODAL =====================
+function renderMembersSelector(selectedIds = []) {
+    const container = document.getElementById('project-members-selector');
+    if (!container) return;
+    
+    // Solo mostrar usuarios aprobados
+    const approvedUsers = users.filter(u => u.is_approved);
+    
+    container.innerHTML = approvedUsers.map(user => `
+        <label class="member-checkbox ${selectedIds.includes(user.id) ? 'selected' : ''}">
+            <input type="checkbox" value="${user.id}" ${selectedIds.includes(user.id) ? 'checked' : ''}>
+            <div class="avatar-small" style="background: ${user.avatar_color}">
+                ${getInitials(user.name)}
+            </div>
+            <span>${user.name}</span>
+        </label>
+    `).join('');
+    
+    // Agregar eventos de cambio
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            cb.closest('.member-checkbox').classList.toggle('selected', cb.checked);
+        });
+    });
+}
+
+function getSelectedMemberIds() {
+    const checkboxes = document.querySelectorAll('#project-members-selector input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+}
+
 document.getElementById('add-project-btn').addEventListener('click', () => {
     document.getElementById('project-id').value = '';
     document.getElementById('project-form').reset();
@@ -364,8 +403,36 @@ document.getElementById('add-project-btn').addEventListener('click', () => {
     document.getElementById('project-color').value = '#6366f1';
     document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
     document.querySelector('.color-option[data-color="#6366f1"]').classList.add('selected');
+    
+    // Seleccionar al usuario actual por defecto
+    renderMembersSelector([currentUser.id]);
+    
     openModal('project-modal');
 });
+
+// Función para abrir modal de editar proyecto
+function editProject(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    
+    document.getElementById('project-id').value = project.id;
+    document.getElementById('project-name').value = project.name;
+    document.getElementById('project-description').value = project.description || '';
+    document.getElementById('project-start').value = project.start_date ? project.start_date.split('T')[0] : '';
+    document.getElementById('project-end').value = project.end_date ? project.end_date.split('T')[0] : '';
+    document.getElementById('project-color').value = project.color;
+    document.getElementById('project-modal-title').textContent = 'Editar Proyecto';
+    
+    document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
+    const colorBtn = document.querySelector(`.color-option[data-color="${project.color}"]`);
+    if (colorBtn) colorBtn.classList.add('selected');
+    
+    // Cargar miembros actuales
+    const memberIds = project.members ? project.members.map(m => m.id) : [];
+    renderMembersSelector(memberIds);
+    
+    openModal('project-modal');
+}
 
 document.querySelectorAll('#project-colors .color-option').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -381,13 +448,15 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     const projectId = document.getElementById('project-id').value;
     const startDate = document.getElementById('project-start').value;
     const endDate = document.getElementById('project-end').value;
+    const memberIds = getSelectedMemberIds();
     
     const projectData = {
         name: document.getElementById('project-name').value,
         description: document.getElementById('project-description').value || null,
         color: document.getElementById('project-color').value,
         start_date: startDate ? new Date(startDate).toISOString() : null,
-        end_date: endDate ? new Date(endDate).toISOString() : null
+        end_date: endDate ? new Date(endDate).toISOString() : null,
+        member_ids: memberIds
     };
     
     try {
