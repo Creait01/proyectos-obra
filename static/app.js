@@ -1989,13 +1989,38 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 // ===================== SEARCH =====================
 document.getElementById('search-input').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
+    const query = e.target.value.toLowerCase().trim();
     
+    // Si no hay búsqueda, mostrar todas las tarjetas
+    if (!query) {
+        document.querySelectorAll('.task-card').forEach(card => {
+            card.style.display = 'flex';
+        });
+        return;
+    }
+    
+    // Buscar en las tarjetas del Kanban
     document.querySelectorAll('.task-card').forEach(card => {
-        const title = card.querySelector('.task-title').textContent.toLowerCase();
-        const desc = card.querySelector('.task-description')?.textContent.toLowerCase() || '';
+        const titleEl = card.querySelector('.task-title');
+        const descEl = card.querySelector('.task-description');
+        
+        const title = titleEl ? titleEl.textContent.toLowerCase() : '';
+        const desc = descEl ? descEl.textContent.toLowerCase() : '';
+        
         const matches = title.includes(query) || desc.includes(query);
-        card.style.display = matches ? 'block' : 'none';
+        card.style.display = matches ? 'flex' : 'none';
+    });
+    
+    // También buscar en la lista de "Mis Tareas"
+    document.querySelectorAll('.my-task-item').forEach(item => {
+        const titleEl = item.querySelector('.my-task-title');
+        const descEl = item.querySelector('.my-task-desc');
+        
+        const title = titleEl ? titleEl.textContent.toLowerCase() : '';
+        const desc = descEl ? descEl.textContent.toLowerCase() : '';
+        
+        const matches = title.includes(query) || desc.includes(query);
+        item.style.display = matches ? 'flex' : 'none';
     });
 });
 
