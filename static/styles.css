@@ -1044,6 +1044,18 @@ body {
     background-size: 16px;
 }
 
+.select-styled option {
+    background: #1a1a2e;
+    color: var(--text-primary);
+    padding: 12px;
+}
+
+.select-styled option:hover,
+.select-styled option:checked {
+    background: var(--primary);
+    color: white;
+}
+
 .select-styled:focus {
     outline: none;
     border-color: var(--primary);
@@ -1282,7 +1294,7 @@ body {
 }
 
 .gantt-task-info {
-    width: 280px;
+    width: 340px;
     padding: 8px 16px;
     display: flex;
     align-items: flex-start;
@@ -1295,6 +1307,7 @@ body {
     flex-direction: column;
     gap: 4px;
     min-width: 0;
+    flex: 1;
 }
 
 .gantt-task-name {
@@ -1328,6 +1341,34 @@ body {
 
 .gantt-task-dates i {
     font-size: 0.6rem;
+}
+
+/* Métricas por tarea en el Gantt */
+.gantt-task-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 70px;
+    text-align: right;
+}
+
+.task-metric {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.task-metric i {
+    font-size: 0.6rem;
+    opacity: 0.7;
+}
+
+.task-effectiveness {
+    font-weight: 600;
+    font-size: 0.75rem;
 }
 
 .gantt-task-bar-container {

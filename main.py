@@ -650,33 +650,68 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
     
     stages = db.query(Stage).filter(Stage.project_id == project_id).order_by(Stage.position).all()
     today = datetime.now()
+    today = today.replace(hour=23, minute=59, second=59)  # Fin del día de hoy
     
     scheduled_progress = 0.0
     actual_progress = 0.0
     stage_details = []
+    task_details = []
     
+    # Calcular efectividad basada en todas las tareas del proyecto
+    all_tasks = db.query(Task).filter(Task.project_id == project_id).all()
+    tasks_with_dates = [t for t in all_tasks if t.start_date and t.due_date]
+    
+    for task in tasks_with_dates:
+        task_scheduled = 0.0
+        start_date = task.start_date.replace(hour=0, minute=0, second=0)
+        end_date = task.due_date.replace(hour=23, minute=59, second=59)
+        
+        if today >= end_date:
+            task_scheduled = 100.0  # Ya debería estar completa
+        elif today >= start_date:
+            total_days = max(1, (end_date - start_date).days)
+            elapsed_days = (today - start_date).days + 1  # +1 porque hoy cuenta
+            task_scheduled = min(100.0, (elapsed_days / total_days) * 100)
+        # else: task_scheduled = 0 (aún no ha comenzado)
+        
+        # Efectividad de la tarea
+        if task_scheduled > 0:
+            task_effectiveness = (task.progress / task_scheduled) * 100
+        else:
+            task_effectiveness = 100.0 if task.progress == 0 else 100.0  # Adelantado si tiene progreso antes de empezar
+        
+        task_details.append({
+            "id": task.id,
+            "title": task.title,
+            "scheduled_progress": round(task_scheduled, 1),
+            "actual_progress": task.progress,
+            "effectiveness": round(task_effectiveness, 1)
+        })
+    
+    # Calcular promedio global basado en tareas
+    if tasks_with_dates:
+        scheduled_progress = sum(t["scheduled_progress"] for t in task_details) / len(task_details)
+        actual_progress = sum(t["actual_progress"] for t in task_details) / len(task_details)
+    
+    # Si hay etapas, también calcular por etapas
     for stage in stages:
-        # Calcular progreso programado de esta etapa
         stage_scheduled = 0.0
         if stage.start_date and stage.end_date:
-            if today >= stage.end_date:
-                stage_scheduled = 100.0  # Ya debería estar completa
-            elif today >= stage.start_date:
-                total_days = (stage.end_date - stage.start_date).days
-                elapsed_days = (today - stage.start_date).days
-                stage_scheduled = min(100.0, (elapsed_days / total_days) * 100) if total_days > 0 else 0
+            stage_start = stage.start_date.replace(hour=0, minute=0, second=0)
+            stage_end = stage.end_date.replace(hour=23, minute=59, second=59)
+            
+            if today >= stage_end:
+                stage_scheduled = 100.0
+            elif today >= stage_start:
+                total_days = max(1, (stage_end - stage_start).days)
+                elapsed_days = (today - stage_start).days + 1
+                stage_scheduled = min(100.0, (elapsed_days / total_days) * 100)
         
-        # Calcular progreso real de esta etapa (promedio de sus tareas)
         stage_tasks = db.query(Task).filter(Task.stage_id == stage.id).all()
         if stage_tasks:
             stage_actual = sum(t.progress for t in stage_tasks) / len(stage_tasks)
         else:
             stage_actual = 0.0
-        
-        # Contribución ponderada al proyecto
-        weight = stage.percentage / 100
-        scheduled_progress += stage_scheduled * weight
-        actual_progress += stage_actual * weight
         
         stage_details.append({
             "id": stage.id,
@@ -688,24 +723,7 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
             "end_date": stage.end_date.isoformat() if stage.end_date else None
         })
     
-    # Si no hay etapas, calcular basado en tareas directamente
-    if not stages:
-        tasks = db.query(Task).filter(Task.project_id == project_id).all()
-        if tasks:
-            tasks_with_dates = [t for t in tasks if t.start_date and t.due_date]
-            if tasks_with_dates:
-                for task in tasks_with_dates:
-                    if today >= task.due_date:
-                        scheduled_progress += 100 / len(tasks_with_dates)
-                    elif today >= task.start_date:
-                        total_days = (task.due_date - task.start_date).days
-                        elapsed_days = (today - task.start_date).days
-                        task_scheduled = min(100.0, (elapsed_days / total_days) * 100) if total_days > 0 else 0
-                        scheduled_progress += task_scheduled / len(tasks_with_dates)
-                
-                actual_progress = sum(t.progress for t in tasks) / len(tasks)
-    
-    # Calcular efectividad
+    # Calcular efectividad global
     if scheduled_progress > 0:
         effectiveness = (actual_progress / scheduled_progress) * 100
     else:
@@ -741,7 +759,8 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
             "status": status,
             "days_difference": days_difference
         },
-        "stages": stage_details
+        "stages": stage_details,
+        "tasks": task_details
     }
 
 # ===================== TAREAS =====================
@@ -810,11 +829,11 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
     if not current_user.is_admin:
         if db_task.assignee_id != current_user.id:
             raise HTTPException(status_code=403, detail="Solo puedes actualizar tareas asignadas a ti")
-        # Usuarios normales solo pueden cambiar progreso, no otros campos
-        allowed_fields = {'progress'}
+        # Usuarios normales pueden cambiar: estado, descripción, progreso y etapa
+        allowed_fields = {'status', 'description', 'progress', 'stage_id'}
         update_fields = set(task.model_dump(exclude_unset=True).keys())
         if not update_fields.issubset(allowed_fields):
-            raise HTTPException(status_code=403, detail="Solo puedes actualizar el progreso de tus tareas")
+            raise HTTPException(status_code=403, detail="Solo puedes actualizar estado, descripción, progreso y etapa de tus tareas")
     
     old_status = db_task.status
     

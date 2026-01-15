@@ -841,7 +841,33 @@ function openTaskModal(taskId) {
     document.getElementById('task-stage').value = task.stage_id || '';
     
     document.getElementById('task-modal-title').textContent = 'Editar Tarea';
-    document.getElementById('delete-task-btn').style.display = 'block';
+    
+    // Configurar visibilidad según rol
+    const isAdmin = currentUser && currentUser.is_admin;
+    const isMyTask = task.assignee_id === currentUser?.id;
+    
+    // Mostrar/ocultar botón eliminar (solo admin)
+    document.getElementById('delete-task-btn').style.display = isAdmin ? 'block' : 'none';
+    
+    // Campos que solo admin puede editar
+    document.getElementById('task-title').disabled = !isAdmin;
+    document.getElementById('task-priority').disabled = !isAdmin;
+    document.getElementById('task-start').disabled = !isAdmin;
+    document.getElementById('task-due').disabled = !isAdmin;
+    document.getElementById('task-assignee').disabled = !isAdmin;
+    
+    // Campos que usuarios normales pueden editar (si es su tarea)
+    const canEdit = isAdmin || isMyTask;
+    document.getElementById('task-status').disabled = !canEdit;
+    document.getElementById('task-description').disabled = !canEdit;
+    document.getElementById('task-progress').disabled = !canEdit;
+    document.getElementById('task-stage').disabled = !canEdit;
+    
+    // Mostrar botón guardar solo si puede editar algo
+    const submitBtn = document.querySelector('#task-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.style.display = canEdit ? 'block' : 'none';
+    }
     
     openModal('task-modal');
 }
@@ -854,22 +880,39 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const taskId = document.getElementById('task-id').value;
-    const assigneeValue = document.getElementById('task-assignee').value;
-    const stageValue = document.getElementById('task-stage').value;
-    const startDateValue = document.getElementById('task-start').value;
-    const dueDateValue = document.getElementById('task-due').value;
+    const isAdmin = currentUser && currentUser.is_admin;
     
-    const taskData = {
-        title: document.getElementById('task-title').value,
-        description: document.getElementById('task-description').value || null,
-        status: document.getElementById('task-status').value,
-        priority: document.getElementById('task-priority').value,
-        assignee_id: assigneeValue ? parseInt(assigneeValue) : null,
-        stage_id: stageValue ? parseInt(stageValue) : null,
-        start_date: startDateValue ? new Date(startDateValue).toISOString() : null,
-        due_date: dueDateValue ? new Date(dueDateValue).toISOString() : null,
-        progress: parseInt(document.getElementById('task-progress').value) || 0
-    };
+    let taskData;
+    
+    if (isAdmin) {
+        // Admin puede enviar todos los campos
+        const assigneeValue = document.getElementById('task-assignee').value;
+        const stageValue = document.getElementById('task-stage').value;
+        const startDateValue = document.getElementById('task-start').value;
+        const dueDateValue = document.getElementById('task-due').value;
+        
+        taskData = {
+            title: document.getElementById('task-title').value,
+            description: document.getElementById('task-description').value || null,
+            status: document.getElementById('task-status').value,
+            priority: document.getElementById('task-priority').value,
+            assignee_id: assigneeValue ? parseInt(assigneeValue) : null,
+            stage_id: stageValue ? parseInt(stageValue) : null,
+            start_date: startDateValue ? new Date(startDateValue).toISOString() : null,
+            due_date: dueDateValue ? new Date(dueDateValue).toISOString() : null,
+            progress: parseInt(document.getElementById('task-progress').value) || 0
+        };
+    } else {
+        // Usuario normal solo puede enviar: estado, descripción, progreso, etapa
+        const stageValue = document.getElementById('task-stage').value;
+        
+        taskData = {
+            status: document.getElementById('task-status').value,
+            description: document.getElementById('task-description').value || null,
+            progress: parseInt(document.getElementById('task-progress').value) || 0,
+            stage_id: stageValue ? parseInt(stageValue) : null
+        };
+    }
     
     try {
         if (taskId) {
@@ -879,6 +922,11 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
             });
             showToast('Tarea actualizada', 'success');
         } else {
+            // Solo admin puede crear tareas
+            if (!isAdmin) {
+                showToast('Solo administradores pueden crear tareas', 'error');
+                return;
+            }
             await apiRequest(`/api/projects/${currentProject.id}/tasks`, {
                 method: 'POST',
                 body: JSON.stringify(taskData)
@@ -1201,7 +1249,44 @@ function renderGantt() {
         const startOffset = startDayOffset * ganttScale;
         const duration = durationDays * ganttScale;
         
-        console.log(`Tarea: ${task.title}, Start: ${start.toDateString()}, End: ${end.toDateString()}, Offset: ${startOffset}px, Duration: ${duration}px`);
+        // CALCULAR AVANCE PROGRAMADO DE ESTA TAREA
+        let scheduledProgress = 0;
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        if (today >= endDate) {
+            // Ya pasó la fecha de fin, debería estar al 100%
+            scheduledProgress = 100;
+        } else if (today >= startDate) {
+            // Estamos dentro del rango de la tarea
+            const totalDaysTask = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
+            const elapsedDays = (today - startDate) / (1000 * 60 * 60 * 24) + 1; // +1 porque hoy cuenta
+            scheduledProgress = Math.min(100, Math.round((elapsedDays / totalDaysTask) * 100));
+        }
+        // Si today < startDate, scheduledProgress = 0 (aún no ha comenzado)
+        
+        // CALCULAR EFECTIVIDAD DE LA TAREA
+        let taskEffectiveness = 100;
+        if (scheduledProgress > 0) {
+            taskEffectiveness = Math.round((task.progress / scheduledProgress) * 100);
+        } else if (task.progress > 0) {
+            taskEffectiveness = 100; // Adelantado si tiene progreso antes de empezar
+        }
+        
+        // Determinar color de efectividad
+        let effectivenessColor = '#10b981'; // verde
+        let effectivenessIcon = '🚀';
+        if (taskEffectiveness < 100) {
+            effectivenessColor = '#ef4444'; // rojo
+            effectivenessIcon = '⚠️';
+        } else if (taskEffectiveness === 100) {
+            effectivenessColor = '#f59e0b'; // amarillo/naranja
+            effectivenessIcon = '✅';
+        }
+        
+        console.log(`Tarea: ${task.title}, Start: ${start.toDateString()}, End: ${end.toDateString()}, Programado: ${scheduledProgress}%, Real: ${task.progress}%, Efectividad: ${taskEffectiveness}%`);
         
         // Get assignee name
         const assignee = task.assignee_id ? users.find(u => u.id === task.assignee_id) : null;
@@ -1223,15 +1308,27 @@ function renderGantt() {
                         <span class="gantt-task-assignee"><i class="fas fa-user"></i> ${assigneeName}</span>
                         <span class="gantt-task-dates"><i class="fas fa-calendar"></i> ${startDateStr} - ${endDateStr}</span>
                     </div>
+                    <div class="gantt-task-metrics">
+                        <span class="task-metric" title="Avance programado a hoy"><i class="fas fa-calendar-check"></i> ${scheduledProgress}%</span>
+                        <span class="task-metric" title="Avance real"><i class="fas fa-tasks"></i> ${task.progress}%</span>
+                        <span class="task-metric task-effectiveness" style="color: ${effectivenessColor}" title="Efectividad">${effectivenessIcon} ${taskEffectiveness}%</span>
+                    </div>
                 </div>
                 <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
-                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"></div>` : ''}
-                    <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 30px; top: 5px; background: ${barColor}; border-radius: 6px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);" 
+                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"><span class="today-label">HOY</span></div>` : ''}
+                    <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 36px; top: 2px; background: ${barColor}; border-radius: 6px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); overflow: hidden;" 
                          class="gantt-task-bar"
                          data-id="${task.id}" 
-                         title="${task.title} (${startDateStr} - ${endDateStr}) - ${task.progress}%">
-                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${task.progress}%; background: rgba(255,255,255,0.3); border-radius: 6px 0 0 6px;"></div>
-                        <span style="color: white; font-size: 0.75rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); position: relative; z-index: 1;">${task.progress}%</span>
+                         title="Programado: ${scheduledProgress}% | Real: ${task.progress}% | Efectividad: ${taskEffectiveness}%">
+                        <!-- Barra de progreso programado (fondo gris más oscuro) -->
+                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${scheduledProgress}%; background: rgba(0,0,0,0.3); border-radius: 6px 0 0 6px;"></div>
+                        <!-- Barra de progreso real (overlay brillante) -->
+                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${task.progress}%; background: rgba(255,255,255,0.35); border-radius: 6px 0 0 6px;"></div>
+                        <!-- Indicadores de texto -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 8px; position: relative; z-index: 1; height: 100%;">
+                            <span style="color: rgba(255,255,255,0.8); font-size: 0.65rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">📅${scheduledProgress}%</span>
+                            <span style="color: white; font-size: 0.8rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${task.progress}%</span>
+                        </div>
                     </div>
                 </div>
             </div>
