@@ -958,14 +958,14 @@ function renderGantt() {
                         <span class="gantt-task-dates"><i class="fas fa-calendar"></i> ${startDateStr} - ${endDateStr}</span>
                     </div>
                 </div>
-                <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px; position: relative;">
+                <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
                     ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"></div>` : ''}
-                    <div class="gantt-task-bar" 
-                         style="position: absolute; left: ${startOffset}px; width: ${duration}px; background-color: ${barColor}; height: 36px; top: 2px;" 
+                    <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 30px; top: 5px; background: ${barColor}; border-radius: 6px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);" 
+                         class="gantt-task-bar"
                          data-id="${task.id}" 
                          title="${task.title} (${startDateStr} - ${endDateStr}) - ${task.progress}%">
-                        <div class="gantt-bar-progress" style="width: ${task.progress}%;"></div>
-                        <span class="gantt-bar-text">${task.progress}%</span>
+                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${task.progress}%; background: rgba(255,255,255,0.3); border-radius: 6px 0 0 6px;"></div>
+                        <span style="color: white; font-size: 0.75rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); position: relative; z-index: 1;">${task.progress}%</span>
                     </div>
                 </div>
             </div>
