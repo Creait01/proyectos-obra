@@ -3,22 +3,54 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect
 from typing import List, Optional
 import json
+import os
 from datetime import datetime, timedelta
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity
+from models import Project, Task, User, Activity, TaskProgress
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
     UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse,
-    ActivityResponse, DashboardStats
+    ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
 
-# Crear tablas
-Base.metadata.create_all(bind=engine)
+# ===================== INICIALIZAR BASE DE DATOS =====================
+def init_database():
+    """Crear tablas - eliminar las viejas si tienen estructura incorrecta"""
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        
+        # Si la tabla users existe, verificar columnas
+        if 'users' in tables:
+            columns = [col['name'] for col in inspector.get_columns('users')]
+            
+            # Si faltan las nuevas columnas, eliminar TODAS las tablas
+            if 'is_admin' not in columns or 'is_approved' not in columns:
+                print("⚠️ Estructura de BD desactualizada. Recreando tablas...")
+                Base.metadata.drop_all(bind=engine)
+        
+        # Crear todas las tablas
+        Base.metadata.create_all(bind=engine)
+        print("✅ Base de datos inicializada correctamente")
+        
+    except Exception as e:
+        print(f"⚠️ Error verificando BD: {e}")
+        # Si hay cualquier error, intentar crear las tablas de cero
+        try:
+            Base.metadata.drop_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
+            print("✅ Base de datos recreada")
+        except Exception as e2:
+            print(f"❌ Error fatal: {e2}")
+
+# Inicializar DB
+init_database()
 
 # ===================== CREAR ADMIN POR DEFECTO =====================
 def create_default_admin():
@@ -40,6 +72,9 @@ def create_default_admin():
             print("✅ Usuario administrador creado: it@corpocrea.com")
         else:
             print("✅ Usuario administrador ya existe")
+    except Exception as e:
+        print(f"⚠️ Error creando admin: {e}")
+        db.rollback()
     finally:
         db.close()
 
@@ -210,6 +245,10 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
 
 @app.post("/api/projects", response_model=ProjectResponse)
 async def create_project(project: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Solo admins pueden crear proyectos
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear proyectos")
+    
     new_project = Project(
         name=project.name,
         description=project.description,
@@ -237,6 +276,10 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
 
 @app.put("/api/projects/{project_id}", response_model=ProjectResponse)
 async def update_project(project_id: int, project: ProjectUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Solo admins pueden editar proyectos
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar proyectos")
+    
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if not db_project:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -250,6 +293,10 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
 
 @app.delete("/api/projects/{project_id}")
 async def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Solo admins pueden eliminar proyectos
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar proyectos")
+    
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if not db_project:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
@@ -266,6 +313,10 @@ async def get_tasks(project_id: int, db: Session = Depends(get_db), current_user
 
 @app.post("/api/projects/{project_id}/tasks", response_model=TaskResponse)
 async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Solo admins pueden crear tareas
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear tareas")
+    
     # Obtener la última posición
     last_task = db.query(Task).filter(
         Task.project_id == project_id,
@@ -315,6 +366,16 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
     if not db_task:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
     
+    # Usuarios normales solo pueden actualizar tareas asignadas a ellos
+    if not current_user.is_admin:
+        if db_task.assignee_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Solo puedes actualizar tareas asignadas a ti")
+        # Usuarios normales solo pueden cambiar progreso, no otros campos
+        allowed_fields = {'progress'}
+        update_fields = set(task.model_dump(exclude_unset=True).keys())
+        if not update_fields.issubset(allowed_fields):
+            raise HTTPException(status_code=403, detail="Solo puedes actualizar el progreso de tus tareas")
+    
     old_status = db_task.status
     
     for key, value in task.model_dump(exclude_unset=True).items():
@@ -346,6 +407,10 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
 
 @app.delete("/api/tasks/{task_id}")
 async def delete_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Solo admins pueden eliminar tareas
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar tareas")
+    
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
@@ -360,6 +425,102 @@ async def delete_task(task_id: int, db: Session = Depends(get_db), current_user:
     }, str(project_id))
     
     return {"message": "Tarea eliminada"}
+
+# ===================== REGISTRO DE AVANCES =====================
+@app.post("/api/tasks/{task_id}/progress", response_model=TaskProgressResponse)
+async def register_progress(task_id: int, progress_data: TaskProgressCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Registrar avance con comentario en una tarea"""
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+    
+    # Solo el asignado o admin pueden registrar avance
+    if not current_user.is_admin and db_task.assignee_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Solo puedes registrar avance en tareas asignadas a ti")
+    
+    # Validar progreso
+    if progress_data.progress < 0 or progress_data.progress > 100:
+        raise HTTPException(status_code=400, detail="El progreso debe estar entre 0 y 100")
+    
+    # Guardar el progreso anterior
+    previous_progress = db_task.progress or 0
+    
+    # Crear registro de historial
+    progress_record = TaskProgress(
+        task_id=task_id,
+        user_id=current_user.id,
+        previous_progress=previous_progress,
+        new_progress=progress_data.progress,
+        comment=progress_data.comment
+    )
+    db.add(progress_record)
+    
+    # Actualizar el progreso de la tarea
+    db_task.progress = progress_data.progress
+    
+    # Si llega a 100%, marcar como completada
+    if progress_data.progress == 100:
+        db_task.status = "done"
+    elif progress_data.progress > 0 and db_task.status == "todo":
+        db_task.status = "in_progress"
+    
+    # Registrar actividad
+    activity = Activity(
+        action="progress_updated",
+        entity_type="task",
+        entity_id=db_task.id,
+        entity_name=db_task.title,
+        user_id=current_user.id,
+        details=f"Progreso: {previous_progress}% → {progress_data.progress}%"
+    )
+    db.add(activity)
+    
+    db.commit()
+    db.refresh(progress_record)
+    
+    # Broadcast
+    await manager.broadcast({
+        "type": "task_updated",
+        "task": TaskResponse.model_validate(db_task).model_dump(mode='json')
+    }, str(db_task.project_id))
+    
+    return TaskProgressResponse(
+        id=progress_record.id,
+        task_id=progress_record.task_id,
+        user_id=progress_record.user_id,
+        user_name=current_user.name,
+        previous_progress=progress_record.previous_progress,
+        new_progress=progress_record.new_progress,
+        comment=progress_record.comment,
+        created_at=progress_record.created_at
+    )
+
+@app.get("/api/tasks/{task_id}/progress", response_model=List[TaskProgressResponse])
+async def get_progress_history(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener historial de avances de una tarea"""
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+    
+    progress_records = db.query(TaskProgress).filter(
+        TaskProgress.task_id == task_id
+    ).order_by(TaskProgress.created_at.desc()).all()
+    
+    result = []
+    for record in progress_records:
+        user = db.query(User).filter(User.id == record.user_id).first()
+        result.append(TaskProgressResponse(
+            id=record.id,
+            task_id=record.task_id,
+            user_id=record.user_id,
+            user_name=user.name if user else "Usuario eliminado",
+            previous_progress=record.previous_progress,
+            new_progress=record.new_progress,
+            comment=record.comment,
+            created_at=record.created_at
+        ))
+    
+    return result
 
 # ===================== DASHBOARD =====================
 @app.get("/api/dashboard/stats", response_model=DashboardStats)

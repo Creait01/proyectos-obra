@@ -516,13 +516,67 @@
                     <input type="range" id="task-progress" min="0" max="100" value="0">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-danger" id="delete-task-btn" style="margin-right: auto;">
+                    <button type="button" class="btn btn-danger admin-only" id="delete-task-btn" style="margin-right: auto;">
                         <i class="fas fa-trash"></i> Eliminar
                     </button>
                     <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="submit" class="btn btn-primary admin-only">Guardar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Progress Modal (para usuarios normales) -->
+    <div class="modal-overlay" id="progress-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-line"></i> Registrar Avance</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="progress-form">
+                <input type="hidden" id="progress-task-id">
+                <div class="progress-task-info">
+                    <h3 id="progress-task-title"></h3>
+                    <p id="progress-current">Progreso actual: <span>0%</span></p>
+                </div>
+                <div class="form-group">
+                    <label>Nuevo Progreso: <span id="new-progress-value">0</span>%</label>
+                    <input type="range" id="new-progress" min="0" max="100" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Comentario (opcional)</label>
+                    <textarea id="progress-comment" rows="3" placeholder="Describe el avance realizado..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="openProgressHistory()">
+                        <i class="fas fa-history"></i> Ver Historial
+                    </button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Avance
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Progress History Modal -->
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal glass-card modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-history"></i> Historial de Avances</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="history-content" id="history-content">
+                <div class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <p>No hay registros de avance</p>
+                </div>
+            </div>
         </div>
     </div>
 

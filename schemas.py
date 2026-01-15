@@ -100,6 +100,24 @@ class TaskResponse(TaskBase):
     class Config:
         from_attributes = True
 
+# ===================== TASK PROGRESS SCHEMAS =====================
+class TaskProgressCreate(BaseModel):
+    progress: float
+    comment: Optional[str] = None
+
+class TaskProgressResponse(BaseModel):
+    id: int
+    task_id: int
+    user_id: int
+    user_name: Optional[str] = None
+    previous_progress: float
+    new_progress: float
+    comment: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
 # ===================== ACTIVITY SCHEMAS =====================
 class ActivityResponse(BaseModel):
     id: int

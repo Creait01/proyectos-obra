@@ -205,6 +205,15 @@ async function initApp() {
 function setupAdminUI() {
     if (!currentUser) return;
     
+    // Aplicar clase según rol
+    if (currentUser.is_admin) {
+        document.body.classList.remove('user-role');
+        document.body.classList.add('admin-role');
+    } else {
+        document.body.classList.remove('admin-role');
+        document.body.classList.add('user-role');
+    }
+    
     // Mostrar/ocultar opción de administración
     const adminNav = document.querySelector('.nav-item[data-view="admin"]');
     if (currentUser.is_admin) {
@@ -230,6 +239,9 @@ function setupAdminUI() {
             }
         });
     });
+    
+    // Setup progress form
+    setupProgressForm();
 }
 
 function updateUserInfo() {
@@ -244,6 +256,11 @@ function updateUserInfo() {
     avatar.style.background = currentUser.avatar_color;
     userName.textContent = currentUser.name;
     userEmail.textContent = currentUser.email;
+    
+    // Mostrar badge de admin
+    if (currentUser.is_admin) {
+        userName.innerHTML = `${currentUser.name} <span class="user-badge admin" style="font-size:0.7rem;">Admin</span>`;
+    }
 }
 
 // ===================== NAVIGATION =====================
@@ -414,6 +431,7 @@ async function loadTasks() {
 
 function renderKanban() {
     const statuses = ['todo', 'in_progress', 'review', 'done'];
+    const isAdmin = currentUser && currentUser.is_admin;
     
     statuses.forEach(status => {
         const column = document.getElementById(`column-${status}`);
@@ -424,14 +442,22 @@ function renderKanban() {
         column.innerHTML = statusTasks.map(task => {
             const assignee = users.find(u => u.id === task.assignee_id);
             const overdue = task.status !== 'done' && isOverdue(task.due_date);
+            const isMyTask = task.assignee_id === currentUser?.id;
+            const canUpdateProgress = isMyTask || isAdmin;
             
             return `
-                <div class="task-card" data-id="${task.id}" draggable="true">
+                <div class="task-card" data-id="${task.id}" draggable="${isAdmin}">
                     <div class="task-card-header">
                         <span class="task-priority ${task.priority}">${task.priority}</span>
+                        ${task.progress > 0 ? `<span class="task-progress-badge">${task.progress}%</span>` : ''}
                     </div>
                     <div class="task-title">${task.title}</div>
                     ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+                    ${task.progress > 0 ? `
+                        <div class="task-progress-bar">
+                            <div class="task-progress-fill" style="width: ${task.progress}%"></div>
+                        </div>
+                    ` : ''}
                     <div class="task-footer">
                         ${task.due_date ? `
                             <span class="task-due ${overdue ? 'overdue' : ''}">
@@ -439,30 +465,53 @@ function renderKanban() {
                                 ${formatDate(task.due_date)}
                             </span>
                         ` : '<span></span>'}
-                        ${assignee ? `
-                            <div class="task-assignee" style="background: ${assignee.avatar_color}" title="${assignee.name}">
-                                ${getInitials(assignee.name)}
-                            </div>
-                        ` : ''}
+                        <div class="task-footer-right">
+                            ${canUpdateProgress && !isAdmin ? `
+                                <button class="btn-progress" onclick="event.stopPropagation(); openProgressModal(tasks.find(t => t.id === ${task.id}))" title="Registrar avance">
+                                    <i class="fas fa-chart-line"></i>
+                                </button>
+                            ` : ''}
+                            ${assignee ? `
+                                <div class="task-assignee" style="background: ${assignee.avatar_color}" title="${assignee.name}">
+                                    ${getInitials(assignee.name)}
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             `;
         }).join('');
         
-        // Add drag and drop listeners
+        // Add drag and drop listeners (solo para admin)
         column.querySelectorAll('.task-card').forEach(card => {
-            card.addEventListener('dragstart', handleDragStart);
-            card.addEventListener('dragend', handleDragEnd);
-            card.addEventListener('click', () => openTaskModal(parseInt(card.dataset.id)));
+            if (isAdmin) {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            }
+            card.addEventListener('click', (e) => {
+                // Evitar abrir modal si se hizo clic en el botón de progreso
+                if (e.target.closest('.btn-progress')) return;
+                
+                const taskId = parseInt(card.dataset.id);
+                const task = tasks.find(t => t.id === taskId);
+                
+                if (isAdmin) {
+                    openTaskModal(taskId);
+                } else if (task.assignee_id === currentUser?.id) {
+                    openProgressModal(task);
+                }
+            });
         });
     });
     
-    // Column drop listeners
-    document.querySelectorAll('.column-content').forEach(column => {
-        column.addEventListener('dragover', handleDragOver);
-        column.addEventListener('drop', handleDrop);
-        column.addEventListener('dragleave', handleDragLeave);
-    });
+    // Column drop listeners (solo para admin)
+    if (isAdmin) {
+        document.querySelectorAll('.column-content').forEach(column => {
+            column.addEventListener('dragover', handleDragOver);
+            column.addEventListener('drop', handleDrop);
+            column.addEventListener('dragleave', handleDragLeave);
+        });
+    }
 }
 
 function handleDragStart(e) {
@@ -1161,6 +1210,113 @@ async function deleteUser(userId) {
     } catch (error) {
         showToast(error.message, 'error');
     }
+}
+
+// ===================== PROGRESS FUNCTIONS =====================
+let currentProgressTaskId = null;
+
+function setupProgressForm() {
+    const progressSlider = document.getElementById('new-progress');
+    if (progressSlider) {
+        progressSlider.addEventListener('input', (e) => {
+            document.getElementById('new-progress-value').textContent = e.target.value;
+        });
+    }
+    
+    const progressForm = document.getElementById('progress-form');
+    if (progressForm) {
+        progressForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await submitProgress();
+        });
+    }
+}
+
+function openProgressModal(task) {
+    currentProgressTaskId = task.id;
+    document.getElementById('progress-task-id').value = task.id;
+    document.getElementById('progress-task-title').textContent = task.title;
+    document.getElementById('progress-current').querySelector('span').textContent = `${task.progress || 0}%`;
+    document.getElementById('new-progress').value = task.progress || 0;
+    document.getElementById('new-progress-value').textContent = task.progress || 0;
+    document.getElementById('progress-comment').value = '';
+    
+    openModal('progress-modal');
+}
+
+async function submitProgress() {
+    const taskId = document.getElementById('progress-task-id').value;
+    const progress = parseFloat(document.getElementById('new-progress').value);
+    const comment = document.getElementById('progress-comment').value;
+    
+    try {
+        await apiRequest(`/api/tasks/${taskId}/progress`, {
+            method: 'POST',
+            body: JSON.stringify({ progress, comment })
+        });
+        
+        showToast('Avance registrado correctamente', 'success');
+        closeModal('progress-modal');
+        loadTasks();
+        loadDashboard();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function openProgressHistory() {
+    if (!currentProgressTaskId) return;
+    
+    try {
+        const history = await apiRequest(`/api/tasks/${currentProgressTaskId}/progress`);
+        renderProgressHistory(history);
+        closeModal('progress-modal');
+        openModal('history-modal');
+    } catch (error) {
+        showToast('Error cargando historial', 'error');
+    }
+}
+
+function renderProgressHistory(history) {
+    const container = document.getElementById('history-content');
+    
+    if (history.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-clipboard-list"></i>
+                <p>No hay registros de avance</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = history.map(item => `
+        <div class="history-item">
+            <div class="history-avatar" style="background: ${getRandomColor(item.user_name)}">
+                ${getInitials(item.user_name)}
+            </div>
+            <div class="history-details">
+                <div class="history-header">
+                    <span class="history-user">${item.user_name}</span>
+                    <span class="history-date">${formatDateTime(item.created_at)}</span>
+                </div>
+                <div class="history-progress">
+                    <div class="history-progress-change">
+                        <span class="old">${item.previous_progress}%</span>
+                        <span class="arrow">→</span>
+                        <span class="new">${item.new_progress}%</span>
+                    </div>
+                </div>
+                ${item.comment ? `<div class="history-comment">"${item.comment}"</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function getRandomColor(name) {
+    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6'];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
 }
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {

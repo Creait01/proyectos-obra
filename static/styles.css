@@ -1910,3 +1910,159 @@ body {
         transform: translateX(0);
     }
 }
+
+/* ===================== PROGRESS MODAL STYLES ===================== */
+.progress-task-info {
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.progress-task-info h3 {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+}
+
+.progress-task-info p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.progress-task-info span {
+    color: var(--primary-light);
+    font-weight: 600;
+}
+
+/* History Timeline */
+.history-content {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.history-item {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    transition: var(--transition-fast);
+}
+
+.history-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--border-color);
+}
+
+.history-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.history-details {
+    flex: 1;
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.history-user {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.history-date {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.history-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.history-progress-change {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+}
+
+.history-progress-change .old {
+    color: var(--text-muted);
+}
+
+.history-progress-change .arrow {
+    color: var(--primary-light);
+}
+
+.history-progress-change .new {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.history-comment {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-style: italic;
+    border-left: 3px solid var(--primary);
+}
+
+/* Role-based visibility */
+.admin-only {
+    display: inline-flex;
+}
+
+body.user-role .admin-only {
+    display: none !important;
+}
+
+body.user-role #add-project-btn {
+    display: none !important;
+}
+
+body.user-role #add-task-btn {
+    display: none !important;
+}
+
+/* User task card action */
+.task-card .btn-progress {
+    padding: 6px 12px;
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-fast);
+}
+
+.task-card .btn-progress:hover {
+    background: #0ea371;
+    transform: translateY(-1px);
+}

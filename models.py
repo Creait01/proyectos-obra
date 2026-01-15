@@ -54,6 +54,22 @@ class Task(Base):
     
     project = relationship("Project", back_populates="tasks")
     assignee = relationship("User", back_populates="assigned_tasks")
+    progress_history = relationship("TaskProgress", back_populates="task", cascade="all, delete-orphan")
+
+class TaskProgress(Base):
+    """Historial de avances de una tarea con comentarios"""
+    __tablename__ = "task_progress"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    previous_progress = Column(Float, default=0)  # Progreso anterior
+    new_progress = Column(Float, nullable=False)  # Nuevo progreso
+    comment = Column(Text)  # Comentario del avance
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    task = relationship("Task", back_populates="progress_history")
+    user = relationship("User")
 
 class Activity(Base):
     __tablename__ = "activities"
