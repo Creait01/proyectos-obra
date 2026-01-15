@@ -1321,18 +1321,13 @@ function renderGantt() {
                         <span class="gantt-task-assignee"><i class="fas fa-user"></i> ${assigneeName}</span>
                         <span class="gantt-task-dates"><i class="fas fa-calendar"></i> ${startDateStr} - ${endDateStr}</span>
                     </div>
-                    <div class="gantt-task-metrics">
-                        <span class="task-metric" title="Avance programado a hoy"><i class="fas fa-calendar-check"></i> ${scheduledProgress}%</span>
-                        <span class="task-metric" title="Avance real"><i class="fas fa-tasks"></i> ${task.progress}%</span>
-                        <span class="task-metric task-effectiveness" style="color: ${effectivenessColor}" title="Efectividad">${effectivenessIcon} ${taskEffectiveness}%</span>
-                    </div>
                 </div>
                 <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
                     ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale}px;"></div>` : ''}
                     <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 36px; top: 2px; background: ${barColor}; border-radius: 6px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); overflow: hidden;" 
                          class="gantt-task-bar"
                          data-id="${task.id}" 
-                         title="Programado: ${scheduledProgress}% | Real: ${task.progress}% | Efectividad: ${taskEffectiveness}%">
+                         title="📅 Prog: ${scheduledProgress}% | ✅ Real: ${task.progress}% | ${effectivenessIcon} Efect: ${taskEffectiveness}%">
                         <!-- Barra de progreso programado (fondo gris más oscuro) -->
                         <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${scheduledProgress}%; background: rgba(0,0,0,0.3); border-radius: 6px 0 0 6px;"></div>
                         <!-- Barra de progreso real (overlay brillante) -->
