@@ -1227,7 +1227,7 @@ function renderGantt() {
         if (isToday) todayIndex = dayIndex;
         
         days.push(`
-            <div class="gantt-day ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" data-index="${dayIndex}">
+            <div class="gantt-day ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" data-index="${dayIndex}" style="width: ${ganttScale}px; min-width: ${ganttScale}px;">
                 <span class="gantt-day-date">${d.getDate()} ${monthNames[d.getMonth()]}</span>
                 <span class="gantt-day-name">${dayNames[d.getDay()]}</span>
             </div>
@@ -1323,7 +1323,7 @@ function renderGantt() {
                     </div>
                 </div>
                 <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
-                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale}px;"></div>` : ''}
+                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${(todayIndex * ganttScale) + (ganttScale / 2)}px;"></div>` : ''}
                     <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 36px; top: 2px; background: ${barColor}; border-radius: 6px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); overflow: hidden;" 
                          class="gantt-task-bar"
                          data-id="${task.id}" 
