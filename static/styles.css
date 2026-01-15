@@ -1836,6 +1836,25 @@ body {
     transform: translateY(-1px);
 }
 
+.btn-remove-admin {
+    padding: 8px 16px;
+    background: var(--warning);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-fast);
+}
+
+.btn-remove-admin:hover {
+    background: #e67e00;
+    transform: translateY(-1px);
+}
+
 .admin-only.hidden {
     display: none !important;
 }

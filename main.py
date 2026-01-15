@@ -221,6 +221,22 @@ async def make_admin(user_id: int, db: Session = Depends(get_db), current_user: 
     db.commit()
     return {"message": f"Usuario {user.name} es ahora administrador"}
 
+@app.put("/api/admin/users/{user_id}/remove-admin")
+async def remove_admin(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden modificar roles")
+    
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="No puedes quitarte el rol de administrador a ti mismo")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    user.is_admin = False
+    db.commit()
+    return {"message": f"Usuario {user.name} ya no es administrador"}
+
 @app.delete("/api/admin/users/{user_id}")
 async def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not current_user.is_admin:

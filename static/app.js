@@ -1107,35 +1107,44 @@ function renderPendingUsers(users) {
 function renderAllUsersAdmin(allUsers) {
     const container = document.getElementById('all-users-list');
     
-    container.innerHTML = allUsers.map(user => `
+    container.innerHTML = allUsers.map(user => {
+        const isCurrentUser = user.id === currentUser.id;
+        
+        return `
         <div class="user-card" data-user-id="${user.id}">
             <div class="user-card-info">
                 <div class="avatar" style="background: ${user.avatar_color}">
                     ${getInitials(user.name)}
                 </div>
                 <div class="user-card-details">
-                    <h4>${user.name}</h4>
+                    <h4>${user.name} ${isCurrentUser ? '<small>(Tú)</small>' : ''}</h4>
                     <p>${user.email}</p>
                     <div class="user-card-meta">
-                        ${user.is_admin ? '<span class="user-badge admin">Admin</span>' : ''}
-                        ${user.is_approved ? '<span class="user-badge approved">Aprobado</span>' : '<span class="user-badge pending">Pendiente</span>'}
+                        ${user.is_admin ? '<span class="user-badge admin">Administrador</span>' : '<span class="user-badge user">Usuario</span>'}
+                        ${user.is_approved ? '' : '<span class="user-badge pending">Pendiente</span>'}
                     </div>
                 </div>
             </div>
             <div class="user-card-actions">
-                ${!user.is_admin && user.is_approved ? `
-                    <button class="btn-make-admin" onclick="makeAdmin(${user.id})">
-                        <i class="fas fa-crown"></i> Hacer Admin
-                    </button>
+                ${!isCurrentUser && user.is_approved ? `
+                    ${user.is_admin ? `
+                        <button class="btn-remove-admin" onclick="removeAdmin(${user.id})">
+                            <i class="fas fa-user"></i> Quitar Admin
+                        </button>
+                    ` : `
+                        <button class="btn-make-admin" onclick="makeAdmin(${user.id})">
+                            <i class="fas fa-crown"></i> Hacer Admin
+                        </button>
+                    `}
                 ` : ''}
-                ${user.id !== currentUser.id ? `
+                ${!isCurrentUser ? `
                     <button class="btn-reject" onclick="deleteUser(${user.id})">
                         <i class="fas fa-trash"></i>
                     </button>
                 ` : ''}
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 function updatePendingBadge(count) {
@@ -1189,6 +1198,21 @@ async function makeAdmin(userId) {
             method: 'PUT'
         });
         showToast('Usuario promovido a administrador', 'success');
+        loadAllUsersAdmin();
+        loadUsers();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function removeAdmin(userId) {
+    if (!confirm('¿Seguro que deseas quitar el rol de administrador a este usuario?')) return;
+    
+    try {
+        await apiRequest(`/api/admin/users/${userId}/remove-admin`, {
+            method: 'PUT'
+        });
+        showToast('Rol de administrador removido', 'success');
         loadAllUsersAdmin();
         loadUsers();
     } catch (error) {
