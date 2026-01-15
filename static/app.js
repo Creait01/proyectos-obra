@@ -678,15 +678,19 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const taskId = document.getElementById('task-id').value;
+    const assigneeValue = document.getElementById('task-assignee').value;
+    const startDateValue = document.getElementById('task-start').value;
+    const dueDateValue = document.getElementById('task-due').value;
+    
     const taskData = {
         title: document.getElementById('task-title').value,
-        description: document.getElementById('task-description').value,
+        description: document.getElementById('task-description').value || null,
         status: document.getElementById('task-status').value,
         priority: document.getElementById('task-priority').value,
-        assignee_id: document.getElementById('task-assignee').value || null,
-        start_date: document.getElementById('task-start').value || null,
-        due_date: document.getElementById('task-due').value || null,
-        progress: parseInt(document.getElementById('task-progress').value)
+        assignee_id: assigneeValue ? parseInt(assigneeValue) : null,
+        start_date: startDateValue ? new Date(startDateValue).toISOString() : null,
+        due_date: dueDateValue ? new Date(dueDateValue).toISOString() : null,
+        progress: parseInt(document.getElementById('task-progress').value) || 0
     };
     
     try {
