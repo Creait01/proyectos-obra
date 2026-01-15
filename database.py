@@ -3,14 +3,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-# Detectar entorno: usa PostgreSQL en producción, SQLite en local
+# Detectar entorno: usa MySQL en producción, SQLite en local
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
-    # Producción (Railway, Render, etc.) - PostgreSQL
-    # Railway usa postgres:// pero SQLAlchemy necesita postgresql://
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    # Producción (Railway) - MySQL
+    # Railway usa mysql:// pero SQLAlchemy necesita mysql+pymysql://
+    if DATABASE_URL.startswith("mysql://"):
+        DATABASE_URL = DATABASE_URL.replace("mysql://", "mysql+pymysql://", 1)
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 else:
     # Local - SQLite

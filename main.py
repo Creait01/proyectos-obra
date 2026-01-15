@@ -28,16 +28,18 @@ def init_database():
         Base.metadata.create_all(bind=engine)
         print("✅ Base de datos inicializada correctamente")
         
-        # Verificar y crear tabla project_members si no existe
+        # Verificar y crear tabla project_members si no existe (MySQL syntax)
         from sqlalchemy import text
         with engine.connect() as conn:
             try:
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS project_members (
-                        id SERIAL PRIMARY KEY,
-                        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
-                        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                        added_at TIMESTAMP DEFAULT NOW()
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        project_id INT,
+                        user_id INT,
+                        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                     )
                 """))
                 conn.commit()
