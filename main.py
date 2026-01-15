@@ -14,7 +14,7 @@ from models import Project, Task, User, Activity, TaskProgress
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
-    UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse,
+    UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse, UserUpdate,
     ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
@@ -238,7 +238,7 @@ async def remove_admin(user_id: int, db: Session = Depends(get_db), current_user
     return {"message": f"Usuario {user.name} ya no es administrador"}
 
 @app.put("/api/admin/users/{user_id}")
-async def update_user(user_id: int, user_data: schemas.UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Solo administradores pueden editar usuarios")
     
