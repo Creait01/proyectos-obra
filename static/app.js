@@ -855,9 +855,15 @@ function renderGantt() {
         }
     });
     
-    // Add padding
-    minDate.setDate(minDate.getDate() - 3);
-    maxDate.setDate(maxDate.getDate() + 7);
+    // Add padding - mostrar al menos 30 días
+    minDate.setDate(minDate.getDate() - 7);
+    maxDate.setDate(maxDate.getDate() + 30);
+    
+    // Asegurar mínimo 45 días de visualización
+    const diffDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
+    if (diffDays < 45) {
+        maxDate.setDate(maxDate.getDate() + (45 - diffDays));
+    }
     
     // Render timeline with full dates
     const timeline = document.getElementById('gantt-timeline');
