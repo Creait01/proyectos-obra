@@ -855,14 +855,14 @@ function renderGantt() {
         }
     });
     
-    // Add padding - mostrar al menos 30 días
+    // Add padding - mostrar al menos 90 días
     minDate.setDate(minDate.getDate() - 7);
-    maxDate.setDate(maxDate.getDate() + 30);
+    maxDate.setDate(maxDate.getDate() + 90);
     
-    // Asegurar mínimo 45 días de visualización
+    // Asegurar mínimo 120 días de visualización
     const diffDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
-    if (diffDays < 45) {
-        maxDate.setDate(maxDate.getDate() + (45 - diffDays));
+    if (diffDays < 120) {
+        maxDate.setDate(maxDate.getDate() + (120 - diffDays));
     }
     
     // Render timeline with full dates
@@ -914,6 +914,10 @@ function renderGantt() {
         const assignee = task.assignee_id ? users.find(u => u.id === task.assignee_id) : null;
         const assigneeName = assignee ? assignee.name : 'Sin asignar';
         
+        // Formatear fechas para mostrar
+        const startDateStr = task.start_date ? new Date(task.start_date).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'}) : '';
+        const endDateStr = task.due_date ? new Date(task.due_date).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'}) : '';
+        
         return `
             <div class="gantt-task-row">
                 <div class="gantt-task-info">
@@ -921,11 +925,12 @@ function renderGantt() {
                     <div class="gantt-task-details">
                         <span class="gantt-task-name">${task.title}</span>
                         <span class="gantt-task-assignee"><i class="fas fa-user"></i> ${assigneeName}</span>
+                        <span class="gantt-task-dates"><i class="fas fa-calendar"></i> ${startDateStr} - ${endDateStr}</span>
                     </div>
                 </div>
                 <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
                     ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"></div>` : ''}
-                    <div class="gantt-task-bar" style="left: ${startOffset}px; width: ${duration}px; background: ${colors[task.status]};" data-id="${task.id}">
+                    <div class="gantt-task-bar" style="left: ${startOffset}px; width: ${duration}px; background: ${colors[task.status]};" data-id="${task.id}" title="${task.title} - ${task.progress}%">
                         <div class="gantt-bar-progress" style="width: ${task.progress}%"></div>
                         <span class="gantt-bar-text">${task.progress}%</span>
                     </div>
