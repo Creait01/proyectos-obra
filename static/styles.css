@@ -1269,16 +1269,30 @@ body {
 }
 
 .gantt-day.today {
-    background: rgba(99, 102, 241, 0.2);
+    background: rgba(99, 102, 241, 0.3);
     border-radius: var(--radius-sm);
+    position: relative;
+}
+
+.gantt-day.today::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 8px;
+    background: var(--primary);
 }
 
 .gantt-day.today .gantt-day-date {
-    color: var(--primary-light);
+    color: white;
+    font-weight: 700;
 }
 
 .gantt-day.today .gantt-day-name {
-    color: var(--primary);
+    color: var(--primary-light);
+    font-weight: 600;
 }
 
 .gantt-tasks {
@@ -1383,26 +1397,27 @@ body {
 
 .gantt-today-line {
     position: absolute;
-    top: -20px;
+    top: 0;
     bottom: 0;
-    width: 3px;
+    width: 2px;
     background: linear-gradient(to bottom, var(--primary), var(--secondary));
     z-index: 15;
-    box-shadow: 0 0 10px var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+    transform: translateX(-1px);
 }
 
 .gantt-today-line::before {
     content: 'HOY';
     position: absolute;
-    top: -18px;
+    top: -24px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 700;
     color: white;
     background: var(--primary);
-    padding: 3px 8px;
-    border-radius: 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
     white-space: nowrap;
 }
 
@@ -2593,13 +2608,14 @@ body.user-role #add-task-btn {
     padding: 15px;
     background: var(--bg-card);
     border-radius: var(--radius-md);
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 .gantt-effectiveness-item {
     display: flex;
     align-items: center;
     gap: 10px;
+    cursor: help;
 }
 
 .gantt-effectiveness-item .metric-value {
@@ -2610,6 +2626,20 @@ body.user-role #add-task-btn {
 .gantt-effectiveness-item .metric-label {
     font-size: 0.75rem;
     color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.info-icon {
+    font-size: 0.65rem;
+    opacity: 0.6;
+    cursor: help;
+}
+
+.info-icon:hover {
+    opacity: 1;
+    color: var(--primary);
 }
 
 .gantt-effectiveness-item.scheduled .metric-value {
@@ -2622,4 +2652,34 @@ body.user-role #add-task-btn {
 
 .gantt-effectiveness-item.effectiveness .metric-value {
     color: var(--primary);
+}
+
+/* Leyenda de cálculos */
+.gantt-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-md);
+    margin-bottom: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.legend-item i {
+    font-size: 0.75rem;
+    color: var(--primary-light);
+    opacity: 0.7;
+}
+
+.legend-item strong {
+    color: var(--text-secondary);
 }

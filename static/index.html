@@ -378,26 +378,42 @@
                     
                     <!-- Métricas de Efectividad del Gantt -->
                     <div class="gantt-effectiveness" id="gantt-effectiveness">
-                        <div class="gantt-effectiveness-item scheduled">
+                        <div class="gantt-effectiveness-item scheduled" title="Porcentaje que debería estar completado a día de hoy según las fechas de las tareas">
                             <div>
                                 <div class="metric-value" id="gantt-scheduled">--%</div>
-                                <div class="metric-label">Programado</div>
+                                <div class="metric-label">Programado <i class="fas fa-info-circle info-icon"></i></div>
                             </div>
                         </div>
-                        <div class="gantt-effectiveness-item actual">
+                        <div class="gantt-effectiveness-item actual" title="Porcentaje real de avance reportado en las tareas">
                             <div>
                                 <div class="metric-value" id="gantt-actual">--%</div>
-                                <div class="metric-label">Real</div>
+                                <div class="metric-label">Real <i class="fas fa-info-circle info-icon"></i></div>
                             </div>
                         </div>
-                        <div class="gantt-effectiveness-item effectiveness">
+                        <div class="gantt-effectiveness-item effectiveness" title="Efectividad = (Real / Programado) × 100. Mayor a 100% = Adelantado">
                             <div>
                                 <div class="metric-value" id="gantt-effectiveness-value">--%</div>
-                                <div class="metric-label">Efectividad</div>
+                                <div class="metric-label">Efectividad <i class="fas fa-info-circle info-icon"></i></div>
                             </div>
                         </div>
                         <div class="gantt-effectiveness-item" id="gantt-status-container">
                             <span id="gantt-status-text">Selecciona un proyecto</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Leyenda de cálculos -->
+                    <div class="gantt-legend">
+                        <div class="legend-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <span><strong>Programado:</strong> % que debería estar completado según fechas</span>
+                        </div>
+                        <div class="legend-item">
+                            <i class="fas fa-tasks"></i>
+                            <span><strong>Real:</strong> % de avance actual de las tareas</span>
+                        </div>
+                        <div class="legend-item">
+                            <i class="fas fa-chart-line"></i>
+                            <span><strong>Efectividad:</strong> Real ÷ Programado × 100 (≥100% = adelantado)</span>
                         </div>
                     </div>
                     

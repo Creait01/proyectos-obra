@@ -669,7 +669,10 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
         if today >= end_date:
             task_scheduled = 100.0  # Ya debería estar completa
         elif today >= start_date:
-            total_days = max(1, (end_date - start_date).days)
+            # Calcular días totales de la tarea (incluye día inicio y fin)
+            total_days = (end_date - start_date).days + 1
+            total_days = max(1, total_days)
+            # Días transcurridos desde el inicio hasta hoy
             elapsed_days = (today - start_date).days + 1  # +1 porque hoy cuenta
             task_scheduled = min(100.0, (elapsed_days / total_days) * 100)
         # else: task_scheduled = 0 (aún no ha comenzado)
@@ -737,17 +740,8 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
     else:
         status = "atrasado"
     
-    # Calcular días de diferencia aproximados
-    if project.start_date and project.end_date:
-        total_project_days = (project.end_date - project.start_date).days
-        if total_project_days > 0:
-            scheduled_days = (scheduled_progress / 100) * total_project_days
-            actual_days = (actual_progress / 100) * total_project_days
-            days_difference = int(actual_days - scheduled_days)
-        else:
-            days_difference = 0
-    else:
-        days_difference = 0
+    # Calcular diferencia de porcentaje
+    progress_difference = actual_progress - scheduled_progress
     
     return {
         "project_id": project_id,
@@ -757,7 +751,7 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
             "actual_progress": round(actual_progress, 1),
             "effectiveness": round(effectiveness, 1),
             "status": status,
-            "days_difference": days_difference
+            "progress_difference": round(progress_difference, 1)
         },
         "stages": stage_details,
         "tasks": task_details

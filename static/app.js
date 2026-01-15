@@ -1016,13 +1016,19 @@ async function loadProjectEffectiveness(projectId) {
             en_tiempo: 'fa-check-circle',
             atrasado: 'fa-exclamation-triangle'
         };
-        const statusTexts = {
-            adelantado: `¡Adelantado! +${Math.abs(metrics.days_difference)} días`,
-            en_tiempo: 'En tiempo',
-            atrasado: `Atrasado ${Math.abs(metrics.days_difference)} días`
-        };
         
-        statusEl.innerHTML = `<i class="fas ${statusIcons[metrics.status]}"></i><span>${statusTexts[metrics.status]}</span>`;
+        // Usar diferencia de porcentaje en lugar de días
+        const diff = metrics.progress_difference;
+        let statusText = '';
+        if (diff > 0) {
+            statusText = `¡Adelantado! +${Math.abs(diff)}%`;
+        } else if (diff >= -10) {
+            statusText = `En tiempo (${diff}%)`;
+        } else {
+            statusText = `Atrasado ${Math.abs(diff)}%`;
+        }
+        
+        statusEl.innerHTML = `<i class="fas ${statusIcons[metrics.status]}"></i><span>${statusText}</span>`;
     } catch (error) {
         console.error('Error loading effectiveness:', error);
     }
@@ -1125,12 +1131,17 @@ async function updateGanttEffectiveness() {
         document.getElementById('gantt-actual').textContent = `${metrics.actual_progress}%`;
         document.getElementById('gantt-effectiveness-value').textContent = `${metrics.effectiveness}%`;
         
-        const statusTexts = {
-            adelantado: `🚀 ¡Adelantado! +${Math.abs(metrics.days_difference)} días`,
-            en_tiempo: `✅ En tiempo`,
-            atrasado: `⚠️ Atrasado ${Math.abs(metrics.days_difference)} días`
-        };
-        document.getElementById('gantt-status-text').textContent = statusTexts[metrics.status];
+        // Mostrar diferencia de porcentaje
+        const diff = metrics.progress_difference;
+        let statusText = '';
+        if (diff > 0) {
+            statusText = `🚀 ¡Adelantado! +${Math.abs(diff)}%`;
+        } else if (diff >= -10) {
+            statusText = `✅ En tiempo (${diff}%)`;
+        } else {
+            statusText = `⚠️ Atrasado ${Math.abs(diff)}%`;
+        }
+        document.getElementById('gantt-status-text').textContent = statusText;
         
         // Colorear según estado
         const effectivenessEl = document.getElementById('gantt-effectiveness-value');
@@ -1261,8 +1272,10 @@ function renderGantt() {
             scheduledProgress = 100;
         } else if (today >= startDate) {
             // Estamos dentro del rango de la tarea
-            const totalDaysTask = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
-            const elapsedDays = (today - startDate) / (1000 * 60 * 60 * 24) + 1; // +1 porque hoy cuenta
+            // Calcular días totales (incluye día inicio y fin)
+            const totalDaysTask = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+            // Días transcurridos desde el inicio hasta hoy
+            const elapsedDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
             scheduledProgress = Math.min(100, Math.round((elapsedDays / totalDaysTask) * 100));
         }
         // Si today < startDate, scheduledProgress = 0 (aún no ha comenzado)
@@ -1315,7 +1328,7 @@ function renderGantt() {
                     </div>
                 </div>
                 <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
-                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"><span class="today-label">HOY</span></div>` : ''}
+                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"></div>` : ''}
                     <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 36px; top: 2px; background: ${barColor}; border-radius: 6px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); overflow: hidden;" 
                          class="gantt-task-bar"
                          data-id="${task.id}" 
