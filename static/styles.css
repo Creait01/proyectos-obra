@@ -2066,3 +2066,33 @@ body.user-role #add-task-btn {
     background: #0ea371;
     transform: translateY(-1px);
 }
+
+.task-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-progress-badge {
+    background: var(--success);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.task-progress-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+
+.task-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), #34d399);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
