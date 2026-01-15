@@ -10,13 +10,14 @@ import os
 from datetime import datetime, timedelta
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity, TaskProgress, ProjectMember
+from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
     UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse, UserUpdate,
     ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse,
-    ProjectMemberResponse
+    ProjectMemberResponse, StageCreate, StageResponse, StageUpdate,
+    EffectivenessMetric, ProjectEffectiveness
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
 
@@ -46,6 +47,39 @@ def init_database():
                 print("✅ Tabla project_members verificada")
             except Exception as e:
                 print(f"⚠️ Tabla project_members: {e}")
+            
+            # Crear tabla stages si no existe
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS stages (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        project_id INT NOT NULL,
+                        name VARCHAR(200) NOT NULL,
+                        description TEXT,
+                        percentage FLOAT NOT NULL,
+                        position INT DEFAULT 0,
+                        start_date DATETIME,
+                        end_date DATETIME,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla stages verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla stages: {e}")
+            
+            # Agregar columna stage_id a tasks si no existe
+            try:
+                conn.execute(text("""
+                    ALTER TABLE tasks ADD COLUMN stage_id INT,
+                    ADD FOREIGN KEY (stage_id) REFERENCES stages(id) ON DELETE SET NULL
+                """))
+                conn.commit()
+                print("✅ Columna stage_id agregada a tasks")
+            except Exception as e:
+                # Si ya existe, ignorar el error
+                pass
         
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
@@ -459,6 +493,257 @@ async def delete_project(project_id: int, db: Session = Depends(get_db), current
     db.commit()
     return {"message": "Proyecto eliminado"}
 
+# ===================== ETAPAS =====================
+@app.get("/api/projects/{project_id}/stages", response_model=List[StageResponse])
+async def get_stages(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener todas las etapas de un proyecto"""
+    stages = db.query(Stage).filter(Stage.project_id == project_id).order_by(Stage.position).all()
+    
+    # Calcular progreso de cada etapa basado en sus tareas
+    result = []
+    for stage in stages:
+        stage_tasks = db.query(Task).filter(Task.stage_id == stage.id).all()
+        if stage_tasks:
+            avg_progress = sum(t.progress for t in stage_tasks) / len(stage_tasks)
+        else:
+            avg_progress = 0
+        
+        result.append({
+            "id": stage.id,
+            "project_id": stage.project_id,
+            "name": stage.name,
+            "description": stage.description,
+            "percentage": stage.percentage,
+            "position": stage.position,
+            "start_date": stage.start_date,
+            "end_date": stage.end_date,
+            "created_at": stage.created_at,
+            "progress": round(avg_progress, 1)
+        })
+    
+    return result
+
+@app.post("/api/projects/{project_id}/stages", response_model=StageResponse)
+async def create_stage(project_id: int, stage: StageCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Crear una nueva etapa en un proyecto"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear etapas")
+    
+    # Verificar que el proyecto existe
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Obtener suma actual de porcentajes
+    existing_stages = db.query(Stage).filter(Stage.project_id == project_id).all()
+    total_percentage = sum(s.percentage for s in existing_stages)
+    
+    if total_percentage + stage.percentage > 100:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"La suma de porcentajes excede 100%. Disponible: {100 - total_percentage}%"
+        )
+    
+    # Obtener última posición
+    last_stage = db.query(Stage).filter(Stage.project_id == project_id).order_by(Stage.position.desc()).first()
+    position = (last_stage.position + 1) if last_stage else 0
+    
+    new_stage = Stage(
+        project_id=project_id,
+        name=stage.name,
+        description=stage.description,
+        percentage=stage.percentage,
+        position=stage.position if stage.position else position,
+        start_date=stage.start_date,
+        end_date=stage.end_date
+    )
+    
+    db.add(new_stage)
+    db.commit()
+    db.refresh(new_stage)
+    
+    return {
+        "id": new_stage.id,
+        "project_id": new_stage.project_id,
+        "name": new_stage.name,
+        "description": new_stage.description,
+        "percentage": new_stage.percentage,
+        "position": new_stage.position,
+        "start_date": new_stage.start_date,
+        "end_date": new_stage.end_date,
+        "created_at": new_stage.created_at,
+        "progress": 0
+    }
+
+@app.put("/api/stages/{stage_id}", response_model=StageResponse)
+async def update_stage(stage_id: int, stage: StageUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Actualizar una etapa"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar etapas")
+    
+    db_stage = db.query(Stage).filter(Stage.id == stage_id).first()
+    if not db_stage:
+        raise HTTPException(status_code=404, detail="Etapa no encontrada")
+    
+    # Si se actualiza el porcentaje, verificar que no exceda 100%
+    if stage.percentage is not None:
+        other_stages = db.query(Stage).filter(
+            Stage.project_id == db_stage.project_id,
+            Stage.id != stage_id
+        ).all()
+        total_other = sum(s.percentage for s in other_stages)
+        
+        if total_other + stage.percentage > 100:
+            raise HTTPException(
+                status_code=400,
+                detail=f"La suma de porcentajes excede 100%. Disponible: {100 - total_other}%"
+            )
+    
+    update_data = stage.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_stage, key, value)
+    
+    db.commit()
+    db.refresh(db_stage)
+    
+    # Calcular progreso
+    stage_tasks = db.query(Task).filter(Task.stage_id == stage_id).all()
+    progress = sum(t.progress for t in stage_tasks) / len(stage_tasks) if stage_tasks else 0
+    
+    return {
+        "id": db_stage.id,
+        "project_id": db_stage.project_id,
+        "name": db_stage.name,
+        "description": db_stage.description,
+        "percentage": db_stage.percentage,
+        "position": db_stage.position,
+        "start_date": db_stage.start_date,
+        "end_date": db_stage.end_date,
+        "created_at": db_stage.created_at,
+        "progress": round(progress, 1)
+    }
+
+@app.delete("/api/stages/{stage_id}")
+async def delete_stage(stage_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Eliminar una etapa"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar etapas")
+    
+    db_stage = db.query(Stage).filter(Stage.id == stage_id).first()
+    if not db_stage:
+        raise HTTPException(status_code=404, detail="Etapa no encontrada")
+    
+    # Desasociar tareas de esta etapa
+    db.query(Task).filter(Task.stage_id == stage_id).update({"stage_id": None})
+    
+    db.delete(db_stage)
+    db.commit()
+    return {"message": "Etapa eliminada"}
+
+# ===================== EFECTIVIDAD =====================
+@app.get("/api/projects/{project_id}/effectiveness")
+async def get_project_effectiveness(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Calcular métrica de efectividad del proyecto"""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    stages = db.query(Stage).filter(Stage.project_id == project_id).order_by(Stage.position).all()
+    today = datetime.now()
+    
+    scheduled_progress = 0.0
+    actual_progress = 0.0
+    stage_details = []
+    
+    for stage in stages:
+        # Calcular progreso programado de esta etapa
+        stage_scheduled = 0.0
+        if stage.start_date and stage.end_date:
+            if today >= stage.end_date:
+                stage_scheduled = 100.0  # Ya debería estar completa
+            elif today >= stage.start_date:
+                total_days = (stage.end_date - stage.start_date).days
+                elapsed_days = (today - stage.start_date).days
+                stage_scheduled = min(100.0, (elapsed_days / total_days) * 100) if total_days > 0 else 0
+        
+        # Calcular progreso real de esta etapa (promedio de sus tareas)
+        stage_tasks = db.query(Task).filter(Task.stage_id == stage.id).all()
+        if stage_tasks:
+            stage_actual = sum(t.progress for t in stage_tasks) / len(stage_tasks)
+        else:
+            stage_actual = 0.0
+        
+        # Contribución ponderada al proyecto
+        weight = stage.percentage / 100
+        scheduled_progress += stage_scheduled * weight
+        actual_progress += stage_actual * weight
+        
+        stage_details.append({
+            "id": stage.id,
+            "name": stage.name,
+            "percentage": stage.percentage,
+            "scheduled_progress": round(stage_scheduled, 1),
+            "actual_progress": round(stage_actual, 1),
+            "start_date": stage.start_date.isoformat() if stage.start_date else None,
+            "end_date": stage.end_date.isoformat() if stage.end_date else None
+        })
+    
+    # Si no hay etapas, calcular basado en tareas directamente
+    if not stages:
+        tasks = db.query(Task).filter(Task.project_id == project_id).all()
+        if tasks:
+            tasks_with_dates = [t for t in tasks if t.start_date and t.due_date]
+            if tasks_with_dates:
+                for task in tasks_with_dates:
+                    if today >= task.due_date:
+                        scheduled_progress += 100 / len(tasks_with_dates)
+                    elif today >= task.start_date:
+                        total_days = (task.due_date - task.start_date).days
+                        elapsed_days = (today - task.start_date).days
+                        task_scheduled = min(100.0, (elapsed_days / total_days) * 100) if total_days > 0 else 0
+                        scheduled_progress += task_scheduled / len(tasks_with_dates)
+                
+                actual_progress = sum(t.progress for t in tasks) / len(tasks)
+    
+    # Calcular efectividad
+    if scheduled_progress > 0:
+        effectiveness = (actual_progress / scheduled_progress) * 100
+    else:
+        effectiveness = 100.0 if actual_progress == 0 else 0.0
+    
+    # Determinar estado
+    if effectiveness >= 100:
+        status = "adelantado"
+    elif effectiveness >= 90:
+        status = "en_tiempo"
+    else:
+        status = "atrasado"
+    
+    # Calcular días de diferencia aproximados
+    if project.start_date and project.end_date:
+        total_project_days = (project.end_date - project.start_date).days
+        if total_project_days > 0:
+            scheduled_days = (scheduled_progress / 100) * total_project_days
+            actual_days = (actual_progress / 100) * total_project_days
+            days_difference = int(actual_days - scheduled_days)
+        else:
+            days_difference = 0
+    else:
+        days_difference = 0
+    
+    return {
+        "project_id": project_id,
+        "project_name": project.name,
+        "metrics": {
+            "scheduled_progress": round(scheduled_progress, 1),
+            "actual_progress": round(actual_progress, 1),
+            "effectiveness": round(effectiveness, 1),
+            "status": status,
+            "days_difference": days_difference
+        },
+        "stages": stage_details
+    }
+
 # ===================== TAREAS =====================
 @app.get("/api/projects/{project_id}/tasks", response_model=List[TaskResponse])
 async def get_tasks(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -485,6 +770,7 @@ async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(g
         status=task.status,
         priority=task.priority,
         project_id=project_id,
+        stage_id=task.stage_id,
         assignee_id=task.assignee_id,
         position=position,
         start_date=task.start_date,

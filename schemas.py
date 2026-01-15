@@ -72,6 +72,35 @@ class ProjectMemberResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# ===================== STAGE SCHEMAS =====================
+class StageBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    percentage: float  # Porcentaje de la obra que representa esta etapa
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+class StageCreate(StageBase):
+    position: Optional[int] = 0
+
+class StageUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    percentage: Optional[float] = None
+    position: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+class StageResponse(StageBase):
+    id: int
+    project_id: int
+    position: int
+    created_at: datetime
+    progress: Optional[float] = 0  # Progreso calculado de las tareas
+    
+    class Config:
+        from_attributes = True
+
 class ProjectResponse(ProjectBase):
     id: int
     owner_id: int
@@ -94,6 +123,7 @@ class TaskBase(BaseModel):
 
 class TaskCreate(TaskBase):
     assignee_id: Optional[int] = None
+    stage_id: Optional[int] = None
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -102,6 +132,7 @@ class TaskUpdate(BaseModel):
     priority: Optional[str] = None
     position: Optional[int] = None
     assignee_id: Optional[int] = None
+    stage_id: Optional[int] = None
     start_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     progress: Optional[float] = None
@@ -109,6 +140,7 @@ class TaskUpdate(BaseModel):
 class TaskResponse(TaskBase):
     id: int
     project_id: int
+    stage_id: Optional[int]
     assignee_id: Optional[int]
     position: int
     created_at: datetime
@@ -161,3 +193,18 @@ class DashboardStats(BaseModel):
     low_priority_tasks: int
     overdue_tasks: int
     completion_rate: float
+
+# ===================== EFFECTIVENESS SCHEMAS =====================
+class EffectivenessMetric(BaseModel):
+    """Métrica de efectividad: % programado vs % real"""
+    scheduled_progress: float  # Porcentaje que debería llevar según fechas
+    actual_progress: float     # Porcentaje real completado
+    effectiveness: float       # Efectividad (actual/scheduled * 100)
+    status: str               # "adelantado", "en_tiempo", "atrasado"
+    days_difference: int      # Días de diferencia (+ adelantado, - atrasado)
+
+class ProjectEffectiveness(BaseModel):
+    project_id: int
+    project_name: str
+    metrics: EffectivenessMetric
+    stages: List[dict] = []  # Desglose por etapas

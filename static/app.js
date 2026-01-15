@@ -4,6 +4,7 @@ let currentProject = null;
 let projects = [];
 let tasks = [];
 let users = [];
+let stages = [];  // Etapas del proyecto actual
 let ws = null;
 let draggedTask = null;
 
@@ -350,8 +351,24 @@ async function selectProject(projectId) {
         document.getElementById(id).value = projectId;
     });
     
+    // Cargar etapas del proyecto
+    if (currentProject) {
+        stages = await loadProjectStages(projectId);
+        updateStageSelect();
+    } else {
+        stages = [];
+    }
+    
     await loadTasks();
     connectWebSocket();
+}
+
+function updateStageSelect() {
+    const select = document.getElementById('task-stage');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">Sin etapa</option>' + 
+        stages.map(s => `<option value="${s.id}">${s.name} (${s.percentage}%)</option>`).join('');
 }
 
 document.getElementById('kanban-project-select').addEventListener('change', (e) => {
@@ -396,6 +413,100 @@ function getSelectedMemberIds() {
     return Array.from(checkboxes).map(cb => parseInt(cb.value));
 }
 
+// ===================== ETAPAS DEL PROYECTO =====================
+let tempStages = [];  // Etapas temporales al crear/editar proyecto
+
+function renderStagesEditor(existingStages = []) {
+    tempStages = existingStages.map(s => ({...s}));
+    renderStagesList();
+}
+
+function renderStagesList() {
+    const container = document.getElementById('project-stages-container');
+    if (!container) return;
+    
+    container.innerHTML = tempStages.map((stage, index) => `
+        <div class="stage-item" data-index="${index}">
+            <div class="stage-item-header">
+                <input type="text" placeholder="Nombre de la etapa" value="${stage.name || ''}" 
+                       onchange="updateTempStage(${index}, 'name', this.value)">
+                <button type="button" class="btn-remove-stage" onclick="removeTempStage(${index})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="stage-item-row">
+                <input type="date" value="${stage.start_date ? stage.start_date.split('T')[0] : ''}" 
+                       placeholder="Inicio" onchange="updateTempStage(${index}, 'start_date', this.value)">
+                <input type="date" value="${stage.end_date ? stage.end_date.split('T')[0] : ''}" 
+                       placeholder="Fin" onchange="updateTempStage(${index}, 'end_date', this.value)">
+                <div class="stage-percentage">
+                    <input type="number" min="1" max="100" value="${stage.percentage || ''}" 
+                           placeholder="%" onchange="updateTempStage(${index}, 'percentage', parseFloat(this.value))">
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    updateStagesTotalDisplay();
+}
+
+function updateTempStage(index, field, value) {
+    if (tempStages[index]) {
+        tempStages[index][field] = value;
+        if (field === 'percentage') {
+            updateStagesTotalDisplay();
+        }
+    }
+}
+
+function removeTempStage(index) {
+    tempStages.splice(index, 1);
+    renderStagesList();
+}
+
+function addTempStage() {
+    tempStages.push({
+        name: '',
+        percentage: 0,
+        start_date: '',
+        end_date: ''
+    });
+    renderStagesList();
+}
+
+function updateStagesTotalDisplay() {
+    const total = tempStages.reduce((sum, s) => sum + (parseFloat(s.percentage) || 0), 0);
+    const display = document.getElementById('stages-total-percentage');
+    if (display) {
+        display.textContent = `${total}%`;
+        display.style.color = total === 100 ? 'var(--success)' : total > 100 ? 'var(--danger)' : 'var(--warning)';
+    }
+}
+
+function getValidStages() {
+    return tempStages.filter(s => s.name && s.percentage > 0).map(s => ({
+        name: s.name,
+        description: s.description || null,
+        percentage: s.percentage,
+        start_date: s.start_date || null,
+        end_date: s.end_date || null
+    }));
+}
+
+// Cargar etapas de un proyecto existente
+async function loadProjectStages(projectId) {
+    try {
+        const stagesData = await apiRequest(`/api/projects/${projectId}/stages`);
+        return stagesData;
+    } catch (error) {
+        console.error('Error loading stages:', error);
+        return [];
+    }
+}
+
+// Event listener para agregar etapa
+document.getElementById('add-stage-btn')?.addEventListener('click', addTempStage);
+
 document.getElementById('add-project-btn').addEventListener('click', () => {
     document.getElementById('project-id').value = '';
     document.getElementById('project-form').reset();
@@ -407,11 +518,14 @@ document.getElementById('add-project-btn').addEventListener('click', () => {
     // Seleccionar al usuario actual por defecto
     renderMembersSelector([currentUser.id]);
     
+    // Inicializar etapas vacías
+    renderStagesEditor([]);
+    
     openModal('project-modal');
 });
 
 // Función para abrir modal de editar proyecto
-function editProject(projectId) {
+async function editProject(projectId) {
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
     
@@ -431,6 +545,10 @@ function editProject(projectId) {
     const memberIds = project.members ? project.members.map(m => m.id) : [];
     renderMembersSelector(memberIds);
     
+    // Cargar etapas existentes
+    const existingStages = await loadProjectStages(projectId);
+    renderStagesEditor(existingStages);
+    
     openModal('project-modal');
 }
 
@@ -449,6 +567,16 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     const startDate = document.getElementById('project-start').value;
     const endDate = document.getElementById('project-end').value;
     const memberIds = getSelectedMemberIds();
+    const stagesToSave = getValidStages();
+    
+    // Validar que las etapas sumen 100% si hay etapas
+    if (stagesToSave.length > 0) {
+        const totalPercentage = stagesToSave.reduce((sum, s) => sum + s.percentage, 0);
+        if (totalPercentage !== 100) {
+            showToast(`Las etapas deben sumar 100% (actual: ${totalPercentage}%)`, 'warning');
+            return;
+        }
+    }
     
     const projectData = {
         name: document.getElementById('project-name').value,
@@ -460,6 +588,8 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     };
     
     try {
+        let savedProjectId = projectId;
+        
         if (projectId) {
             await apiRequest(`/api/projects/${projectId}`, {
                 method: 'PUT',
@@ -467,11 +597,49 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
             });
             showToast('Proyecto actualizado', 'success');
         } else {
-            await apiRequest('/api/projects', {
+            const newProject = await apiRequest('/api/projects', {
                 method: 'POST',
                 body: JSON.stringify(projectData)
             });
+            savedProjectId = newProject.id;
             showToast('Proyecto creado', 'success');
+        }
+        
+        // Guardar etapas
+        if (savedProjectId && stagesToSave.length > 0) {
+            // Obtener etapas existentes
+            const existingStages = await loadProjectStages(savedProjectId);
+            
+            // Eliminar etapas que ya no están
+            for (const existing of existingStages) {
+                const stillExists = tempStages.find(s => s.id === existing.id);
+                if (!stillExists) {
+                    await apiRequest(`/api/stages/${existing.id}`, { method: 'DELETE' });
+                }
+            }
+            
+            // Crear o actualizar etapas
+            for (let i = 0; i < stagesToSave.length; i++) {
+                const stageData = {
+                    ...stagesToSave[i],
+                    position: i,
+                    start_date: stagesToSave[i].start_date ? new Date(stagesToSave[i].start_date).toISOString() : null,
+                    end_date: stagesToSave[i].end_date ? new Date(stagesToSave[i].end_date).toISOString() : null
+                };
+                
+                const existingStage = tempStages[i];
+                if (existingStage && existingStage.id) {
+                    await apiRequest(`/api/stages/${existingStage.id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(stageData)
+                    });
+                } else {
+                    await apiRequest(`/api/projects/${savedProjectId}/stages`, {
+                        method: 'POST',
+                        body: JSON.stringify(stageData)
+                    });
+                }
+            }
         }
         
         closeModal('project-modal');
@@ -642,6 +810,7 @@ document.getElementById('add-task-btn').addEventListener('click', () => {
     document.getElementById('delete-task-btn').style.display = 'none';
     document.getElementById('progress-value').textContent = '0';
     updateAssigneeSelect();
+    updateStageSelect();
     openModal('task-modal');
 });
 
@@ -668,6 +837,9 @@ function openTaskModal(taskId) {
     updateAssigneeSelect();
     document.getElementById('task-assignee').value = task.assignee_id || '';
     
+    updateStageSelect();
+    document.getElementById('task-stage').value = task.stage_id || '';
+    
     document.getElementById('task-modal-title').textContent = 'Editar Tarea';
     document.getElementById('delete-task-btn').style.display = 'block';
     
@@ -683,6 +855,7 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
     
     const taskId = document.getElementById('task-id').value;
     const assigneeValue = document.getElementById('task-assignee').value;
+    const stageValue = document.getElementById('task-stage').value;
     const startDateValue = document.getElementById('task-start').value;
     const dueDateValue = document.getElementById('task-due').value;
     
@@ -692,6 +865,7 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
         status: document.getElementById('task-status').value,
         priority: document.getElementById('task-priority').value,
         assignee_id: assigneeValue ? parseInt(assigneeValue) : null,
+        stage_id: stageValue ? parseInt(stageValue) : null,
         start_date: startDateValue ? new Date(startDateValue).toISOString() : null,
         due_date: dueDateValue ? new Date(dueDateValue).toISOString() : null,
         progress: parseInt(document.getElementById('task-progress').value) || 0
@@ -750,10 +924,66 @@ async function loadDashboard() {
         
         renderStats(stats);
         renderActivities(activities);
+        renderEffectivenessProjectSelect();
     } catch (error) {
         console.error('Error loading dashboard:', error);
     }
 }
+
+function renderEffectivenessProjectSelect() {
+    const select = document.getElementById('effectiveness-project-select');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">Seleccionar proyecto</option>' + 
+        projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+async function loadProjectEffectiveness(projectId) {
+    if (!projectId) {
+        document.getElementById('effectiveness-value').textContent = '--%';
+        document.getElementById('scheduled-value').textContent = '0%';
+        document.getElementById('actual-value').textContent = '0%';
+        document.getElementById('scheduled-bar').style.width = '0%';
+        document.getElementById('actual-bar').style.width = '0%';
+        document.getElementById('effectiveness-status').className = 'effectiveness-status';
+        document.getElementById('effectiveness-status').innerHTML = '<i class="fas fa-clock"></i><span>Selecciona un proyecto</span>';
+        return;
+    }
+    
+    try {
+        const data = await apiRequest(`/api/projects/${projectId}/effectiveness`);
+        const metrics = data.metrics;
+        
+        document.getElementById('effectiveness-value').textContent = `${metrics.effectiveness}%`;
+        document.getElementById('scheduled-value').textContent = `${metrics.scheduled_progress}%`;
+        document.getElementById('actual-value').textContent = `${metrics.actual_progress}%`;
+        document.getElementById('scheduled-bar').style.width = `${metrics.scheduled_progress}%`;
+        document.getElementById('actual-bar').style.width = `${metrics.actual_progress}%`;
+        
+        const statusEl = document.getElementById('effectiveness-status');
+        statusEl.className = `effectiveness-status ${metrics.status}`;
+        
+        const statusIcons = {
+            adelantado: 'fa-rocket',
+            en_tiempo: 'fa-check-circle',
+            atrasado: 'fa-exclamation-triangle'
+        };
+        const statusTexts = {
+            adelantado: `¡Adelantado! +${Math.abs(metrics.days_difference)} días`,
+            en_tiempo: 'En tiempo',
+            atrasado: `Atrasado ${Math.abs(metrics.days_difference)} días`
+        };
+        
+        statusEl.innerHTML = `<i class="fas ${statusIcons[metrics.status]}"></i><span>${statusTexts[metrics.status]}</span>`;
+    } catch (error) {
+        console.error('Error loading effectiveness:', error);
+    }
+}
+
+// Event listener para el selector de efectividad
+document.getElementById('effectiveness-project-select')?.addEventListener('change', (e) => {
+    loadProjectEffectiveness(e.target.value);
+});
 
 function renderStats(stats) {
     document.getElementById('stat-projects').textContent = stats.total_projects;
@@ -830,8 +1060,44 @@ function renderActivities(activities) {
 // ===================== GANTT =====================
 let ganttScale = 40; // pixels per day
 
+async function updateGanttEffectiveness() {
+    if (!currentProject) {
+        document.getElementById('gantt-scheduled').textContent = '--%';
+        document.getElementById('gantt-actual').textContent = '--%';
+        document.getElementById('gantt-effectiveness-value').textContent = '--%';
+        document.getElementById('gantt-status-text').textContent = 'Selecciona un proyecto';
+        return;
+    }
+    
+    try {
+        const data = await apiRequest(`/api/projects/${currentProject.id}/effectiveness`);
+        const metrics = data.metrics;
+        
+        document.getElementById('gantt-scheduled').textContent = `${metrics.scheduled_progress}%`;
+        document.getElementById('gantt-actual').textContent = `${metrics.actual_progress}%`;
+        document.getElementById('gantt-effectiveness-value').textContent = `${metrics.effectiveness}%`;
+        
+        const statusTexts = {
+            adelantado: `🚀 ¡Adelantado! +${Math.abs(metrics.days_difference)} días`,
+            en_tiempo: `✅ En tiempo`,
+            atrasado: `⚠️ Atrasado ${Math.abs(metrics.days_difference)} días`
+        };
+        document.getElementById('gantt-status-text').textContent = statusTexts[metrics.status];
+        
+        // Colorear según estado
+        const effectivenessEl = document.getElementById('gantt-effectiveness-value');
+        effectivenessEl.style.color = metrics.status === 'adelantado' ? 'var(--success)' : 
+                                       metrics.status === 'atrasado' ? 'var(--danger)' : 'var(--warning)';
+    } catch (error) {
+        console.error('Error updating gantt effectiveness:', error);
+    }
+}
+
 function renderGantt() {
     console.log('renderGantt llamado - Proyecto:', currentProject?.name, '- Tareas:', tasks.length);
+    
+    // Actualizar efectividad
+    updateGanttEffectiveness();
     
     if (!currentProject) {
         document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Selecciona un proyecto para ver el Gantt</p>';

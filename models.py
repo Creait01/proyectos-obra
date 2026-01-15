@@ -35,6 +35,24 @@ class Project(Base):
     owner = relationship("User", back_populates="projects")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
+    stages = relationship("Stage", back_populates="project", cascade="all, delete-orphan", order_by="Stage.position")
+
+class Stage(Base):
+    """Etapas del proyecto - cada etapa representa un porcentaje de la obra"""
+    __tablename__ = "stages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(Text)
+    percentage = Column(Float, nullable=False)  # Porcentaje que representa esta etapa (suma total = 100%)
+    position = Column(Integer, default=0)  # Orden de la etapa
+    start_date = Column(DateTime)
+    end_date = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    project = relationship("Project", back_populates="stages")
+    tasks = relationship("Task", back_populates="stage")
 
 class ProjectMember(Base):
     """Miembros asignados a un proyecto"""
@@ -59,6 +77,7 @@ class Task(Base):
     position = Column(Integer, default=0)
     progress = Column(Float, default=0)  # 0-100 para Gantt
     project_id = Column(Integer, ForeignKey("projects.id"))
+    stage_id = Column(Integer, ForeignKey("stages.id"), nullable=True)  # Etapa a la que pertenece
     assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     start_date = Column(DateTime)
     due_date = Column(DateTime)
@@ -66,6 +85,7 @@ class Task(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     project = relationship("Project", back_populates="tasks")
+    stage = relationship("Stage", back_populates="tasks")
     assignee = relationship("User", back_populates="assigned_tasks")
     progress_history = relationship("TaskProgress", back_populates="task", cascade="all, delete-orphan")
 

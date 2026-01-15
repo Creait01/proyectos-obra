@@ -2348,3 +2348,237 @@ body.user-role #add-task-btn {
     border-radius: 2px;
     transition: width 0.3s ease;
 }
+
+/* ===================== ETAPAS DEL PROYECTO ===================== */
+.stages-container {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+.stage-item {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.stage-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.stage-item-header input {
+    flex: 1;
+    margin-right: 10px;
+}
+
+.stage-item-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 80px;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.stage-item-row input {
+    width: 100%;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.stage-item-row input[type="number"] {
+    text-align: center;
+}
+
+.stage-percentage {
+    position: relative;
+}
+
+.stage-percentage::after {
+    content: '%';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+.btn-remove-stage {
+    background: var(--danger);
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stages-total {
+    text-align: right;
+    padding: 8px 0;
+    border-top: 1px solid var(--border-color);
+    margin-top: 10px;
+}
+
+.stages-total strong {
+    color: var(--primary);
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+}
+
+/* ===================== EFECTIVIDAD ===================== */
+.effectiveness-card {
+    min-height: 280px;
+}
+
+.effectiveness-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.effectiveness-gauge {
+    text-align: center;
+    padding: 15px;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+}
+
+.gauge-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.gauge-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.effectiveness-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.effectiveness-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.effectiveness-item .label {
+    width: 80px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.effectiveness-item .value {
+    width: 45px;
+    text-align: right;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.progress-mini {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-mini-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.progress-mini-fill.scheduled {
+    background: linear-gradient(90deg, #64748b, #94a3b8);
+}
+
+.progress-mini-fill.actual {
+    background: linear-gradient(90deg, var(--success), #34d399);
+}
+
+.effectiveness-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.effectiveness-status.adelantado {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+}
+
+.effectiveness-status.en_tiempo {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--warning);
+}
+
+.effectiveness-status.atrasado {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+}
+
+/* ===================== GANTT EFFECTIVENESS ===================== */
+.gantt-effectiveness {
+    display: flex;
+    gap: 20px;
+    padding: 15px;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    margin-bottom: 15px;
+}
+
+.gantt-effectiveness-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gantt-effectiveness-item .metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.gantt-effectiveness-item .metric-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.gantt-effectiveness-item.scheduled .metric-value {
+    color: #94a3b8;
+}
+
+.gantt-effectiveness-item.actual .metric-value {
+    color: var(--success);
+}
+
+.gantt-effectiveness-item.effectiveness .metric-value {
+    color: var(--primary);
+}
