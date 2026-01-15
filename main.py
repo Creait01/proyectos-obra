@@ -21,33 +21,14 @@ from auth import get_current_user, create_access_token, verify_password, get_pas
 
 # ===================== INICIALIZAR BASE DE DATOS =====================
 def init_database():
-    """Crear tablas - eliminar las viejas si tienen estructura incorrecta"""
+    """Crear tablas si no existen - NO borrar datos existentes"""
     try:
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-        
-        # Si la tabla users existe, verificar columnas
-        if 'users' in tables:
-            columns = [col['name'] for col in inspector.get_columns('users')]
-            
-            # Si faltan las nuevas columnas, eliminar TODAS las tablas
-            if 'is_admin' not in columns or 'is_approved' not in columns:
-                print("⚠️ Estructura de BD desactualizada. Recreando tablas...")
-                Base.metadata.drop_all(bind=engine)
-        
-        # Crear todas las tablas
+        # Solo crear tablas que no existan (preserva datos)
         Base.metadata.create_all(bind=engine)
         print("✅ Base de datos inicializada correctamente")
         
     except Exception as e:
-        print(f"⚠️ Error verificando BD: {e}")
-        # Si hay cualquier error, intentar crear las tablas de cero
-        try:
-            Base.metadata.drop_all(bind=engine)
-            Base.metadata.create_all(bind=engine)
-            print("✅ Base de datos recreada")
-        except Exception as e2:
-            print(f"❌ Error fatal: {e2}")
+        print(f"⚠️ Error inicializando BD: {e}")
 
 # Inicializar DB
 init_database()
