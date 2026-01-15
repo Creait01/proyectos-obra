@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Executive Dashboard Template - Full LIVE Design -->
+    <t t-name="cash_register_close.ExecutiveDashboard" owl="1">
+        <div class="crc-executive-dashboard crc-live-theme">
+            <!-- Loading Overlay -->
+            <div t-if="state.loading" class="crc-loading-overlay">
+                <div class="crc-spinner"></div>
+                <span>Cargando datos en tiempo real...</span>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- HEADER - Estilo moderno oscuro -->
+            <!-- ========================================== -->
+            <div class="crc-live-header">
+                <div class="crc-header-left">
+                    <div class="crc-header-icon">
+                        <i class="fa fa-dashboard"></i>
+                    </div>
+                    <div class="crc-header-text">
+                        <h1>Dashboard Ejecutivo</h1>
+                        <p>Control de Efectivo en Tiempo Real</p>
+                    </div>
+                </div>
+                <div class="crc-header-right">
+                    <div class="crc-live-indicator">
+                        <span class="crc-live-dot"></span>
+                        <span>EN VIVO</span>
+                    </div>
+                    <button class="crc-refresh-btn" t-on-click="onRefresh">
+                        <i class="fa fa-refresh"></i>
+                        Actualizar
+                    </button>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- SALDOS ACTUALES - Cards principales -->
+            <!-- ========================================== -->
+            <div class="crc-live-section crc-balance-section">
+                <div class="crc-section-title">
+                    <i class="fa fa-money"></i>
+                    <span>SALDO ACTUAL DE EFECTIVO</span>
+                    <span class="crc-live-badge">LIVE</span>
+                </div>
+                <div class="crc-live-grid crc-grid-3">
+                    <div class="crc-live-card crc-card-usd">
+                        <div class="crc-card-glow"></div>
+                        <div class="crc-card-icon">
+                            <i class="fa fa-dollar"></i>
+                        </div>
+                        <div class="crc-card-body">
+                            <span class="crc-card-label">Dólares Americanos</span>
+                            <span class="crc-card-value crc-value-large">$ <t t-esc="formatNumber(state.realtimeBalanceUsd || 0)"/></span>
+                        </div>
+                        <div class="crc-card-status">
+                            <i class="fa fa-circle crc-status-online"></i>
+                        </div>
+                    </div>
+                    <div class="crc-live-card crc-card-eur">
+                        <div class="crc-card-glow"></div>
+                        <div class="crc-card-icon">
+                            <i class="fa fa-euro"></i>
+                        </div>
+                        <div class="crc-card-body">
+                            <span class="crc-card-label">Euros</span>
+                            <span class="crc-card-value crc-value-large">€ <t t-esc="formatNumber(state.realtimeBalanceEur || 0)"/></span>
+                        </div>
+                        <div class="crc-card-status">
+                            <i class="fa fa-circle crc-status-online"></i>
+                        </div>
+                    </div>
+                    <div class="crc-live-card crc-card-bs">
+                        <div class="crc-card-glow"></div>
+                        <div class="crc-card-icon">
+                            <span class="crc-bs-icon">Bs</span>
+                        </div>
+                        <div class="crc-card-body">
+                            <span class="crc-card-label">Bolívares</span>
+                            <span class="crc-card-value crc-value-large">Bs <t t-esc="formatNumber(state.realtimeBalanceBs || 0)"/></span>
+                        </div>
+                        <div class="crc-card-status">
+                            <i class="fa fa-circle crc-status-online"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- MOVIMIENTOS HOY - Entradas y Salidas -->
+            <!-- ========================================== -->
+            <div class="crc-live-section crc-today-section">
+                <div class="crc-section-title">
+                    <i class="fa fa-calendar-check-o"></i>
+                    <span>MOVIMIENTOS DE HOY</span>
+                    <span class="crc-count-badge"><t t-esc="state.todayMovementsCount || 0"/> mov.</span>
+                </div>
+                <div class="crc-live-grid crc-grid-4">
+                    <!-- Entradas USD -->
+                    <div class="crc-live-card crc-card-income">
+                        <div class="crc-card-icon-sm">
+                            <i class="fa fa-arrow-down"></i>
+                        </div>
+                        <div class="crc-card-body">
+                            <span class="crc-card-label">Entradas USD</span>
+                            <span class="crc-card-value crc-value-income">$ <t t-esc="formatNumber(state.todayIncomeUsd || 0)"/></span>
+                        </div>
+                    </div>
+                    <!-- Salidas USD -->
+                    <div class="crc-live-card crc-card-expense">
+                        <div class="crc-card-icon-sm">
+                            <i class="fa fa-arrow-up"></i>
+                        </div>
+                        <div class="crc-card-body">
+                            <span class="crc-card-label">Salidas USD</span>
+                            <span class="crc-card-value crc-value-expense">$ <t t-esc="formatNumber(state.todayExpenseUsd || 0)"/></span>
+                        </div>
+                    </div>
+                    <!-- Entradas EUR -->
+                    <div class="crc-live-card crc-card-income">
+                        <div class="crc-card-icon-sm">
+                            <i class="fa fa-arrow-down"></i>
+                        </div>
+                        <div class="crc-card-body">
+                            <span class="crc-card-label">Entradas EUR</span>
+                            <span class="crc-card-value crc-value-income">€ <t t-esc="formatNumber(state.todayIncomeEur || 0)"/></span>
+                        </div>
+                    </div>
+                    <!-- Salidas EUR -->
+                    <div class="crc-live-card crc-card-expense">
+                        <div class="crc-card-icon-sm">
+                            <i class="fa fa-arrow-up"></i>
+                        </div>
+                        <div class="crc-card-body">
+                            <span class="crc-card-label">Salidas EUR</span>
+                            <span class="crc-card-value crc-value-expense">€ <t t-esc="formatNumber(state.todayExpenseEur || 0)"/></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- FLUJO DE CAJA - Gráfico principal con selector -->
+            <!-- ========================================== -->
+            <div class="crc-live-section crc-chart-section">
+                <div class="crc-section-title crc-section-with-selector">
+                    <div class="crc-title-left">
+                        <i class="fa fa-line-chart"></i>
+                        <span>FLUJO DE CAJA</span>
+                        <!-- Selector de Moneda USD/EUR -->
+                        <div class="crc-currency-toggle">
+                            <button t-attf-class="crc-currency-btn #{state.flowCurrency === 'USD' ? 'active' : ''}"
+                                    t-on-click="() => this.onFlowCurrencyChange('USD')">
+                                USD
+                            </button>
+                            <button t-attf-class="crc-currency-btn #{state.flowCurrency === 'EUR' ? 'active' : ''}"
+                                    t-on-click="() => this.onFlowCurrencyChange('EUR')">
+                                EUR
+                            </button>
+                        </div>
+                    </div>
+                    <div class="crc-flow-period-selector">
+                        <button t-attf-class="crc-flow-btn #{state.flowPeriod === 'day' ? 'active' : ''}"
+                                t-on-click="() => this.onFlowPeriodChange('day')">
+                            <i class="fa fa-clock-o"></i>
+                            Hoy
+                        </button>
+                        <button t-attf-class="crc-flow-btn #{state.flowPeriod === 'month' ? 'active' : ''}"
+                                t-on-click="() => this.onFlowPeriodChange('month')">
+                            <i class="fa fa-calendar"></i>
+                            Mes
+                        </button>
+                        <button t-attf-class="crc-flow-btn #{state.flowPeriod === 'year' ? 'active' : ''}"
+                                t-on-click="() => this.onFlowPeriodChange('year')">
+                            <i class="fa fa-calendar-o"></i>
+                            Año
+                        </button>
+                    </div>
+                </div>
+                <div class="crc-chart-wrapper">
+                    <canvas t-ref="cashFlowChart"></canvas>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- BILLETES Y DENOMINACIONES -->
+            <!-- ========================================== -->
+            <div class="crc-live-section crc-distribution-section">
+                <div class="crc-section-title">
+                    <i class="fa fa-money"></i>
+                    <span>BILLETES Y DENOMINACIONES</span>
+                </div>
+                <div class="crc-live-grid crc-grid-3">
+                    <!-- Billetes en Mal Estado -->
+                    <div class="crc-live-card crc-list-card">
+                        <div class="crc-list-header">
+                            <span class="crc-list-title">
+                                <i class="fa fa-exclamation-triangle crc-warning-icon"></i>
+                                Billetes en Mal Estado
+                            </span>
+                            <span class="crc-list-badge crc-badge-warning">
+                                <t t-esc="state.badBillsData?.total_count || 0"/> billetes
+                            </span>
+                        </div>
+                        <div class="crc-list-body">
+                            <t t-if="state.badBillsData?.by_condition?.length > 0">
+                                <t t-foreach="state.badBillsData.by_condition" t-as="item" t-key="item.name">
+                                    <div class="crc-list-item">
+                                        <span class="crc-item-name"><t t-esc="item.name"/></span>
+                                        <span class="crc-item-qty"><t t-esc="item.quantity"/> uds</span>
+                                        <span class="crc-item-value crc-expense-text">$ <t t-esc="formatNumber(item.value)"/></span>
+                                    </div>
+                                </t>
+                            </t>
+                            <t t-else="">
+                                <div class="crc-empty-state">
+                                    <i class="fa fa-check-circle crc-success-icon"></i>
+                                    <span>Sin billetes dañados</span>
+                                </div>
+                            </t>
+                        </div>
+                        <div class="crc-list-footer">
+                            <span>Total USD:</span>
+                            <span class="crc-expense-text">$ <t t-esc="formatNumber(state.badBillsData?.total_value_usd || 0)"/></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Denominaciones USD -->
+                    <div class="crc-live-card crc-list-card">
+                        <div class="crc-list-header">
+                            <span class="crc-list-title">
+                                <i class="fa fa-usd crc-income-icon"></i>
+                                Denominaciones USD
+                            </span>
+                            <span class="crc-list-badge crc-badge-success">
+                                <t t-esc="state.denominationsData?.close_date || 'Último cierre'"/>
+                            </span>
+                        </div>
+                        <div class="crc-list-body crc-scrollable">
+                            <t t-if="state.denominationsData?.usd?.length > 0">
+                                <t t-foreach="state.denominationsData.usd" t-as="denom" t-key="denom.name">
+                                    <div class="crc-list-item">
+                                        <span class="crc-item-name"><t t-esc="denom.name"/></span>
+                                        <span class="crc-item-qty"><t t-esc="denom.quantity"/> uds</span>
+                                        <span class="crc-item-value crc-income-text">$ <t t-esc="formatNumber(denom.total)"/></span>
+                                    </div>
+                                </t>
+                            </t>
+                            <t t-else="">
+                                <div class="crc-empty-state">
+                                    <i class="fa fa-info-circle"></i>
+                                    <span>Sin datos de denominaciones</span>
+                                </div>
+                            </t>
+                        </div>
+                        <div class="crc-list-footer">
+                            <span>Total:</span>
+                            <span class="crc-income-text">$ <t t-esc="formatNumber(state.denominationsData?.total_usd || 0)"/></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Denominaciones EUR -->
+                    <div class="crc-live-card crc-list-card">
+                        <div class="crc-list-header">
+                            <span class="crc-list-title">
+                                <i class="fa fa-eur crc-balance-icon"></i>
+                                Denominaciones EUR
+                            </span>
+                            <span class="crc-list-badge crc-badge-info">
+                                <t t-esc="state.denominationsData?.close_date || 'Último cierre'"/>
+                            </span>
+                            </span>
+                        </div>
+                        <div class="crc-list-body crc-scrollable">
+                            <t t-if="state.denominationsData?.eur?.length > 0">
+                                <t t-foreach="state.denominationsData.eur" t-as="denom" t-key="denom.name">
+                                    <div class="crc-list-item">
+                                        <span class="crc-item-name"><t t-esc="denom.name"/></span>
+                                        <span class="crc-item-qty"><t t-esc="denom.quantity"/> uds</span>
+                                        <span class="crc-item-value crc-balance-text">€ <t t-esc="formatNumber(denom.total)"/></span>
+                                    </div>
+                                </t>
+                            </t>
+                            <t t-else="">
+                                <div class="crc-empty-state">
+                                    <i class="fa fa-info-circle"></i>
+                                    <span>Sin datos de denominaciones</span>
+                                </div>
+                            </t>
+                        </div>
+                        <div class="crc-list-footer">
+                            <span>Total:</span>
+                            <span class="crc-balance-text">€ <t t-esc="formatNumber(state.denominationsData?.total_eur || 0)"/></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- RESUMEN DE CIERRES - Stats rápidas -->
+            <!-- ========================================== -->
+            <div class="crc-live-section crc-stats-section">
+                <div class="crc-section-title">
+                    <i class="fa fa-tasks"></i>
+                    <span>ESTADO DE CIERRES</span>
+                </div>
+                <div class="crc-live-grid crc-grid-4">
+                    <div class="crc-live-card crc-stat-card">
+                        <div class="crc-stat-icon crc-icon-success">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                        <div class="crc-stat-body">
+                            <span class="crc-stat-number" t-esc="state.closedCount || 0"/>
+                            <span class="crc-stat-label">Completados</span>
+                        </div>
+                    </div>
+                    <div class="crc-live-card crc-stat-card">
+                        <div class="crc-stat-icon crc-icon-confirmed">
+                            <i class="fa fa-shield"></i>
+                        </div>
+                        <div class="crc-stat-body">
+                            <span class="crc-stat-number" t-esc="state.confirmedCount || 0"/>
+                            <span class="crc-stat-label">Confirmados</span>
+                        </div>
+                    </div>
+                    <div class="crc-live-card crc-stat-card">
+                        <div class="crc-stat-icon crc-icon-pending">
+                            <i class="fa fa-clock-o"></i>
+                        </div>
+                        <div class="crc-stat-body">
+                            <span class="crc-stat-number" t-esc="state.pendingCount || 0"/>
+                            <span class="crc-stat-label">Pendientes</span>
+                        </div>
+                    </div>
+                    <div class="crc-live-card crc-stat-card">
+                        <div class="crc-stat-icon crc-icon-company">
+                            <i class="fa fa-building"></i>
+                        </div>
+                        <div class="crc-stat-body">
+                            <span class="crc-stat-number" t-esc="state.companiesCount || 0"/>
+                            <span class="crc-stat-label">Empresas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- ACCIONES RÁPIDAS -->
+            <!-- ========================================== -->
+            <div class="crc-actions-section">
+                <button class="crc-action-btn crc-btn-primary" t-on-click="onViewCloses">
+                    <i class="fa fa-list-alt"></i>
+                    <span>Ver Todos los Cierres</span>
+                </button>
+                <button class="crc-action-btn crc-btn-success" t-on-click="onNewClose">
+                    <i class="fa fa-plus-circle"></i>
+                    <span>Nuevo Cierre de Caja</span>
+                </button>
+            </div>
+        </div>
+    </t>
+
+</templates>

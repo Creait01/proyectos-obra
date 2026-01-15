@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Vista Form del Wizard -->
+    <record id="view_cash_register_copy_previous_wizard_form" model="ir.ui.view">
+        <field name="name">cash.register.copy.previous.wizard.form</field>
+        <field name="model">cash.register.copy.previous.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Copiar Conteo del Cierre Anterior">
+                <group>
+                    <group string="Información">
+                        <field name="account_id" readonly="1"/>
+                        <field name="previous_date" readonly="1"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <group string="Opciones">
+                        <field name="copy_denominations" widget="boolean_toggle"/>
+                        <field name="copy_bad_bills" widget="boolean_toggle"/>
+                    </group>
+                </group>
+                
+                <notebook>
+                    <page string="Denominaciones" name="denominations" 
+                          attrs="{'invisible': [('copy_denominations', '=', False)]}">
+                        <p class="text-muted mb-3">
+                            <i class="fa fa-info-circle"/> 
+                            Puede modificar las cantidades antes de confirmar.
+                        </p>
+                        <field name="denomination_line_ids" nolabel="1">
+                            <tree string="Denominaciones" editable="bottom">
+                                <field name="denomination_id" readonly="1"/>
+                                <field name="denomination_type" readonly="1"/>
+                                <field name="denomination_value" readonly="1"/>
+                                <field name="quantity"/>
+                                <field name="total" readonly="1" sum="Total"/>
+                            </tree>
+                        </field>
+                    </page>
+                    
+                    <page string="Billetes en Mal Estado" name="bad_bills"
+                          attrs="{'invisible': [('copy_bad_bills', '=', False)]}">
+                        <p class="text-muted mb-3">
+                            <i class="fa fa-info-circle"/> 
+                            Puede modificar las cantidades y estados antes de confirmar.
+                        </p>
+                        <field name="bad_bills_line_ids" nolabel="1">
+                            <tree string="Billetes en Mal Estado" editable="bottom">
+                                <field name="denomination_id"/>
+                                <field name="denomination_value" readonly="1"/>
+                                <field name="condition"/>
+                                <field name="quantity"/>
+                                <field name="total" readonly="1" sum="Total"/>
+                                <field name="notes"/>
+                            </tree>
+                        </field>
+                    </page>
+                </notebook>
+                
+                <!-- Resumen de totales -->
+                <group class="mt-4">
+                    <group>
+                        <div class="alert alert-info text-center">
+                            <div class="row">
+                                <div class="col-4">
+                                    <small class="text-muted">Denominaciones</small>
+                                    <h5><field name="total_denominations" widget="monetary" nolabel="1"/></h5>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Billetes Mal Estado</small>
+                                    <h5><field name="total_bad_bills" widget="monetary" nolabel="1"/></h5>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted fw-bold">Total Contado</small>
+                                    <h4 class="text-primary"><field name="total_counted" widget="monetary" nolabel="1"/></h4>
+                                </div>
+                            </div>
+                        </div>
+                    </group>
+                </group>
+                
+                <footer>
+                    <button name="action_confirm" type="object" 
+                            string="Confirmar y Copiar" 
+                            class="btn-primary"
+                            icon="fa-check"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+    
+    <!-- Acción del Wizard -->
+    <record id="action_cash_register_copy_previous_wizard" model="ir.actions.act_window">
+        <field name="name">Copiar Conteo del Cierre Anterior</field>
+        <field name="res_model">cash.register.copy.previous.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

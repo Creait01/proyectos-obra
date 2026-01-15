@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Record Rules -->
+    <record id="cash_register_close_company_rule" model="ir.rule">
+        <field name="name">Cierre de Caja: Multi-Compañía</field>
+        <field name="model_id" ref="model_cash_register_close"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="cash_register_close_line_company_rule" model="ir.rule">
+        <field name="name">Línea Cierre de Caja: Multi-Compañía</field>
+        <field name="model_id" ref="model_cash_register_close_line"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>

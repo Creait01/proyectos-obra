@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ======================================== -->
+    <!-- DASHBOARD CONSOLIDADO - POR CIERRE       -->
+    <!-- ======================================== -->
+
+    <!-- Vista Tree del Dashboard Consolidado -->
+    <record id="view_cash_register_consolidated_tree" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.tree</field>
+        <field name="model">cash.register.consolidated</field>
+        <field name="arch" type="xml">
+            <tree string="Dashboard Consolidado" 
+                  decoration-success="state == 'closed'"
+                  decoration-warning="state == 'in_progress'"
+                  decoration-muted="state == 'draft'"
+                  default_order="date desc, company_id">
+                <field name="date"/>
+                <field name="company_id"/>
+                <field name="state" widget="badge" 
+                       decoration-success="state == 'closed'"
+                       decoration-warning="state == 'in_progress'"
+                       decoration-info="state == 'draft'"/>
+                <field name="accounts_count" string="Cuentas"/>
+                
+                <!-- Totales Bs -->
+                <field name="total_initial_balance_bs" string="Inicio Bs" sum="Total"/>
+                <field name="total_income_bs" string="Ingreso Bs" sum="Total"/>
+                <field name="total_expense_bs" string="Egreso Bs" sum="Total"/>
+                <field name="total_final_balance_bs" string="Final Bs" sum="Total"/>
+                <field name="total_difference_bs" string="Dif. Bs" sum="Total"
+                       decoration-danger="total_difference_bs &lt; 0"
+                       decoration-success="total_difference_bs == 0"
+                       decoration-warning="total_difference_bs &gt; 0"/>
+                
+                <!-- Totales USD -->
+                <field name="total_initial_balance_usd" string="Inicio $" sum="Total" optional="show"/>
+                <field name="total_income_usd" string="Ingreso $" sum="Total" optional="show"/>
+                <field name="total_expense_usd" string="Egreso $" sum="Total" optional="show"/>
+                <field name="total_final_balance_usd" string="Final $" sum="Total" optional="show"/>
+                <field name="total_difference_usd" string="Dif. $" sum="Total" optional="show"
+                       decoration-danger="total_difference_usd &lt; 0"
+                       decoration-success="total_difference_usd == 0"/>
+                
+                <!-- Totales EUR -->
+                <field name="total_initial_balance_eur" string="Inicio €" sum="Total" optional="hide"/>
+                <field name="total_income_eur" string="Ingreso €" sum="Total" optional="hide"/>
+                <field name="total_expense_eur" string="Egreso €" sum="Total" optional="hide"/>
+                <field name="total_final_balance_eur" string="Final €" sum="Total" optional="hide"/>
+                <field name="total_difference_eur" string="Dif. €" sum="Total" optional="hide"/>
+                
+                <button name="action_open_close" type="object" icon="fa-external-link" title="Abrir Cierre"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Vista Pivot del Dashboard Consolidado -->
+    <record id="view_cash_register_consolidated_pivot" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.pivot</field>
+        <field name="model">cash.register.consolidated</field>
+        <field name="arch" type="xml">
+            <pivot string="Análisis Consolidado" sample="1">
+                <field name="company_id" type="row"/>
+                <field name="date" type="col" interval="month"/>
+                <field name="total_final_balance_bs" type="measure"/>
+                <field name="total_final_balance_usd" type="measure"/>
+                <field name="total_income_bs" type="measure"/>
+                <field name="total_expense_bs" type="measure"/>
+                <field name="total_difference_bs" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Vista Graph del Dashboard Consolidado -->
+    <record id="view_cash_register_consolidated_graph" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.graph</field>
+        <field name="model">cash.register.consolidated</field>
+        <field name="arch" type="xml">
+            <graph string="Gráfico Consolidado" type="bar" stacked="1" sample="1">
+                <field name="company_id"/>
+                <field name="total_final_balance_bs" type="measure"/>
+                <field name="total_final_balance_usd" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Vista Search del Dashboard Consolidado -->
+    <record id="view_cash_register_consolidated_search" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.search</field>
+        <field name="model">cash.register.consolidated</field>
+        <field name="arch" type="xml">
+            <search string="Buscar en Consolidado">
+                <field name="company_id"/>
+                <field name="date"/>
+                <field name="state"/>
+                
+                <filter name="filter_today" string="Hoy" 
+                        domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_this_week" string="Esta Semana" 
+                        domain="[('date', '>=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_this_month" string="Este Mes" 
+                        domain="[('date', '>=', context_today().strftime('%Y-%m-01'))]"/>
+                
+                <separator/>
+                
+                <filter name="filter_closed" string="Cerrados" domain="[('state', '=', 'closed')]"/>
+                <filter name="filter_in_progress" string="En Proceso" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="filter_draft" string="Borradores" domain="[('state', '=', 'draft')]"/>
+                
+                <separator/>
+                
+                <filter name="filter_with_difference" string="Con Diferencia" 
+                        domain="['|', ('total_difference_bs', '!=', 0), ('total_difference_usd', '!=', 0)]"/>
+                
+                <separator/>
+                
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_date" string="Fecha" context="{'group_by': 'date:day'}"/>
+                    <filter name="group_by_date_week" string="Semana" context="{'group_by': 'date:week'}"/>
+                    <filter name="group_by_date_month" string="Mes" context="{'group_by': 'date:month'}"/>
+                    <filter name="group_by_company" string="Empresa" context="{'group_by': 'company_id'}"/>
+                    <filter name="group_by_state" string="Estado" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Acción del Dashboard Consolidado -->
+    <record id="action_cash_register_consolidated" model="ir.actions.act_window">
+        <field name="name">Dashboard Consolidado</field>
+        <field name="res_model">cash.register.consolidated</field>
+        <field name="view_mode">tree,pivot,graph</field>
+        <field name="search_view_id" ref="view_cash_register_consolidated_search"/>
+        <field name="context">{
+            'search_default_filter_this_month': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Dashboard Consolidado Multi-Empresa
+            </p>
+            <p>
+                Aquí puede ver un resumen de todos los cierres de caja de todas las empresas.
+            </p>
+        </field>
+    </record>
+
+    <!-- ======================================== -->
+    <!-- LÍNEAS CONSOLIDADAS - DETALLE           -->
+    <!-- ======================================== -->
+
+    <!-- Vista Tree de Líneas Consolidadas -->
+    <record id="view_cash_register_consolidated_line_tree" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.line.tree</field>
+        <field name="model">cash.register.consolidated.line</field>
+        <field name="arch" type="xml">
+            <tree string="Detalle por Cuenta" 
+                  decoration-success="is_counted == True"
+                  decoration-warning="is_counted == False and state == 'in_progress'"
+                  default_order="date desc, company_id, account_code"
+                  class="consolidated_lines_tree">
+                <field name="date"/>
+                <field name="company_id" string="Empresa"/>
+                <field name="account_code" string="Código"/>
+                <field name="account_name" string="Cuenta"/>
+                <field name="currency_name" string="Moneda"/>
+                <field name="state" widget="badge" 
+                       decoration-success="state == 'closed'"
+                       decoration-warning="state == 'in_progress'"
+                       decoration-info="state == 'draft'"/>
+                <field name="initial_balance" string="Inicio" sum="Total"/>
+                <field name="total_income" string="Ingresos" sum="Total" class="text-success"/>
+                <field name="total_expense" string="Egresos" sum="Total" class="text-danger"/>
+                <field name="final_balance" string="Final" sum="Total" class="fw-bold"/>
+                <field name="counted_amount" string="Contado" sum="Total"/>
+                <field name="difference" string="Diferencia" sum="Total"
+                       decoration-danger="difference &lt; 0"
+                       decoration-success="difference == 0"
+                       decoration-warning="difference &gt; 0"/>
+                <field name="is_counted" widget="boolean_toggle" readonly="1"/>
+                <button name="action_open_close" type="object" icon="fa-external-link" title="Ver Cierre"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Vista Pivot de Líneas Consolidadas -->
+    <record id="view_cash_register_consolidated_line_pivot" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.line.pivot</field>
+        <field name="model">cash.register.consolidated.line</field>
+        <field name="arch" type="xml">
+            <pivot string="Análisis por Cuenta" sample="1">
+                <field name="company_id" type="row"/>
+                <field name="currency_name" type="row"/>
+                <field name="date" type="col" interval="month"/>
+                <field name="final_balance" type="measure"/>
+                <field name="total_income" type="measure"/>
+                <field name="total_expense" type="measure"/>
+                <field name="difference" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Vista Graph de Líneas Consolidadas -->
+    <record id="view_cash_register_consolidated_line_graph" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.line.graph</field>
+        <field name="model">cash.register.consolidated.line</field>
+        <field name="arch" type="xml">
+            <graph string="Gráfico por Cuenta" type="bar" stacked="1" sample="1">
+                <field name="company_id"/>
+                <field name="final_balance" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Vista Search de Líneas Consolidadas -->
+    <record id="view_cash_register_consolidated_line_search" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.line.search</field>
+        <field name="model">cash.register.consolidated.line</field>
+        <field name="arch" type="xml">
+            <search string="Buscar Líneas">
+                <field name="company_id"/>
+                <field name="account_code"/>
+                <field name="account_name"/>
+                <field name="currency_name"/>
+                <field name="date"/>
+                
+                <filter name="filter_today" string="Hoy" 
+                        domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_this_month" string="Este Mes" 
+                        domain="[('date', '>=', context_today().strftime('%Y-%m-01'))]"/>
+                
+                <separator/>
+                
+                <filter name="filter_bs" string="Bolívares" domain="[('is_usd_account', '=', False), ('is_eur_account', '=', False)]"/>
+                <filter name="filter_usd" string="Dólares" domain="[('is_usd_account', '=', True)]"/>
+                <filter name="filter_eur" string="Euros" domain="[('is_eur_account', '=', True)]"/>
+                
+                <separator/>
+                
+                <filter name="filter_counted" string="Contados" domain="[('is_counted', '=', True)]"/>
+                <filter name="filter_not_counted" string="Sin Contar" domain="[('is_counted', '=', False)]"/>
+                <filter name="filter_with_difference" string="Con Diferencia" domain="[('difference', '!=', 0)]"/>
+                
+                <separator/>
+                
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_company" string="Empresa" context="{'group_by': 'company_id'}"/>
+                    <filter name="group_by_currency" string="Moneda" context="{'group_by': 'currency_name'}"/>
+                    <filter name="group_by_account" string="Cuenta" context="{'group_by': 'account_id'}"/>
+                    <filter name="group_by_date" string="Fecha" context="{'group_by': 'date:day'}"/>
+                    <filter name="group_by_date_month" string="Mes" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Acción de Líneas Consolidadas -->
+    <record id="action_cash_register_consolidated_lines" model="ir.actions.act_window">
+        <field name="name">Detalle por Cuenta</field>
+        <field name="res_model">cash.register.consolidated.line</field>
+        <field name="view_mode">tree,pivot,graph</field>
+        <field name="search_view_id" ref="view_cash_register_consolidated_line_search"/>
+        <field name="context">{
+            'search_default_filter_this_month': 1,
+            'search_default_group_by_company': 1,
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Detalle de Cuentas de Efectivo
+            </p>
+            <p>
+                Aquí puede ver el detalle de cada cuenta de efectivo de todas las empresas.
+            </p>
+        </field>
+    </record>
+
+    <!-- ======================================== -->
+    <!-- DASHBOARD EJECUTIVO PARA DIRECTIVOS     -->
+    <!-- ======================================== -->
+
+    <record id="view_cash_register_executive_dashboard_form" model="ir.ui.view">
+        <field name="name">cash.register.executive.dashboard.form</field>
+        <field name="model">cash.register.executive.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Dashboard Ejecutivo" class="o_executive_dashboard">
+                <sheet>
+                    <div class="executive_dashboard_container">
+                        <!-- HEADER PRINCIPAL -->
+                        <div class="dashboard_header">
+                            <div class="header_content">
+                                <div class="header_icon">
+                                    <span class="fa fa-line-chart"/>
+                                </div>
+                                <div class="header_text">
+                                    <div class="header_title">Dashboard Ejecutivo</div>
+                                    <div class="header_subtitle">Resumen de Caja Multi-Empresa</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FILTROS -->
+                        <div class="dashboard_filters">
+                            <div class="filter_group">
+                                <div class="filter_label">Desde</div>
+                                <field name="date_from"/>
+                            </div>
+                            <div class="filter_group">
+                                <div class="filter_label">Hasta</div>
+                                <field name="date_to"/>
+                            </div>
+                            <div class="filter_group filter_companies">
+                                <div class="filter_label">Empresas</div>
+                                <field name="company_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            </div>
+                            <div class="filter_actions">
+                                <button name="action_refresh" type="object" class="btn btn-primary" string="🔄 Actualizar"/>
+                            </div>
+                        </div>
+
+                        <!-- KPIs PRINCIPALES -->
+                        <div class="kpi_section">
+                            <div class="section_title">📈 Indicadores Clave</div>
+                            <div class="kpi_grid">
+                                <div class="kpi_card kpi_total">
+                                    <div class="kpi_icon"><span class="fa fa-folder-open"/></div>
+                                    <div class="kpi_value"><field name="total_closes" nolabel="1"/></div>
+                                    <div class="kpi_label">Total Cierres</div>
+                                </div>
+                                <div class="kpi_card kpi_success">
+                                    <div class="kpi_icon"><span class="fa fa-check-circle"/></div>
+                                    <div class="kpi_value"><field name="closed_count" nolabel="1"/></div>
+                                    <div class="kpi_label">Cerrados</div>
+                                </div>
+                                <div class="kpi_card kpi_warning">
+                                    <div class="kpi_icon"><span class="fa fa-clock-o"/></div>
+                                    <div class="kpi_value"><field name="pending_count" nolabel="1"/></div>
+                                    <div class="kpi_label">Pendientes</div>
+                                </div>
+                                <div class="kpi_card kpi_info">
+                                    <div class="kpi_icon"><span class="fa fa-building"/></div>
+                                    <div class="kpi_value"><field name="companies_count" nolabel="1"/></div>
+                                    <div class="kpi_label">Empresas</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BOLÍVARES -->
+                        <div class="currency_section bs_section">
+                            <div class="section_title">🇻🇪 Bolívares (Bs)</div>
+                            <div class="currency_cards">
+                                <div class="currency_card income_card">
+                                    <div class="card_icon"><span class="fa fa-arrow-down"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Ingresos</span>
+                                        <span class="card_value"><field name="total_income_bs" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card expense_card">
+                                    <div class="card_icon"><span class="fa fa-arrow-up"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Egresos</span>
+                                        <span class="card_value"><field name="total_expense_bs" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card balance_card">
+                                    <div class="card_icon"><span class="fa fa-balance-scale"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Saldo Final</span>
+                                        <span class="card_value"><field name="total_balance_bs" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card difference_card">
+                                    <div class="card_icon"><span class="fa fa-exclamation-triangle"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Diferencia</span>
+                                        <span class="card_value"><field name="total_difference_bs" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DÓLARES -->
+                        <div class="currency_section usd_section">
+                            <div class="section_title">💵 Dólares (USD)</div>
+                            <div class="currency_cards">
+                                <div class="currency_card income_card">
+                                    <div class="card_icon"><span class="fa fa-arrow-down"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Ingresos</span>
+                                        <span class="card_value">$ <field name="total_income_usd" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card expense_card">
+                                    <div class="card_icon"><span class="fa fa-arrow-up"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Egresos</span>
+                                        <span class="card_value">$ <field name="total_expense_usd" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card balance_card">
+                                    <div class="card_icon"><span class="fa fa-balance-scale"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Saldo Final</span>
+                                        <span class="card_value">$ <field name="total_balance_usd" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card difference_card">
+                                    <div class="card_icon"><span class="fa fa-exclamation-triangle"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Diferencia</span>
+                                        <span class="card_value">$ <field name="total_difference_usd" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- EUROS (Opcional) -->
+                        <div class="currency_section eur_section">
+                            <div class="section_title">💶 Euros (EUR)</div>
+                            <div class="currency_cards">
+                                <div class="currency_card income_card">
+                                    <div class="card_icon"><span class="fa fa-arrow-down"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Ingresos</span>
+                                        <span class="card_value">€ <field name="total_income_eur" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card expense_card">
+                                    <div class="card_icon"><span class="fa fa-arrow-up"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Egresos</span>
+                                        <span class="card_value">€ <field name="total_expense_eur" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card balance_card">
+                                    <div class="card_icon"><span class="fa fa-balance-scale"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Saldo Final</span>
+                                        <span class="card_value">€ <field name="total_balance_eur" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                                <div class="currency_card difference_card">
+                                    <div class="card_icon"><span class="fa fa-exclamation-triangle"/></div>
+                                    <div class="card_content">
+                                        <span class="card_label">Diferencia</span>
+                                        <span class="card_value">€ <field name="total_difference_eur" nolabel="1"/></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RESUMEN POR EMPRESA -->
+                        <div class="companies_section">
+                            <div class="section_title">🏢 Resumen por Empresa</div>
+                            <field name="companies_summary_html" nolabel="1" class="companies_html"/>
+                        </div>
+
+                        <!-- ACCIONES -->
+                        <div class="dashboard_actions">
+                            <button name="action_view_details" type="object" class="btn btn-primary btn-lg" string="📊 Ver Dashboard Detallado"/>
+                            <button name="action_view_closes" type="object" class="btn btn-secondary btn-lg" string="📋 Ver Todos los Cierres"/>
+                        </div>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Acción especial para crear y abrir dashboard (formulario) -->
+    <record id="action_open_executive_dashboard_form" model="ir.actions.server">
+        <field name="name">Abrir Dashboard Ejecutivo (Formulario)</field>
+        <field name="model_id" ref="model_cash_register_executive_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_dashboard()
+        </field>
+    </record>
+
+    <!-- ======================================== -->
+    <!-- WIZARD REPORTE CONSOLIDADO               -->
+    <!-- ======================================== -->
+
+    <record id="view_cash_register_consolidated_report_wizard_form" model="ir.ui.view">
+        <field name="name">cash.register.consolidated.report.wizard.form</field>
+        <field name="model">cash.register.consolidated.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Filtrar Dashboard">
+                <div class="alert alert-info mb-3" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); border: none; border-radius: 10px;">
+                    <h5 class="text-white mb-0">
+                        <i class="fa fa-filter me-2"/>Filtrar Dashboard Consolidado
+                    </h5>
+                </div>
+                <group>
+                    <group string="📅 Período">
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                    <group string="🔍 Filtros">
+                        <field name="state_filter"/>
+                    </group>
+                </group>
+                <group string="🏢 Empresas">
+                    <field name="company_ids" widget="many2many_tags" nolabel="1" 
+                           options="{'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_view_consolidated" type="object" 
+                            string="📊 Ver Por Empresa" class="btn-primary"/>
+                    <button name="action_view_lines" type="object" 
+                            string="📋 Ver Por Cuenta" class="btn-info"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_register_consolidated_report_wizard" model="ir.actions.act_window">
+        <field name="name">Filtrar Dashboard Consolidado</field>
+        <field name="res_model">cash.register.consolidated.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ======================================== -->
+    <!-- ACCIÓN CLIENTE PARA DASHBOARD OWL       -->
+    <!-- ======================================== -->
+    
+    <!-- Acción Cliente para Dashboard Ejecutivo con Chart.js -->
+    <record id="action_cash_register_executive_dashboard_owl" model="ir.actions.client">
+        <field name="name">Dashboard Ejecutivo</field>
+        <field name="tag">cash_register_executive_dashboard</field>
+    </record>
+
+</odoo>

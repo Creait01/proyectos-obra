@@ -1,0 +1,413 @@
+/**
+ * Cash Register Close - Estilos Específicos del Módulo
+ * TODOS los estilos están encapsulados en clases específicas
+ * para NO afectar el resto de Odoo
+ * ============================================================
+ */
+
+/* ============================================= */
+/* ESTILOS PARA VISTAS DE CIERRE DE CAJA       */
+/* Clase contenedora: .o_cash_register_close   */
+/* ============================================= */
+
+.o_cash_register_close {
+    /* Variables locales */
+    --cr-primary: #667eea;
+    --cr-secondary: #764ba2;
+    --cr-success: #28a745;
+    --cr-danger: #dc3545;
+    --cr-info: #17a2b8;
+    --cr-warning: #ffc107;
+
+    /* Estilos base del formulario */
+    .o_form_sheet {
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Badges de estado */
+    .o_field_badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 11px;
+    }
+
+    /* Tarjetas de resumen */
+    .cr-summary-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+
+    /* Valores monetarios */
+    .cr-amount {
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .cr-amount-positive {
+        color: var(--cr-success);
+    }
+
+    .cr-amount-negative {
+        color: var(--cr-danger);
+    }
+
+    .cr-amount-neutral {
+        color: var(--cr-info);
+    }
+}
+
+/* ============================================= */
+/* DASHBOARD DE CIERRE - Clase específica      */
+/* ============================================= */
+
+.cash_register_dashboard {
+    padding: 16px;
+    
+    /* Tarjetas del dashboard */
+    .cr-card {
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .cr-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Header de tarjetas coloridas */
+    .cr-card-header {
+        padding: 16px;
+        color: #ffffff;
+    }
+
+    .cr-card-header.cr-primary {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    }
+
+    .cr-card-header.cr-success {
+        background: linear-gradient(135deg, #198754 0%, #157347 100%);
+    }
+
+    .cr-card-header.cr-danger {
+        background: linear-gradient(135deg, #dc3545 0%, #bb2d3b 100%);
+    }
+
+    .cr-card-header.cr-info {
+        background: linear-gradient(135deg, #0dcaf0 0%, #31d2f2 100%);
+        color: #000000;
+    }
+
+    .cr-card-header.cr-warning {
+        background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
+        color: #000000;
+    }
+
+    .cr-card-header.cr-secondary {
+        background: linear-gradient(135deg, #6c757d 0%, #5c636a 100%);
+    }
+
+    /* Contenido de tarjetas */
+    .cr-card-body {
+        padding: 16px;
+    }
+
+    .cr-card-title {
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 4px;
+        opacity: 0.9;
+    }
+
+    .cr-card-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    /* Grid de tarjetas */
+    .cr-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    /* Sección de totales */
+    .cr-totals-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        margin-top: 24px;
+    }
+
+    .cr-total-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .cr-total-row:last-child {
+        border-bottom: none;
+    }
+
+    .cr-total-label {
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .cr-total-value {
+        font-weight: 700;
+        font-size: 1.125rem;
+    }
+}
+
+/* ============================================= */
+/* WIZARD DE CIERRE MASIVO                      */
+/* ============================================= */
+
+.o_cash_register_wizard {
+    .cr-wizard-header {
+        text-align: center;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .cr-wizard-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .cr-wizard-icon i {
+        font-size: 28px;
+        color: #ffffff;
+    }
+
+    .cr-wizard-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .cr-wizard-subtitle {
+        color: #718096;
+        font-size: 0.875rem;
+    }
+
+    /* Lista de empresas */
+    .cr-company-list {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+    }
+
+    .cr-company-item {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        border-radius: 6px;
+        transition: background 0.2s ease;
+    }
+
+    .cr-company-item:hover {
+        background: #f7fafc;
+    }
+
+    .cr-company-checkbox {
+        margin-right: 12px;
+    }
+
+    .cr-company-name {
+        font-weight: 500;
+    }
+
+    /* Botones del wizard */
+    .cr-wizard-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid #e2e8f0;
+    }
+}
+
+/* ============================================= */
+/* DENOMINACIONES                               */
+/* ============================================= */
+
+.o_cash_denomination {
+    .cr-denom-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+
+    .cr-denom-card {
+        background: #ffffff;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+
+    .cr-denom-card:focus-within {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .cr-denom-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .cr-denom-input {
+        width: 100%;
+        text-align: center;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .cr-denom-total {
+        margin-top: 8px;
+        font-size: 0.75rem;
+        color: #718096;
+    }
+}
+
+/* ============================================= */
+/* VISTA KANBAN ESPECÍFICA                      */
+/* ============================================= */
+
+.o_cash_register_kanban {
+    .o_kanban_record {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .o_kanban_record:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .cr-kanban-header {
+        padding: 12px 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+    }
+
+    .cr-kanban-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .cr-kanban-date {
+        font-size: 0.75rem;
+        opacity: 0.85;
+    }
+
+    .cr-kanban-body {
+        padding: 16px;
+    }
+
+    .cr-kanban-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        font-size: 0.813rem;
+    }
+
+    .cr-kanban-label {
+        color: #718096;
+    }
+
+    .cr-kanban-value {
+        font-weight: 600;
+    }
+
+    .cr-kanban-footer {
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+    }
+
+    /* Estados */
+    .cr-state-draft {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+
+    .cr-state-progress {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .cr-state-closed {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .cr-state-cancelled {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+}
+
+/* ============================================= */
+/* RESPONSIVE                                   */
+/* ============================================= */
+
+@media (max-width: 768px) {
+    .cash_register_dashboard {
+        padding: 12px;
+    }
+
+    .cash_register_dashboard .cr-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .cash_register_dashboard .cr-card-value {
+        font-size: 1.25rem;
+    }
+
+    .o_cash_denomination .cr-denom-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .cash_register_dashboard .cr-cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .o_cash_denomination .cr-denom-grid {
+        grid-template-columns: 1fr;
+    }
+}

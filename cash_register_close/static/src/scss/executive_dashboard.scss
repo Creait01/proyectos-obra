@@ -1,0 +1,1011 @@
+/**
+ * Cash Register Executive Dashboard - LIVE Theme
+ * Diseño unificado en tiempo real con estilo moderno oscuro
+ * ============================================================
+ */
+
+/* ============================================================
+   CSS Variables
+   ============================================================ */
+.crc-executive-dashboard {
+    --crc-bg-dark: #0f172a;
+    --crc-bg-darker: #020617;
+    --crc-bg-card: rgba(30, 41, 59, 0.8);
+    --crc-bg-card-hover: rgba(51, 65, 85, 0.9);
+    
+    --crc-accent-green: #10b981;
+    --crc-accent-green-glow: rgba(16, 185, 129, 0.4);
+    --crc-accent-blue: #3b82f6;
+    --crc-accent-blue-glow: rgba(59, 130, 246, 0.4);
+    --crc-accent-purple: #8b5cf6;
+    --crc-accent-purple-glow: rgba(139, 92, 246, 0.4);
+    --crc-accent-orange: #f59e0b;
+    --crc-accent-orange-glow: rgba(245, 158, 11, 0.4);
+    --crc-accent-red: #ef4444;
+    --crc-accent-red-glow: rgba(239, 68, 68, 0.4);
+    --crc-accent-cyan: #06b6d4;
+    
+    --crc-text-primary: #f1f5f9;
+    --crc-text-secondary: #94a3b8;
+    --crc-text-muted: #64748b;
+    
+    --crc-border: rgba(148, 163, 184, 0.1);
+    --crc-border-light: rgba(148, 163, 184, 0.2);
+    
+    --crc-radius: 12px;
+    --crc-radius-lg: 16px;
+    --crc-radius-xl: 20px;
+    
+    --crc-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    --crc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    --crc-shadow-glow: 0 0 40px rgba(59, 130, 246, 0.15);
+    
+    --crc-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --crc-transition-fast: all 0.15s ease;
+}
+
+/* ============================================================
+   Main Container
+   ============================================================ */
+.crc-executive-dashboard.crc-live-theme {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, var(--crc-bg-dark) 0%, var(--crc-bg-darker) 100%);
+    min-height: 100vh;
+    height: auto !important;
+    padding: 24px;
+    padding-bottom: 60px;
+    box-sizing: border-box;
+    color: var(--crc-text-primary);
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+}
+
+/* Forzar scroll en contenedor padre de Odoo */
+.o_action_manager .o_action:has(.crc-executive-dashboard),
+.o_action_manager > div:has(.crc-executive-dashboard) {
+    height: auto !important;
+    min-height: 100%;
+    overflow: visible !important;
+}
+
+.o_action_manager {
+    &:has(.crc-executive-dashboard) {
+        overflow-y: auto !important;
+        overflow-x: hidden;
+    }
+}
+
+.o_content:has(.crc-executive-dashboard) {
+    overflow-y: auto !important;
+    height: auto !important;
+}
+
+/* ============================================================
+   Loading Overlay
+   ============================================================ */
+.crc-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 9999;
+    color: var(--crc-text-primary);
+    font-size: 14px;
+}
+
+.crc-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--crc-border);
+    border-top-color: var(--crc-accent-blue);
+    border-radius: 50%;
+    animation: crc-spin 1s linear infinite;
+}
+
+@keyframes crc-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.crc-live-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: var(--crc-bg-card);
+    border: 1px solid var(--crc-border);
+    border-radius: var(--crc-radius-lg);
+    margin-bottom: 24px;
+    backdrop-filter: blur(10px);
+}
+
+.crc-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.crc-header-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--crc-accent-blue) 0%, var(--crc-accent-purple) 100%);
+    border-radius: var(--crc-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px var(--crc-accent-blue-glow);
+    
+    i {
+        font-size: 24px;
+        color: #fff;
+    }
+}
+
+.crc-header-text {
+    h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--crc-text-primary);
+        letter-spacing: -0.5px;
+    }
+    
+    p {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: var(--crc-text-secondary);
+    }
+}
+
+.crc-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.crc-live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 24px;
+    
+    span:last-child {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--crc-accent-green);
+        letter-spacing: 1px;
+    }
+}
+
+.crc-live-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--crc-accent-green);
+    border-radius: 50%;
+    animation: crc-pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 10px var(--crc-accent-green);
+}
+
+@keyframes crc-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+}
+
+.crc-refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, var(--crc-accent-blue) 0%, #2563eb 100%);
+    color: #fff;
+    border: none;
+    border-radius: var(--crc-radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--crc-transition);
+    font-family: inherit;
+    
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px var(--crc-accent-blue-glow);
+    }
+    
+    i {
+        font-size: 14px;
+    }
+}
+
+/* ============================================================
+   Live Sections
+   ============================================================ */
+.crc-live-section {
+    background: var(--crc-bg-card);
+    border: 1px solid var(--crc-border);
+    border-radius: var(--crc-radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+    
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--crc-accent-blue), transparent);
+        opacity: 0.5;
+    }
+}
+
+.crc-section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--crc-border);
+    
+    i {
+        font-size: 18px;
+        color: var(--crc-accent-blue);
+    }
+    
+    span:first-of-type {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--crc-text-primary);
+        letter-spacing: 1px;
+    }
+}
+
+.crc-live-badge {
+    margin-left: auto;
+    background: var(--crc-accent-green);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    animation: crc-pulse 2s ease-in-out infinite;
+}
+
+.crc-count-badge {
+    margin-left: auto;
+    background: rgba(148, 163, 184, 0.2);
+    color: var(--crc-text-secondary);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ============================================================
+   Live Grid System
+   ============================================================ */
+.crc-live-grid {
+    display: grid;
+    gap: 16px;
+    
+    &.crc-grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+        
+        @media (max-width: 1024px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        @media (max-width: 640px) {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    &.crc-grid-4 {
+        grid-template-columns: repeat(4, 1fr);
+        
+        @media (max-width: 1024px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        @media (max-width: 640px) {
+            grid-template-columns: 1fr;
+        }
+    }
+}
+
+/* ============================================================
+   Live Cards - Main Balance Cards
+   ============================================================ */
+.crc-live-card {
+    background: rgba(51, 65, 85, 0.5);
+    border: 1px solid var(--crc-border-light);
+    border-radius: var(--crc-radius);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: var(--crc-transition);
+    position: relative;
+    overflow: hidden;
+    
+    &:hover {
+        background: var(--crc-bg-card-hover);
+        transform: translateY(-2px);
+        box-shadow: var(--crc-shadow-lg);
+    }
+}
+
+.crc-card-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0;
+    transition: var(--crc-transition);
+    pointer-events: none;
+}
+
+.crc-card-usd {
+    .crc-card-glow {
+        background: radial-gradient(circle at 30% 50%, var(--crc-accent-green-glow) 0%, transparent 50%);
+    }
+    .crc-card-icon {
+        background: linear-gradient(135deg, var(--crc-accent-green) 0%, #059669 100%);
+        box-shadow: 0 0 20px var(--crc-accent-green-glow);
+    }
+    &:hover .crc-card-glow { opacity: 1; }
+}
+
+.crc-card-eur {
+    .crc-card-glow {
+        background: radial-gradient(circle at 30% 50%, var(--crc-accent-blue-glow) 0%, transparent 50%);
+    }
+    .crc-card-icon {
+        background: linear-gradient(135deg, var(--crc-accent-blue) 0%, #2563eb 100%);
+        box-shadow: 0 0 20px var(--crc-accent-blue-glow);
+    }
+    &:hover .crc-card-glow { opacity: 1; }
+}
+
+.crc-card-bs {
+    .crc-card-glow {
+        background: radial-gradient(circle at 30% 50%, var(--crc-accent-orange-glow) 0%, transparent 50%);
+    }
+    .crc-card-icon {
+        background: linear-gradient(135deg, var(--crc-accent-orange) 0%, #d97706 100%);
+        box-shadow: 0 0 20px var(--crc-accent-orange-glow);
+    }
+    &:hover .crc-card-glow { opacity: 1; }
+}
+
+.crc-card-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--crc-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    i {
+        font-size: 28px;
+        color: #fff;
+    }
+}
+
+.crc-bs-icon {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+}
+
+.crc-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.crc-card-label {
+    font-size: 13px;
+    color: var(--crc-text-secondary);
+    font-weight: 500;
+}
+
+.crc-card-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--crc-text-primary);
+    
+    &.crc-value-large {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+    
+    &.crc-value-income {
+        color: var(--crc-accent-green);
+    }
+    
+    &.crc-value-expense {
+        color: var(--crc-accent-red);
+    }
+}
+
+.crc-card-status {
+    .crc-status-online {
+        font-size: 8px;
+        color: var(--crc-accent-green);
+        animation: crc-blink 1.5s ease-in-out infinite;
+    }
+}
+
+@keyframes crc-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ============================================================
+   Income/Expense Cards
+   ============================================================ */
+.crc-card-income {
+    border-left: 3px solid var(--crc-accent-green);
+    
+    .crc-card-icon-sm {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--crc-accent-green);
+    }
+}
+
+.crc-card-expense {
+    border-left: 3px solid var(--crc-accent-red);
+    
+    .crc-card-icon-sm {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--crc-accent-red);
+    }
+}
+
+.crc-card-icon-sm {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--crc-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    i {
+        font-size: 18px;
+    }
+}
+
+/* ============================================================
+   Chart Section
+   ============================================================ */
+.crc-section-with-selector {
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.crc-title-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    
+    i {
+        font-size: 18px;
+        color: var(--crc-accent-blue);
+    }
+    
+    span:first-of-type {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--crc-text-primary);
+        letter-spacing: 1px;
+    }
+}
+
+.crc-flow-period-selector {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    background: rgba(51, 65, 85, 0.5);
+    padding: 4px;
+    border-radius: var(--crc-radius);
+    border: 1px solid var(--crc-border-light);
+}
+
+/* Selector de Moneda USD/EUR */
+.crc-currency-toggle {
+    display: flex;
+    gap: 2px;
+    margin-left: 16px;
+    background: rgba(51, 65, 85, 0.5);
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid var(--crc-border-light);
+}
+
+.crc-currency-btn {
+    padding: 6px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--crc-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--crc-transition-fast);
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    
+    &:hover {
+        color: var(--crc-text-primary);
+        background: rgba(148, 163, 184, 0.15);
+    }
+    
+    &.active {
+        background: linear-gradient(135deg, var(--crc-accent-green), #059669);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+}
+
+.crc-flow-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--crc-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--crc-transition-fast);
+    font-family: inherit;
+    
+    i {
+        font-size: 12px;
+    }
+    
+    &:hover {
+        color: var(--crc-text-primary);
+        background: rgba(148, 163, 184, 0.1);
+    }
+    
+    &.active {
+        background: var(--crc-accent-blue);
+        color: #fff;
+        box-shadow: 0 2px 8px var(--crc-accent-blue-glow);
+    }
+}
+
+.crc-chart-wrapper {
+    height: 320px;
+    position: relative;
+    
+    canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+/* ============================================================
+   List Cards - Billetes y Denominaciones
+   ============================================================ */
+.crc-list-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    min-height: 300px;
+    overflow: hidden;
+}
+
+.crc-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(30, 41, 59, 0.5);
+    border-bottom: 1px solid var(--crc-border-light);
+}
+
+.crc-list-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--crc-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    i {
+        font-size: 14px;
+    }
+    
+    .crc-warning-icon { color: var(--crc-accent-amber); }
+    .crc-income-icon { color: var(--crc-accent-green); }
+    .crc-balance-icon { color: var(--crc-accent-blue); }
+}
+
+.crc-list-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    
+    &.crc-badge-warning {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--crc-accent-amber);
+    }
+    &.crc-badge-success {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--crc-accent-green);
+    }
+    &.crc-badge-info {
+        background: rgba(59, 130, 246, 0.2);
+        color: var(--crc-accent-blue);
+    }
+}
+
+.crc-list-body {
+    flex: 1;
+    padding: 12px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    
+    &.crc-scrollable {
+        max-height: 180px;
+        overflow-y: auto;
+        
+        &::-webkit-scrollbar {
+            width: 4px;
+        }
+        &::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        &::-webkit-scrollbar-thumb {
+            background: var(--crc-border-light);
+            border-radius: 2px;
+        }
+    }
+}
+
+.crc-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(51, 65, 85, 0.3);
+    border-radius: 8px;
+    gap: 8px;
+}
+
+.crc-item-name {
+    flex: 1;
+    font-size: 12px;
+    color: var(--crc-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.crc-item-qty {
+    font-size: 11px;
+    color: var(--crc-text-secondary);
+    padding: 2px 8px;
+    background: rgba(148, 163, 184, 0.15);
+    border-radius: 4px;
+    min-width: 50px;
+    text-align: center;
+}
+
+.crc-item-value {
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 80px;
+    text-align: right;
+}
+
+.crc-list-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: rgba(30, 41, 59, 0.5);
+    border-top: 1px solid var(--crc-border-light);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--crc-text-secondary);
+}
+
+.crc-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 30px 20px;
+    color: var(--crc-text-muted);
+    
+    i {
+        font-size: 24px;
+        
+        &.crc-success-icon {
+            color: var(--crc-accent-green);
+        }
+    }
+    
+    span {
+        font-size: 12px;
+    }
+}
+
+/* ============================================================
+   Pie Charts
+   ============================================================ */
+.crc-pie-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 20px;
+    min-height: 320px;
+}
+
+.crc-pie-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.crc-pie-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--crc-text-primary);
+}
+
+.crc-pie-total {
+    font-size: 18px;
+    font-weight: 700;
+    
+    &.crc-income-text { color: var(--crc-accent-green); }
+    &.crc-expense-text { color: var(--crc-accent-red); }
+    &.crc-balance-text { color: var(--crc-accent-blue); }
+}
+
+.crc-pie-wrapper {
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    
+    canvas {
+        max-width: 100%;
+        max-height: 100%;
+    }
+}
+
+/* ============================================================
+   Stats Cards
+   ============================================================ */
+.crc-stat-card {
+    padding: 20px;
+}
+
+.crc-stat-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--crc-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    
+    i {
+        font-size: 22px;
+        color: #fff;
+    }
+    
+    &.crc-icon-success {
+        background: linear-gradient(135deg, var(--crc-accent-green) 0%, #059669 100%);
+        box-shadow: 0 0 15px var(--crc-accent-green-glow);
+    }
+    
+    &.crc-icon-confirmed {
+        background: linear-gradient(135deg, var(--crc-accent-purple) 0%, #7c3aed 100%);
+        box-shadow: 0 0 15px var(--crc-accent-purple-glow);
+    }
+    
+    &.crc-icon-pending {
+        background: linear-gradient(135deg, var(--crc-accent-orange) 0%, #d97706 100%);
+        box-shadow: 0 0 15px var(--crc-accent-orange-glow);
+    }
+    
+    &.crc-icon-company {
+        background: linear-gradient(135deg, var(--crc-accent-blue) 0%, #2563eb 100%);
+        box-shadow: 0 0 15px var(--crc-accent-blue-glow);
+    }
+}
+
+.crc-stat-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.crc-stat-number {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--crc-text-primary);
+}
+
+.crc-stat-label {
+    font-size: 13px;
+    color: var(--crc-text-secondary);
+    font-weight: 500;
+}
+
+/* ============================================================
+   Action Buttons
+   ============================================================ */
+.crc-actions-section {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    background: var(--crc-bg-card);
+    border: 1px solid var(--crc-border);
+    border-radius: var(--crc-radius-lg);
+    backdrop-filter: blur(10px);
+}
+
+.crc-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    border: none;
+    border-radius: var(--crc-radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--crc-transition);
+    font-family: inherit;
+    
+    i {
+        font-size: 16px;
+    }
+    
+    &.crc-btn-primary {
+        background: linear-gradient(135deg, var(--crc-accent-blue) 0%, #2563eb 100%);
+        color: #fff;
+        
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--crc-accent-blue-glow);
+        }
+    }
+    
+    &.crc-btn-success {
+        background: linear-gradient(135deg, var(--crc-accent-green) 0%, #059669 100%);
+        color: #fff;
+        
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--crc-accent-green-glow);
+        }
+    }
+}
+
+/* ============================================================
+   Responsive Adjustments
+   ============================================================ */
+@media (max-width: 768px) {
+    .crc-live-header {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+    
+    .crc-header-left {
+        flex-direction: column;
+    }
+    
+    .crc-header-right {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .crc-card-value.crc-value-large {
+        font-size: 22px;
+    }
+    
+    .crc-actions-section {
+        flex-direction: column;
+    }
+    
+    .crc-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ============================================================
+   Balance Section Special Styling
+   ============================================================ */
+.crc-balance-section {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    box-shadow: var(--crc-shadow-glow);
+    
+    &::before {
+        background: linear-gradient(90deg, transparent, var(--crc-accent-green), var(--crc-accent-blue), transparent);
+    }
+}
+
+/* ============================================================
+   Scroll Fix - Overrides para Odoo
+   ============================================================ */
+html:has(.crc-executive-dashboard),
+body:has(.crc-executive-dashboard) {
+    overflow: auto !important;
+}
+
+.o_web_client:has(.crc-executive-dashboard) {
+    overflow: auto !important;
+}
+
+.o_action_manager:has(.crc-executive-dashboard) {
+    overflow: auto !important;
+    height: auto !important;
+    min-height: 100%;
+}
+
+.o_action:has(.crc-executive-dashboard) {
+    overflow: visible !important;
+    height: auto !important;
+}
+
+/* Fix para contenedor principal */
+.crc-executive-dashboard {
+    position: relative;
+    z-index: 1;
+}
+
+/* ============================================================
+   Empty State para gráficos
+   ============================================================ */
+.crc-pie-wrapper:empty::after,
+.crc-chart-wrapper:empty::after {
+    content: 'Sin datos disponibles';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--crc-text-muted);
+    font-size: 14px;
+}

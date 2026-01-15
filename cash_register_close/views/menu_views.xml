@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================================= -->
+    <!-- MENÚS DEL MÓDULO                  -->
+    <!-- ================================= -->
+
+    <!-- Menú principal en Contabilidad > Contabilidad -->
+    <menuitem id="menu_cash_register_root"
+              name="Cierre de Caja"
+              parent="account.menu_finance_entries"
+              sequence="50"/>
+
+    <!-- Submenú: Cierres de Caja -->
+    <menuitem id="menu_cash_register_closes"
+              name="Cierres de Caja"
+              parent="menu_cash_register_root"
+              action="action_cash_register_close"
+              sequence="10"/>
+
+    <!-- === DASHBOARD EJECUTIVO === -->
+
+    <!-- Submenú: Dashboard Ejecutivo (Principal para directivos) -->
+    <menuitem id="menu_cash_register_executive_dashboard"
+              name="Dashboard Ejecutivo"
+              parent="menu_cash_register_root"
+              action="action_cash_register_executive_dashboard_owl"
+              sequence="12"/>
+
+    <!-- === OPCIONES MULTI-EMPRESA === -->
+
+    <!-- === WIZARDS === -->
+
+    <!-- Submenú: Cierre Empresa Actual -->
+    <menuitem id="menu_cash_register_wizard"
+              name="Cierre Empresa Actual"
+              parent="menu_cash_register_root"
+              action="action_cash_register_close_wizard"
+              sequence="20"/>
+
+    <!-- Submenú: Cierre Masivo Multi-Empresa -->
+    <menuitem id="menu_cash_register_mass_close_wizard"
+              name="Cierre Masivo Multi-Empresa"
+              parent="menu_cash_register_root"
+              action="action_cash_register_mass_close_wizard"
+              sequence="25"/>
+
+    <!-- === CONFIGURACIÓN === -->
+
+    <!-- Submenú: Denominaciones -->
+    <menuitem id="menu_cash_denomination"
+              name="Denominaciones"
+              parent="menu_cash_register_root"
+              action="action_cash_denomination"
+              sequence="30"/>
+
+    <!-- Submenú: Confirmación Masiva (acción definida en wizard) -->
+    <menuitem id="menu_cash_register_mass_confirm_wizard"
+              name="Confirmación Masiva"
+              parent="menu_cash_register_root"
+              action="action_cash_register_mass_confirm_wizard"
+              sequence="35"/>
+</odoo>
