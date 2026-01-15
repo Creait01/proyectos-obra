@@ -859,25 +859,34 @@ function renderGantt() {
     minDate.setDate(minDate.getDate() - 3);
     maxDate.setDate(maxDate.getDate() + 7);
     
-    // Render timeline
+    // Render timeline with full dates
     const timeline = document.getElementById('gantt-timeline');
     const days = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    
+    let todayIndex = -1;
+    let dayIndex = 0;
+    
     for (let d = new Date(minDate); d <= maxDate; d.setDate(d.getDate() + 1)) {
         const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-        const isToday = d.getTime() === today.getTime();
+        const isToday = d.toDateString() === today.toDateString();
+        if (isToday) todayIndex = dayIndex;
+        
         days.push(`
-            <div class="gantt-day ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}">
-                ${d.getDate()}<br>
-                <small>${d.toLocaleDateString('es-ES', { weekday: 'short' })}</small>
+            <div class="gantt-day ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" data-index="${dayIndex}">
+                <span class="gantt-day-date">${d.getDate()} ${monthNames[d.getMonth()]}</span>
+                <span class="gantt-day-name">${dayNames[d.getDay()]}</span>
             </div>
         `);
+        dayIndex++;
     }
     timeline.innerHTML = days.join('');
     
-    // Render task bars
+    // Render task bars with assignee name
     const taskRows = document.getElementById('gantt-tasks');
     const colors = {
         todo: '#64748b',
@@ -886,6 +895,8 @@ function renderGantt() {
         done: '#10b981'
     };
     
+    const totalDays = dayIndex;
+    
     taskRows.innerHTML = tasksWithDates.map(task => {
         const start = task.start_date ? new Date(task.start_date) : new Date(task.due_date);
         const end = task.due_date ? new Date(task.due_date) : new Date(task.start_date);
@@ -893,16 +904,24 @@ function renderGantt() {
         const startOffset = Math.floor((start - minDate) / (1000 * 60 * 60 * 24)) * ganttScale;
         const duration = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1) * ganttScale;
         
+        // Get assignee name
+        const assignee = task.assignee_id ? users.find(u => u.id === task.assignee_id) : null;
+        const assigneeName = assignee ? assignee.name : 'Sin asignar';
+        
         return `
             <div class="gantt-task-row">
                 <div class="gantt-task-info">
                     <span class="priority-dot ${task.priority}"></span>
-                    <span class="gantt-task-name">${task.title}</span>
+                    <div class="gantt-task-details">
+                        <span class="gantt-task-name">${task.title}</span>
+                        <span class="gantt-task-assignee"><i class="fas fa-user"></i> ${assigneeName}</span>
+                    </div>
                 </div>
-                <div class="gantt-task-bar-container">
+                <div class="gantt-task-bar-container" style="width: ${totalDays * ganttScale}px;">
+                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${todayIndex * ganttScale + ganttScale/2}px;"></div>` : ''}
                     <div class="gantt-task-bar" style="left: ${startOffset}px; width: ${duration}px; background: ${colors[task.status]};" data-id="${task.id}">
-                        <div class="progress" style="width: ${task.progress}%"></div>
-                        ${duration > 80 ? task.title : ''}
+                        <div class="gantt-bar-progress" style="width: ${task.progress}%"></div>
+                        <span class="gantt-bar-text">${task.progress}%</span>
                     </div>
                 </div>
             </div>
