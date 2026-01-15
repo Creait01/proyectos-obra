@@ -1115,11 +1115,14 @@ function renderActivities(activities) {
 let ganttScale = 40; // pixels per day
 
 async function updateGanttEffectiveness() {
+    const stagesContainer = document.getElementById('gantt-stages-effectiveness');
+    
     if (!currentProject) {
         document.getElementById('gantt-scheduled').textContent = '--%';
         document.getElementById('gantt-actual').textContent = '--%';
         document.getElementById('gantt-effectiveness-value').textContent = '--%';
         document.getElementById('gantt-status-text').textContent = 'Selecciona un proyecto';
+        stagesContainer.innerHTML = '';
         return;
     }
     
@@ -1147,6 +1150,66 @@ async function updateGanttEffectiveness() {
         const effectivenessEl = document.getElementById('gantt-effectiveness-value');
         effectivenessEl.style.color = metrics.status === 'adelantado' ? 'var(--success)' : 
                                        metrics.status === 'atrasado' ? 'var(--danger)' : 'var(--warning)';
+        
+        // Mostrar etapas con efectividad
+        if (data.stages && data.stages.length > 0) {
+            stagesContainer.innerHTML = `
+                <div class="stages-effectiveness-title">
+                    <i class="fas fa-layer-group"></i> Efectividad por Etapa
+                </div>
+                <div class="stages-effectiveness-grid">
+                    ${data.stages.map(stage => {
+                        const stageEffectiveness = stage.scheduled_progress > 0 
+                            ? Math.round((stage.actual_progress / stage.scheduled_progress) * 100) 
+                            : (stage.actual_progress > 0 ? 100 : 100);
+                        
+                        let statusClass = 'adelantado';
+                        let statusIcon = '🚀';
+                        if (stageEffectiveness < 90) {
+                            statusClass = 'atrasado';
+                            statusIcon = '⚠️';
+                        } else if (stageEffectiveness < 100) {
+                            statusClass = 'en-tiempo';
+                            statusIcon = '✅';
+                        }
+                        
+                        const stageDiff = stage.actual_progress - stage.scheduled_progress;
+                        
+                        return `
+                            <div class="stage-effectiveness-card ${statusClass}">
+                                <div class="stage-header">
+                                    <span class="stage-name">${stage.name}</span>
+                                    <span class="stage-weight">${stage.percentage}%</span>
+                                </div>
+                                <div class="stage-metrics">
+                                    <div class="stage-metric">
+                                        <span class="metric-label">📅 Prog.</span>
+                                        <span class="metric-value scheduled">${stage.scheduled_progress}%</span>
+                                    </div>
+                                    <div class="stage-metric">
+                                        <span class="metric-label">✅ Real</span>
+                                        <span class="metric-value actual">${stage.actual_progress}%</span>
+                                    </div>
+                                    <div class="stage-metric">
+                                        <span class="metric-label">📊 Efect.</span>
+                                        <span class="metric-value effectiveness ${statusClass}">${statusIcon} ${stageEffectiveness}%</span>
+                                    </div>
+                                </div>
+                                <div class="stage-progress-bar">
+                                    <div class="progress-scheduled" style="width: ${stage.scheduled_progress}%"></div>
+                                    <div class="progress-actual" style="width: ${stage.actual_progress}%"></div>
+                                </div>
+                                <div class="stage-diff ${stageDiff >= 0 ? 'positive' : 'negative'}">
+                                    ${stageDiff >= 0 ? '+' : ''}${stageDiff.toFixed(1)}%
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        } else {
+            stagesContainer.innerHTML = '';
+        }
     } catch (error) {
         console.error('Error updating gantt effectiveness:', error);
     }

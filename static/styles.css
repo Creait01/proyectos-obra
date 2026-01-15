@@ -2683,3 +2683,157 @@ body.user-role #add-task-btn {
 .legend-item strong {
     color: var(--text-secondary);
 }
+
+/* Efectividad por Etapas */
+.gantt-stages-effectiveness {
+    margin-bottom: 15px;
+}
+
+.stages-effectiveness-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    padding-left: 5px;
+}
+
+.stages-effectiveness-title i {
+    color: var(--primary);
+}
+
+.stages-effectiveness-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.stage-effectiveness-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.stage-effectiveness-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.stage-effectiveness-card.adelantado {
+    border-left: 3px solid var(--success);
+}
+
+.stage-effectiveness-card.en-tiempo {
+    border-left: 3px solid var(--warning);
+}
+
+.stage-effectiveness-card.atrasado {
+    border-left: 3px solid var(--danger);
+}
+
+.stage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.stage-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.stage-weight {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.stage-metrics {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.stage-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.stage-metric .metric-label {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.stage-metric .metric-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.stage-metric .metric-value.scheduled {
+    color: #94a3b8;
+}
+
+.stage-metric .metric-value.actual {
+    color: var(--success);
+}
+
+.stage-metric .metric-value.effectiveness.adelantado {
+    color: var(--success);
+}
+
+.stage-metric .metric-value.effectiveness.en-tiempo {
+    color: var(--warning);
+}
+
+.stage-metric .metric-value.effectiveness.atrasado {
+    color: var(--danger);
+}
+
+.stage-progress-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.stage-progress-bar .progress-scheduled {
+    position: absolute;
+    height: 100%;
+    background: rgba(148, 163, 184, 0.4);
+    border-radius: 3px;
+}
+
+.stage-progress-bar .progress-actual {
+    position: absolute;
+    height: 100%;
+    background: var(--success);
+    border-radius: 3px;
+}
+
+.stage-diff {
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.stage-diff.positive {
+    color: var(--success);
+}
+
+.stage-diff.negative {
+    color: var(--danger);
+}
