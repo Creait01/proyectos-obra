@@ -901,8 +901,15 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         old_val = old_values.get(key)
         
         # Convertir valores para comparación
-        if key in ['start_date', 'due_date'] and value:
-            new_val = value.isoformat() if hasattr(value, 'isoformat') else str(value)
+        if key in ['start_date', 'due_date']:
+            # Comparar solo la fecha (YYYY-MM-DD), ignorando hora y timezone
+            if value:
+                new_val = value.strftime('%Y-%m-%d') if hasattr(value, 'strftime') else str(value)[:10]
+            else:
+                new_val = None
+            # old_val ya es isoformat o None, extraer solo la fecha
+            if old_val:
+                old_val = str(old_val)[:10]
         elif key == 'progress':
             new_val = str(int(value)) if value is not None else '0'
             old_val = str(int(float(old_val))) if old_val else '0'
@@ -926,6 +933,26 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
             elif key == 'progress':
                 display_old = f"{old_val}%"
                 display_new = f"{new_val}%"
+            elif key in ['start_date', 'due_date']:
+                # Formatear fechas de forma legible
+                if old_val:
+                    try:
+                        from datetime import datetime as dt
+                        old_date = dt.strptime(old_val, '%Y-%m-%d')
+                        display_old = old_date.strftime('%d/%m/%Y')
+                    except:
+                        display_old = old_val
+                else:
+                    display_old = 'Sin fecha'
+                if new_val:
+                    try:
+                        from datetime import datetime as dt
+                        new_date = dt.strptime(new_val, '%Y-%m-%d')
+                        display_new = new_date.strftime('%d/%m/%Y')
+                    except:
+                        display_new = new_val
+                else:
+                    display_new = 'Sin fecha'
             elif key == 'assignee_id':
                 # Obtener nombre del usuario
                 if old_val:
