@@ -359,6 +359,9 @@ async function selectProject(projectId) {
         stages = [];
     }
     
+    // Actualizar botón de reporte de proyecto
+    updateProjectReportButton();
+    
     await loadTasks();
     connectWebSocket();
 }
@@ -2130,6 +2133,81 @@ document.getElementById('search-input').addEventListener('input', (e) => {
 document.querySelector('.mobile-menu-toggle').addEventListener('click', () => {
     document.querySelector('.sidebar').classList.toggle('open');
 });
+
+// ===================== REPORTES PDF =====================
+async function downloadReport(url, filename) {
+    const token = getToken();
+    
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al generar el reporte');
+        }
+        
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+        
+        showToast('Reporte descargado exitosamente', 'success');
+    } catch (error) {
+        showToast('Error al descargar el reporte: ' + error.message, 'error');
+    }
+}
+
+document.getElementById('download-general-report').addEventListener('click', async function() {
+    const btn = this;
+    const originalContent = btn.innerHTML;
+    
+    btn.classList.add('downloading');
+    btn.innerHTML = '<i class="fas fa-spinner"></i><span>Generando...</span>';
+    
+    const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    await downloadReport('/api/reports/general', `Reporte_General_${fecha}.pdf`);
+    
+    btn.classList.remove('downloading');
+    btn.innerHTML = originalContent;
+});
+
+document.getElementById('download-project-report').addEventListener('click', async function() {
+    if (!currentProject) {
+        showToast('Selecciona un proyecto primero', 'warning');
+        return;
+    }
+    
+    const btn = this;
+    const originalContent = btn.innerHTML;
+    
+    btn.classList.add('downloading');
+    btn.innerHTML = '<i class="fas fa-spinner"></i><span>Generando...</span>';
+    
+    const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const projectName = currentProject.name.replace(/\s+/g, '_');
+    await downloadReport(`/api/reports/project/${currentProject.id}`, `Reporte_${projectName}_${fecha}.pdf`);
+    
+    btn.classList.remove('downloading');
+    btn.innerHTML = originalContent;
+});
+
+// Mostrar/ocultar botón de reporte de proyecto según el contexto
+function updateProjectReportButton() {
+    const btn = document.getElementById('download-project-report');
+    if (currentProject) {
+        btn.style.display = 'flex';
+    } else {
+        btn.style.display = 'none';
+    }
+}
 
 // ===================== INIT ON LOAD =====================
 document.addEventListener('DOMContentLoaded', async () => {
