@@ -3,10 +3,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, HRFlowable
-from reportlab.graphics.shapes import Drawing, Rect, String, Circle
-from reportlab.graphics.charts.piecharts import Pie
-from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from io import BytesIO
 from datetime import datetime
@@ -28,7 +25,7 @@ def create_styles():
     styles.add(ParagraphStyle(
         name='MainTitle',
         parent=styles['Heading1'],
-        fontSize=28,
+        fontSize=24,
         textColor=PRIMARY_COLOR,
         spaceAfter=20,
         alignment=TA_CENTER,
@@ -47,7 +44,7 @@ def create_styles():
     styles.add(ParagraphStyle(
         name='SectionTitle',
         parent=styles['Heading2'],
-        fontSize=16,
+        fontSize=14,
         textColor=PRIMARY_DARK,
         spaceBefore=25,
         spaceAfter=15,
@@ -58,7 +55,7 @@ def create_styles():
     styles.add(ParagraphStyle(
         name='SubsectionTitle',
         parent=styles['Heading3'],
-        fontSize=13,
+        fontSize=12,
         textColor=GRAY_DARK,
         spaceBefore=15,
         spaceAfter=10,
@@ -77,7 +74,8 @@ def create_styles():
         name='SmallText',
         parent=styles['Normal'],
         fontSize=8,
-        textColor=colors.HexColor('#6b7280')
+        textColor=colors.HexColor('#6b7280'),
+        alignment=TA_CENTER
     ))
     
     styles.add(ParagraphStyle(
@@ -103,35 +101,29 @@ def create_header(styles, title, subtitle=None):
     """Crear encabezado del reporte"""
     elements = []
     
-    # Línea decorativa superior
+    # Linea decorativa superior
     elements.append(HRFlowable(width="100%", thickness=3, color=PRIMARY_COLOR, spaceAfter=20))
     
-    # Título principal
-    elements.append(Paragraph(f"📊 {title}", styles['MainTitle']))
+    # Titulo principal
+    elements.append(Paragraph(title, styles['MainTitle']))
     
     if subtitle:
         elements.append(Paragraph(subtitle, styles['Subtitle']))
     
-    # Fecha de generación
-    fecha = datetime.now().strftime("%d de %B de %Y, %H:%M hrs")
+    # Fecha de generacion
+    fecha = datetime.now().strftime("%d/%m/%Y - %H:%M hrs")
     elements.append(Paragraph(f"Generado el: {fecha}", styles['SmallText']))
     elements.append(Spacer(1, 20))
     
     return elements
 
 def create_metrics_table(metrics_data):
-    """Crear tabla de métricas estilizada"""
-    # Estructura: [[valor, label], [valor, label], ...]
-    data = [[
-        Paragraph(f"<font size='20' color='#6366f1'><b>{m['value']}</b></font>", getSampleStyleSheet()['Normal']),
-    ] for m in metrics_data]
+    """Crear tabla de metricas estilizada"""
+    if not metrics_data:
+        return Spacer(1, 10)
     
-    labels = [[
-        Paragraph(f"<font size='9' color='#6b7280'>{m['label']}</font>", getSampleStyleSheet()['Normal']),
-    ] for m in metrics_data]
-    
-    # Crear tabla horizontal de métricas
-    values_row = [Paragraph(f"<font size='22' color='#6366f1'><b>{m['value']}</b></font>", getSampleStyleSheet()['Normal']) for m in metrics_data]
+    # Crear tabla horizontal de metricas
+    values_row = [Paragraph(f"<font size='20' color='#6366f1'><b>{m['value']}</b></font>", getSampleStyleSheet()['Normal']) for m in metrics_data]
     labels_row = [Paragraph(f"<font size='9' color='#6b7280'>{m['label']}</font>", getSampleStyleSheet()['Normal']) for m in metrics_data]
     
     table = Table([values_row, labels_row], colWidths=[120] * len(metrics_data))
@@ -150,36 +142,30 @@ def create_metrics_table(metrics_data):
 
 def create_effectiveness_box(scheduled, actual, effectiveness, status):
     """Crear caja de efectividad con colores"""
-    status_colors = {
-        'adelantado': SUCCESS_COLOR,
-        'en_tiempo': WARNING_COLOR,
-        'atrasado': DANGER_COLOR
-    }
     status_labels = {
-        'adelantado': '🚀 Adelantado',
-        'en_tiempo': '✅ En Tiempo',
-        'atrasado': '⚠️ Atrasado'
+        'adelantado': 'ADELANTADO',
+        'en_tiempo': 'EN TIEMPO',
+        'atrasado': 'ATRASADO'
     }
     
-    color = status_colors.get(status, GRAY_DARK)
-    label = status_labels.get(status, status)
+    label = status_labels.get(status, status.upper())
     
     data = [
         [
-            Paragraph(f"<font size='11' color='#6b7280'>Programado</font>", getSampleStyleSheet()['Normal']),
-            Paragraph(f"<font size='11' color='#6b7280'>Real</font>", getSampleStyleSheet()['Normal']),
-            Paragraph(f"<font size='11' color='#6b7280'>Efectividad</font>", getSampleStyleSheet()['Normal']),
-            Paragraph(f"<font size='11' color='#6b7280'>Estado</font>", getSampleStyleSheet()['Normal']),
+            Paragraph("<font size='10' color='#6b7280'><b>Programado</b></font>", getSampleStyleSheet()['Normal']),
+            Paragraph("<font size='10' color='#6b7280'><b>Real</b></font>", getSampleStyleSheet()['Normal']),
+            Paragraph("<font size='10' color='#6b7280'><b>Efectividad</b></font>", getSampleStyleSheet()['Normal']),
+            Paragraph("<font size='10' color='#6b7280'><b>Estado</b></font>", getSampleStyleSheet()['Normal']),
         ],
         [
-            Paragraph(f"<font size='18' color='#374151'><b>{scheduled}%</b></font>", getSampleStyleSheet()['Normal']),
-            Paragraph(f"<font size='18' color='#10b981'><b>{actual}%</b></font>", getSampleStyleSheet()['Normal']),
-            Paragraph(f"<font size='18' color='#6366f1'><b>{effectiveness}%</b></font>", getSampleStyleSheet()['Normal']),
-            Paragraph(f"<font size='12'><b>{label}</b></font>", getSampleStyleSheet()['Normal']),
+            Paragraph(f"<font size='16' color='#374151'><b>{scheduled}%</b></font>", getSampleStyleSheet()['Normal']),
+            Paragraph(f"<font size='16' color='#10b981'><b>{actual}%</b></font>", getSampleStyleSheet()['Normal']),
+            Paragraph(f"<font size='16' color='#6366f1'><b>{effectiveness}%</b></font>", getSampleStyleSheet()['Normal']),
+            Paragraph(f"<font size='11'><b>{label}</b></font>", getSampleStyleSheet()['Normal']),
         ],
     ]
     
-    table = Table(data, colWidths=[120, 120, 120, 140])
+    table = Table(data, colWidths=[120, 120, 120, 120])
     table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -200,14 +186,14 @@ def create_tasks_table(tasks, styles):
     status_labels = {
         'todo': 'Por Hacer',
         'in_progress': 'En Progreso',
-        'review': 'En Revisión',
+        'review': 'En Revision',
         'done': 'Completado'
     }
     
     priority_labels = {
-        'low': '🟢 Baja',
-        'medium': '🟡 Media',
-        'high': '🔴 Alta'
+        'low': 'Baja',
+        'medium': 'Media',
+        'high': 'Alta'
     }
     
     # Encabezados
@@ -221,12 +207,12 @@ def create_tasks_table(tasks, styles):
         progress = f"{task.progress or 0}%"
         due_date = task.due_date.strftime("%d/%m/%Y") if task.due_date else "Sin fecha"
         
-        # Truncar título si es muy largo
-        title = task.title[:40] + "..." if len(task.title) > 40 else task.title
+        # Truncar titulo si es muy largo
+        title = task.title[:35] + "..." if len(task.title) > 35 else task.title
         
         data.append([title, status, priority, progress, due_date])
     
-    table = Table(data, colWidths=[180, 90, 80, 60, 80])
+    table = Table(data, colWidths=[160, 80, 70, 60, 80])
     
     # Estilos de la tabla
     style = TableStyle([
@@ -234,13 +220,13 @@ def create_tasks_table(tasks, styles):
         ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_COLOR),
         ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('TOPPADDING', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
         
         # Cuerpo
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
         ('TOPPADDING', (0, 1), (-1, -1), 8),
@@ -259,7 +245,7 @@ def create_tasks_table(tasks, styles):
         if i % 2 == 0:
             style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f9fafb'))
     
-    # Colorear estado según valor
+    # Colorear estado segun valor
     for i, task in enumerate(tasks, 1):
         if task.status == 'done':
             style.add('TEXTCOLOR', (1, i), (1, i), SUCCESS_COLOR)
@@ -280,24 +266,25 @@ def create_stages_table(stages, styles):
     data = [headers]
     
     for stage in stages:
-        effectiveness = round((stage['actual_progress'] / stage['scheduled_progress'] * 100), 1) if stage['scheduled_progress'] > 0 else 100
+        eff = round((stage['actual_progress'] / stage['scheduled_progress'] * 100), 1) if stage['scheduled_progress'] > 0 else 100
         data.append([
-            stage['name'],
+            stage['name'][:30] + "..." if len(stage['name']) > 30 else stage['name'],
             f"{stage['percentage']}%",
             f"{stage['scheduled_progress']}%",
             f"{stage['actual_progress']}%",
-            f"{effectiveness}%"
+            f"{eff}%"
         ])
     
-    table = Table(data, colWidths=[180, 60, 80, 80, 80])
+    table = Table(data, colWidths=[160, 60, 80, 80, 80])
     
     style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_DARK),
         ('TEXTCOLOR', (0, 0), (-1, 0), WHITE),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('TOPPADDING', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
@@ -312,7 +299,7 @@ def create_stages_table(stages, styles):
     return table
 
 def generate_project_report(project, tasks, effectiveness_data, stages):
-    """Generar reporte PDF para un proyecto específico"""
+    """Generar reporte PDF para un proyecto especifico"""
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -329,22 +316,22 @@ def generate_project_report(project, tasks, effectiveness_data, stages):
     # Encabezado
     elements.extend(create_header(
         styles,
-        "Reporte de Proyecto",
-        f"Proyecto: {project.name}"
+        "REPORTE DE PROYECTO",
+        f"{project.name}"
     ))
     
-    # Información del proyecto
-    elements.append(Paragraph("📋 Información General", styles['SectionTitle']))
+    # Informacion del proyecto
+    elements.append(Paragraph("INFORMACION GENERAL", styles['SectionTitle']))
     
     info_data = [
-        ['Nombre del Proyecto:', project.name],
-        ['Descripción:', project.description or 'Sin descripción'],
+        ['Nombre del Proyecto:', project.name or '-'],
+        ['Descripcion:', (project.description or 'Sin descripcion')[:80]],
         ['Fecha de Inicio:', project.start_date.strftime("%d/%m/%Y") if project.start_date else 'No definida'],
         ['Fecha de Fin:', project.end_date.strftime("%d/%m/%Y") if project.end_date else 'No definida'],
         ['Total de Tareas:', str(len(tasks))],
     ]
     
-    info_table = Table(info_data, colWidths=[150, 350])
+    info_table = Table(info_data, colWidths=[130, 350])
     info_table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
@@ -353,13 +340,14 @@ def generate_project_report(project, tasks, effectiveness_data, stages):
         ('TOPPADDING', (0, 0), (-1, -1), 6),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(info_table)
     elements.append(Spacer(1, 20))
     
-    # Métricas de efectividad
+    # Metricas de efectividad
     if effectiveness_data:
-        elements.append(Paragraph("📈 Métricas de Efectividad", styles['SectionTitle']))
+        elements.append(Paragraph("METRICAS DE EFECTIVIDAD", styles['SectionTitle']))
         metrics = effectiveness_data.get('metrics', {})
         elements.append(create_effectiveness_box(
             metrics.get('scheduled_progress', 0),
@@ -371,12 +359,12 @@ def generate_project_report(project, tasks, effectiveness_data, stages):
     
     # Etapas
     if stages:
-        elements.append(Paragraph("🏗️ Etapas del Proyecto", styles['SectionTitle']))
+        elements.append(Paragraph("ETAPAS DEL PROYECTO", styles['SectionTitle']))
         elements.append(create_stages_table(stages, styles))
         elements.append(Spacer(1, 20))
     
     # Resumen de tareas por estado
-    elements.append(Paragraph("📊 Resumen de Tareas", styles['SectionTitle']))
+    elements.append(Paragraph("RESUMEN DE TAREAS", styles['SectionTitle']))
     
     todo_count = len([t for t in tasks if t.status == 'todo'])
     in_progress_count = len([t for t in tasks if t.status == 'in_progress'])
@@ -386,22 +374,22 @@ def generate_project_report(project, tasks, effectiveness_data, stages):
     summary_metrics = [
         {'value': str(todo_count), 'label': 'Por Hacer'},
         {'value': str(in_progress_count), 'label': 'En Progreso'},
-        {'value': str(review_count), 'label': 'En Revisión'},
+        {'value': str(review_count), 'label': 'En Revision'},
         {'value': str(done_count), 'label': 'Completadas'},
     ]
     elements.append(create_metrics_table(summary_metrics))
     elements.append(Spacer(1, 20))
     
     # Lista de tareas
-    elements.append(Paragraph("📝 Detalle de Tareas", styles['SectionTitle']))
+    elements.append(Paragraph("DETALLE DE TAREAS", styles['SectionTitle']))
     elements.append(create_tasks_table(tasks, styles))
     
-    # Pie de página
+    # Pie de pagina
     elements.append(Spacer(1, 30))
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e5e7eb')))
     elements.append(Spacer(1, 10))
     elements.append(Paragraph(
-        f"<font size='8' color='#9ca3af'>ProyectOS - Sistema de Gestión de Proyectos de Obra | Generado automáticamente</font>",
+        "ProyectOS - Sistema de Gestion de Proyectos de Obra | Reporte generado automaticamente",
         styles['SmallText']
     ))
     
@@ -427,12 +415,12 @@ def generate_general_report(projects_data):
     # Encabezado
     elements.extend(create_header(
         styles,
-        "Reporte General de Proyectos",
+        "REPORTE GENERAL DE PROYECTOS",
         f"Resumen ejecutivo de {len(projects_data)} proyecto(s)"
     ))
     
     # Resumen general
-    elements.append(Paragraph("📊 Resumen Ejecutivo", styles['SectionTitle']))
+    elements.append(Paragraph("RESUMEN EJECUTIVO", styles['SectionTitle']))
     
     total_tasks = sum(p['total_tasks'] for p in projects_data)
     completed_tasks = sum(p['completed_tasks'] for p in projects_data)
@@ -448,20 +436,20 @@ def generate_general_report(projects_data):
     elements.append(Spacer(1, 30))
     
     # Tabla de proyectos
-    elements.append(Paragraph("🏗️ Estado de Proyectos", styles['SectionTitle']))
+    elements.append(Paragraph("ESTADO DE PROYECTOS", styles['SectionTitle']))
     
-    headers = ['Proyecto', 'Tareas', 'Progreso', 'Programado', 'Efectividad', 'Estado']
+    headers = ['Proyecto', 'Tareas', 'Real', 'Programado', 'Efectividad', 'Estado']
     data = [headers]
     
     for p in projects_data:
-        status_icons = {
-            'adelantado': '🚀',
-            'en_tiempo': '✅',
-            'atrasado': '⚠️'
+        status_labels = {
+            'adelantado': 'Adelantado',
+            'en_tiempo': 'En Tiempo',
+            'atrasado': 'Atrasado'
         }
-        status_icon = status_icons.get(p['status'], '')
+        status_text = status_labels.get(p['status'], p['status'])
         
-        name = p['name'][:25] + "..." if len(p['name']) > 25 else p['name']
+        name = p['name'][:20] + "..." if len(p['name']) > 20 else p['name']
         
         data.append([
             name,
@@ -469,10 +457,10 @@ def generate_general_report(projects_data):
             f"{p['actual_progress']}%",
             f"{p['scheduled_progress']}%",
             f"{p['effectiveness']}%",
-            f"{status_icon} {p['status'].replace('_', ' ').title()}"
+            status_text
         ])
     
-    table = Table(data, colWidths=[130, 60, 70, 70, 70, 90])
+    table = Table(data, colWidths=[110, 55, 65, 70, 70, 80])
     
     style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_COLOR),
@@ -481,13 +469,14 @@ def generate_general_report(projects_data):
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('TOPPADDING', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
         ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
     ])
     
-    # Colorear según estado
+    # Colorear segun estado
     for i, p in enumerate(projects_data, 1):
         if i % 2 == 0:
             style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f9fafb'))
@@ -504,14 +493,15 @@ def generate_general_report(projects_data):
     elements.append(Spacer(1, 30))
     
     # Detalle por proyecto
-    elements.append(Paragraph("📋 Detalle por Proyecto", styles['SectionTitle']))
+    elements.append(Paragraph("DETALLE POR PROYECTO", styles['SectionTitle']))
     
     for p in projects_data:
         elements.append(Paragraph(f"<b>{p['name']}</b>", styles['SubsectionTitle']))
         
+        desc = (p.get('description') or 'Sin descripcion')[:100]
         detail = f"""
         <font size='9'>
-        <b>Descripción:</b> {p.get('description', 'Sin descripción') or 'Sin descripción'}<br/>
+        <b>Descripcion:</b> {desc}<br/>
         <b>Fecha Inicio:</b> {p.get('start_date', 'No definida')}<br/>
         <b>Fecha Fin:</b> {p.get('end_date', 'No definida')}<br/>
         <b>Tareas:</b> {p['completed_tasks']} de {p['total_tasks']} completadas<br/>
@@ -521,12 +511,12 @@ def generate_general_report(projects_data):
         elements.append(Paragraph(detail, styles['BodyText']))
         elements.append(Spacer(1, 15))
     
-    # Pie de página
+    # Pie de pagina
     elements.append(Spacer(1, 30))
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e5e7eb')))
     elements.append(Spacer(1, 10))
     elements.append(Paragraph(
-        f"<font size='8' color='#9ca3af'>ProyectOS - Sistema de Gestión de Proyectos de Obra | Reporte Mensual para Directiva</font>",
+        "ProyectOS - Sistema de Gestion de Proyectos de Obra | Reporte Mensual para Directiva",
         styles['SmallText']
     ))
     
