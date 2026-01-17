@@ -63,7 +63,7 @@ def create_styles():
     ))
     
     styles.add(ParagraphStyle(
-        name='BodyText',
+        name='CustomBodyText',
         parent=styles['Normal'],
         fontSize=10,
         textColor=GRAY_DARK,
@@ -181,7 +181,7 @@ def create_effectiveness_box(scheduled, actual, effectiveness, status):
 def create_tasks_table(tasks, styles):
     """Crear tabla de tareas"""
     if not tasks:
-        return Paragraph("<i>No hay tareas en este proyecto</i>", styles['BodyText'])
+        return Paragraph("<i>No hay tareas en este proyecto</i>", styles['CustomBodyText'])
     
     status_labels = {
         'todo': 'Por Hacer',
@@ -260,7 +260,7 @@ def create_tasks_table(tasks, styles):
 def create_stages_table(stages, styles):
     """Crear tabla de etapas"""
     if not stages:
-        return Paragraph("<i>No hay etapas definidas</i>", styles['BodyText'])
+        return Paragraph("<i>No hay etapas definidas</i>", styles['CustomBodyText'])
     
     headers = ['Etapa', 'Peso', 'Programado', 'Real', 'Efectividad']
     data = [headers]
@@ -508,7 +508,7 @@ def generate_general_report(projects_data):
         <b>Efectividad:</b> {p['effectiveness']}%
         </font>
         """
-        elements.append(Paragraph(detail, styles['BodyText']))
+        elements.append(Paragraph(detail, styles['CustomBodyText']))
         elements.append(Spacer(1, 15))
     
     # Pie de pagina
