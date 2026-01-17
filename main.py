@@ -1204,121 +1204,17 @@ from reports import generate_project_report, generate_general_report
 @app.get("/api/reports/project/{project_id}")
 async def download_project_report(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Descargar reporte PDF de un proyecto específico"""
-    # Obtener proyecto
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-    
-    # Obtener tareas del proyecto
-    tasks = db.query(Task).filter(Task.project_id == project_id).all()
-    
-    # Calcular efectividad
-    effectiveness_data = None
-    if project.start_date and project.end_date:
-        today = datetime.now().date()
-        start = project.start_date
-        end = project.end_date
+    try:
+        # Obtener proyecto
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         
-        total_days = (end - start).days
-        elapsed_days = (today - start).days
-        
-        if total_days > 0:
-            scheduled_progress = min(100, max(0, round((elapsed_days / total_days) * 100, 1)))
-        else:
-            scheduled_progress = 100 if today >= end else 0
-        
-        # Progreso real (promedio de tareas)
-        if tasks:
-            actual_progress = round(sum(t.progress or 0 for t in tasks) / len(tasks), 1)
-        else:
-            actual_progress = 0
+        # Obtener tareas del proyecto
+        tasks = db.query(Task).filter(Task.project_id == project_id).all()
         
         # Calcular efectividad
-        if scheduled_progress > 0:
-            effectiveness = round((actual_progress / scheduled_progress) * 100, 1)
-        else:
-            effectiveness = 100 if actual_progress > 0 else 0
-        
-        # Determinar estado
-        if effectiveness >= 100:
-            status = "adelantado"
-        elif effectiveness >= 90:
-            status = "en_tiempo"
-        else:
-            status = "atrasado"
-        
-        effectiveness_data = {
-            "metrics": {
-                "scheduled_progress": scheduled_progress,
-                "actual_progress": actual_progress,
-                "effectiveness": effectiveness,
-                "status": status
-            }
-        }
-    
-    # Obtener etapas
-    stages_db = db.query(Stage).filter(Stage.project_id == project_id).order_by(Stage.position).all()
-    stages = []
-    
-    for stage in stages_db:
-        stage_tasks = [t for t in tasks if t.stage_id == stage.id]
-        if stage_tasks:
-            stage_progress = round(sum(t.progress or 0 for t in stage_tasks) / len(stage_tasks), 1)
-        else:
-            stage_progress = 0
-        
-        # Calcular progreso programado para la etapa
-        if effectiveness_data:
-            stage_scheduled = effectiveness_data['metrics']['scheduled_progress']
-        else:
-            stage_scheduled = 0
-        
-        stages.append({
-            "name": stage.name,
-            "percentage": stage.percentage,
-            "scheduled_progress": stage_scheduled,
-            "actual_progress": stage_progress
-        })
-    
-    # Generar PDF
-    pdf_buffer = generate_project_report(project, tasks, effectiveness_data, stages)
-    
-    filename = f"Reporte_{project.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
-    
-    return StreamingResponse(
-        pdf_buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
-
-@app.get("/api/reports/general")
-async def download_general_report(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Descargar reporte PDF general de todos los proyectos"""
-    
-    # Para admin: todos los proyectos
-    # Para usuario normal: solo sus proyectos asignados
-    if current_user.role == "admin":
-        projects = db.query(Project).all()
-    else:
-        member_projects = db.query(ProjectMember.project_id).filter(
-            ProjectMember.user_id == current_user.id
-        ).all()
-        project_ids = [m.project_id for m in member_projects]
-        projects = db.query(Project).filter(Project.id.in_(project_ids)).all() if project_ids else []
-    
-    projects_data = []
-    
-    for project in projects:
-        tasks = db.query(Task).filter(Task.project_id == project.id).all()
-        total_tasks = len(tasks)
-        completed_tasks = len([t for t in tasks if t.status == "done"])
-        
-        # Calcular efectividad
-        scheduled_progress = 0
-        actual_progress = 0
-        effectiveness = 100
-        status = "en_tiempo"
-        
+        effectiveness_data = None
         if project.start_date and project.end_date:
             today = datetime.now().date()
             start = project.start_date
@@ -1332,43 +1228,164 @@ async def download_general_report(db: Session = Depends(get_db), current_user: U
             else:
                 scheduled_progress = 100 if today >= end else 0
             
+            # Progreso real (promedio de tareas)
             if tasks:
                 actual_progress = round(sum(t.progress or 0 for t in tasks) / len(tasks), 1)
+            else:
+                actual_progress = 0
             
+            # Calcular efectividad
             if scheduled_progress > 0:
                 effectiveness = round((actual_progress / scheduled_progress) * 100, 1)
+            else:
+                effectiveness = 100 if actual_progress > 0 else 0
             
+            # Determinar estado
             if effectiveness >= 100:
                 status = "adelantado"
             elif effectiveness >= 90:
                 status = "en_tiempo"
             else:
                 status = "atrasado"
+            
+            effectiveness_data = {
+                "metrics": {
+                    "scheduled_progress": scheduled_progress,
+                    "actual_progress": actual_progress,
+                    "effectiveness": effectiveness,
+                    "status": status
+                }
+            }
         
-        projects_data.append({
-            "id": project.id,
-            "name": project.name,
-            "description": project.description,
-            "start_date": project.start_date.strftime("%d/%m/%Y") if project.start_date else "No definida",
-            "end_date": project.end_date.strftime("%d/%m/%Y") if project.end_date else "No definida",
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks,
-            "scheduled_progress": scheduled_progress,
-            "actual_progress": actual_progress,
-            "effectiveness": effectiveness,
-            "status": status
-        })
+        # Obtener etapas
+        stages_db = db.query(Stage).filter(Stage.project_id == project_id).order_by(Stage.position).all()
+        stages = []
+        
+        for stage in stages_db:
+            stage_tasks = [t for t in tasks if t.stage_id == stage.id]
+            if stage_tasks:
+                stage_progress = round(sum(t.progress or 0 for t in stage_tasks) / len(stage_tasks), 1)
+            else:
+                stage_progress = 0
+            
+            # Calcular progreso programado para la etapa
+            if effectiveness_data:
+                stage_scheduled = effectiveness_data['metrics']['scheduled_progress']
+            else:
+                stage_scheduled = 0
+            
+            stages.append({
+                "name": stage.name,
+                "percentage": stage.percentage,
+                "scheduled_progress": stage_scheduled,
+                "actual_progress": stage_progress
+            })
+        
+        # Generar PDF
+        pdf_buffer = generate_project_report(project, tasks, effectiveness_data, stages)
+        
+        # Limpiar nombre del archivo
+        safe_name = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in project.name)
+        filename = f"Reporte_{safe_name}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generando reporte de proyecto: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
+
+@app.get("/api/reports/general")
+async def download_general_report(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Descargar reporte PDF general de todos los proyectos"""
     
-    # Generar PDF
-    pdf_buffer = generate_general_report(projects_data)
-    
-    filename = f"Reporte_General_Proyectos_{datetime.now().strftime('%Y%m%d')}.pdf"
-    
-    return StreamingResponse(
-        pdf_buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    try:
+        # Para admin: todos los proyectos
+        # Para usuario normal: solo sus proyectos asignados
+        if current_user.role == "admin":
+            projects = db.query(Project).all()
+        else:
+            member_projects = db.query(ProjectMember.project_id).filter(
+                ProjectMember.user_id == current_user.id
+            ).all()
+            project_ids = [m.project_id for m in member_projects]
+            projects = db.query(Project).filter(Project.id.in_(project_ids)).all() if project_ids else []
+        
+        if not projects:
+            raise HTTPException(status_code=404, detail="No hay proyectos para generar el reporte")
+        
+        projects_data = []
+        
+        for project in projects:
+            tasks = db.query(Task).filter(Task.project_id == project.id).all()
+            total_tasks = len(tasks)
+            completed_tasks = len([t for t in tasks if t.status == "done"])
+            
+            # Calcular efectividad
+            scheduled_progress = 0
+            actual_progress = 0
+            effectiveness = 100
+            status = "en_tiempo"
+            
+            if project.start_date and project.end_date:
+                today = datetime.now().date()
+                start = project.start_date
+                end = project.end_date
+                
+                total_days = (end - start).days
+                elapsed_days = (today - start).days
+                
+                if total_days > 0:
+                    scheduled_progress = min(100, max(0, round((elapsed_days / total_days) * 100, 1)))
+                else:
+                    scheduled_progress = 100 if today >= end else 0
+                
+                if tasks:
+                    actual_progress = round(sum(t.progress or 0 for t in tasks) / len(tasks), 1)
+                
+                if scheduled_progress > 0:
+                    effectiveness = round((actual_progress / scheduled_progress) * 100, 1)
+                
+                if effectiveness >= 100:
+                    status = "adelantado"
+                elif effectiveness >= 90:
+                    status = "en_tiempo"
+                else:
+                    status = "atrasado"
+            
+            projects_data.append({
+                "id": project.id,
+                "name": project.name or "Sin nombre",
+                "description": project.description or "",
+                "start_date": project.start_date.strftime("%d/%m/%Y") if project.start_date else "No definida",
+                "end_date": project.end_date.strftime("%d/%m/%Y") if project.end_date else "No definida",
+                "total_tasks": total_tasks,
+                "completed_tasks": completed_tasks,
+                "scheduled_progress": scheduled_progress,
+                "actual_progress": actual_progress,
+                "effectiveness": effectiveness,
+                "status": status
+            })
+        
+        # Generar PDF
+        pdf_buffer = generate_general_report(projects_data)
+        
+        filename = f"Reporte_General_Proyectos_{datetime.now().strftime('%Y%m%d')}.pdf"
+        
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generando reporte: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
 
 # ===================== WEBSOCKET =====================
 @app.websocket("/ws/{project_id}")
