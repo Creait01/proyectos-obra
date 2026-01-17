@@ -1199,11 +1199,37 @@ async def get_users(db: Session = Depends(get_db), current_user: User = Depends(
     return users
 
 # ===================== REPORTES PDF =====================
-from reports import generate_project_report, generate_general_report
+try:
+    from reports import generate_project_report, generate_general_report
+    REPORTLAB_AVAILABLE = True
+except ImportError as e:
+    REPORTLAB_AVAILABLE = False
+    REPORTLAB_ERROR = str(e)
+
+@app.get("/api/reports/test")
+async def test_reports():
+    """Endpoint de prueba para verificar que reportlab funciona"""
+    if not REPORTLAB_AVAILABLE:
+        return {"status": "error", "message": f"ReportLab no disponible: {REPORTLAB_ERROR}"}
+    
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate
+        from io import BytesIO
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        doc.build([])
+        return {"status": "ok", "message": "ReportLab funciona correctamente"}
+    except Exception as e:
+        return {"status": "error", "message": f"Error en ReportLab: {str(e)}"}
 
 @app.get("/api/reports/project/{project_id}")
 async def download_project_report(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Descargar reporte PDF de un proyecto específico"""
+    if not REPORTLAB_AVAILABLE:
+        raise HTTPException(status_code=500, detail=f"ReportLab no disponible: {REPORTLAB_ERROR}")
+    
     try:
         # Obtener proyecto
         project = db.query(Project).filter(Project.id == project_id).first()
@@ -1302,6 +1328,9 @@ async def download_project_report(project_id: int, db: Session = Depends(get_db)
 @app.get("/api/reports/general")
 async def download_general_report(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Descargar reporte PDF general de todos los proyectos"""
+    
+    if not REPORTLAB_AVAILABLE:
+        raise HTTPException(status_code=500, detail=f"ReportLab no disponible: {REPORTLAB_ERROR}")
     
     try:
         # Para admin: todos los proyectos
