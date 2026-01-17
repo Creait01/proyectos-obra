@@ -2146,7 +2146,15 @@ async function downloadReport(url, filename) {
         });
         
         if (!response.ok) {
-            throw new Error('Error al generar el reporte');
+            // Intentar leer el mensaje de error del servidor
+            let errorMsg = 'Error al generar el reporte';
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.detail || errorMsg;
+            } catch (e) {
+                errorMsg = `Error ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMsg);
         }
         
         const blob = await response.blob();
@@ -2161,7 +2169,8 @@ async function downloadReport(url, filename) {
         
         showToast('Reporte descargado exitosamente', 'success');
     } catch (error) {
-        showToast('Error al descargar el reporte: ' + error.message, 'error');
+        console.error('Error descargando reporte:', error);
+        showToast('Error: ' + error.message, 'error');
     }
 }
 

@@ -1224,6 +1224,51 @@ async def test_reports():
     except Exception as e:
         return {"status": "error", "message": f"Error en ReportLab: {str(e)}"}
 
+@app.get("/api/reports/debug")
+async def debug_report(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Debug: ver datos que se enviarían al reporte"""
+    try:
+        if current_user.role == "admin":
+            projects = db.query(Project).all()
+        else:
+            member_projects = db.query(ProjectMember.project_id).filter(
+                ProjectMember.user_id == current_user.id
+            ).all()
+            project_ids = [m.project_id for m in member_projects]
+            projects = db.query(Project).filter(Project.id.in_(project_ids)).all() if project_ids else []
+        
+        projects_data = []
+        for project in projects:
+            tasks = db.query(Task).filter(Task.project_id == project.id).all()
+            projects_data.append({
+                "id": project.id,
+                "name": project.name or "Sin nombre",
+                "description": (project.description or "")[:50],
+                "total_tasks": len(tasks),
+                "completed_tasks": len([t for t in tasks if t.status == "done"]),
+                "scheduled_progress": 0,
+                "actual_progress": 0,
+                "effectiveness": 100,
+                "status": "en_tiempo"
+            })
+        
+        # Intentar generar el PDF
+        try:
+            pdf_buffer = generate_general_report(projects_data)
+            return {"status": "ok", "projects": len(projects_data), "pdf_generated": True}
+        except Exception as pdf_error:
+            import traceback
+            return {
+                "status": "pdf_error",
+                "projects": len(projects_data),
+                "projects_data": projects_data,
+                "error": str(pdf_error),
+                "traceback": traceback.format_exc()
+            }
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
 @app.get("/api/reports/project/{project_id}")
 async def download_project_report(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Descargar reporte PDF de un proyecto específico"""
