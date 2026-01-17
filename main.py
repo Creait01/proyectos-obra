@@ -1228,7 +1228,7 @@ async def test_reports():
 async def debug_report(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Debug: ver datos que se enviarían al reporte"""
     try:
-        if current_user.role == "admin":
+        if current_user.is_admin:
             projects = db.query(Project).all()
         else:
             member_projects = db.query(ProjectMember.project_id).filter(
@@ -1288,8 +1288,9 @@ async def download_project_report(project_id: int, db: Session = Depends(get_db)
         effectiveness_data = None
         if project.start_date and project.end_date:
             today = datetime.now().date()
-            start = project.start_date
-            end = project.end_date
+            # Convertir a date si son datetime
+            start = project.start_date.date() if hasattr(project.start_date, 'date') else project.start_date
+            end = project.end_date.date() if hasattr(project.end_date, 'date') else project.end_date
             
             total_days = (end - start).days
             elapsed_days = (today - start).days
@@ -1380,7 +1381,7 @@ async def download_general_report(db: Session = Depends(get_db), current_user: U
     try:
         # Para admin: todos los proyectos
         # Para usuario normal: solo sus proyectos asignados
-        if current_user.role == "admin":
+        if current_user.is_admin:
             projects = db.query(Project).all()
         else:
             member_projects = db.query(ProjectMember.project_id).filter(
@@ -1407,8 +1408,9 @@ async def download_general_report(db: Session = Depends(get_db), current_user: U
             
             if project.start_date and project.end_date:
                 today = datetime.now().date()
-                start = project.start_date
-                end = project.end_date
+                # Convertir a date si son datetime
+                start = project.start_date.date() if hasattr(project.start_date, 'date') else project.start_date
+                end = project.end_date.date() if hasattr(project.end_date, 'date') else project.end_date
                 
                 total_days = (end - start).days
                 elapsed_days = (today - start).days
