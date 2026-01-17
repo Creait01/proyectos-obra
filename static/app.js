@@ -808,6 +808,7 @@ document.getElementById('add-task-btn').addEventListener('click', () => {
     document.getElementById('task-form').reset();
     document.getElementById('task-modal-title').textContent = 'Nueva Tarea';
     document.getElementById('delete-task-btn').style.display = 'none';
+    document.getElementById('view-history-btn').style.display = 'none'; // Ocultar historial para tareas nuevas
     document.getElementById('progress-value').textContent = '0';
     updateAssigneeSelect();
     updateStageSelect();
@@ -846,8 +847,11 @@ function openTaskModal(taskId) {
     const isAdmin = currentUser && currentUser.is_admin;
     const isMyTask = task.assignee_id === currentUser?.id;
     
+    // Mostrar botón de historial (siempre visible para tareas existentes)
+    document.getElementById('view-history-btn').style.display = 'inline-flex';
+    
     // Mostrar/ocultar botón eliminar (solo admin)
-    document.getElementById('delete-task-btn').style.display = isAdmin ? 'block' : 'none';
+    document.getElementById('delete-task-btn').style.display = isAdmin ? 'inline-flex' : 'none';
     
     // Campos que solo admin puede editar
     document.getElementById('task-title').disabled = !isAdmin;
@@ -961,6 +965,104 @@ document.getElementById('delete-task-btn').addEventListener('click', async () =>
         showToast(error.message, 'error');
     }
 });
+
+// ===================== HISTORIAL DE CAMBIOS =====================
+let currentTaskForHistory = null;
+
+document.getElementById('view-history-btn').addEventListener('click', async () => {
+    const taskId = document.getElementById('task-id').value;
+    if (!taskId) {
+        showToast('Primero guarda la tarea para ver el historial', 'info');
+        return;
+    }
+    
+    // Guardar referencia a la tarea actual
+    currentTaskForHistory = tasks.find(t => t.id === parseInt(taskId));
+    
+    // Mostrar modal de historial
+    openHistoryModal(taskId);
+});
+
+async function openHistoryModal(taskId) {
+    const modal = document.getElementById('history-modal');
+    const container = document.getElementById('history-container');
+    const titleEl = document.getElementById('history-task-title');
+    
+    // Mostrar título de la tarea
+    if (currentTaskForHistory) {
+        titleEl.textContent = currentTaskForHistory.title;
+    }
+    
+    // Mostrar loading
+    container.innerHTML = '<div class="history-loading"><i class="fas fa-spinner fa-spin"></i> Cargando historial...</div>';
+    
+    modal.classList.add('active');
+    
+    try {
+        const history = await apiRequest(`/api/tasks/${taskId}/history`);
+        
+        if (history.length === 0) {
+            container.innerHTML = `
+                <div class="history-empty">
+                    <i class="fas fa-clipboard-list"></i>
+                    <p>No hay cambios registrados para esta tarea</p>
+                    <span>Los cambios se registrarán cuando edites la tarea</span>
+                </div>
+            `;
+            return;
+        }
+        
+        // Agrupar por fecha
+        const groupedHistory = {};
+        history.forEach(entry => {
+            const date = new Date(entry.created_at);
+            const dateKey = date.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            if (!groupedHistory[dateKey]) {
+                groupedHistory[dateKey] = [];
+            }
+            groupedHistory[dateKey].push(entry);
+        });
+        
+        container.innerHTML = Object.entries(groupedHistory).map(([date, entries]) => `
+            <div class="history-date-group">
+                <div class="history-date">${date}</div>
+                ${entries.map(entry => {
+                    const time = new Date(entry.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                    return `
+                        <div class="history-entry">
+                            <div class="history-user">
+                                <div class="history-avatar" style="background: ${entry.user_avatar_color || '#6366f1'}">
+                                    ${entry.user_name.charAt(0).toUpperCase()}
+                                </div>
+                                <div class="history-user-info">
+                                    <span class="history-user-name">${entry.user_name}</span>
+                                    <span class="history-time">${time}</span>
+                                </div>
+                            </div>
+                            <div class="history-change">
+                                <span class="history-field">${entry.field_name}</span>
+                                <div class="history-values">
+                                    ${entry.old_value ? `<span class="history-old">${entry.old_value}</span>` : '<span class="history-old empty">Sin valor</span>'}
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span class="history-new">${entry.new_value || 'Sin valor'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        container.innerHTML = `
+            <div class="history-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>Error al cargar el historial</p>
+            </div>
+        `;
+        console.error('Error loading history:', error);
+    }
+}
 
 // ===================== DASHBOARD =====================
 async function loadDashboard() {

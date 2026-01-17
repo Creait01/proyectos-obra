@@ -88,6 +88,7 @@ class Task(Base):
     stage = relationship("Stage", back_populates="tasks")
     assignee = relationship("User", back_populates="assigned_tasks")
     progress_history = relationship("TaskProgress", back_populates="task", cascade="all, delete-orphan")
+    history = relationship("TaskHistory", back_populates="task", cascade="all, delete-orphan", order_by="TaskHistory.created_at.desc()")
 
 class TaskProgress(Base):
     """Historial de avances de una tarea con comentarios"""
@@ -102,6 +103,21 @@ class TaskProgress(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     task = relationship("Task", back_populates="progress_history")
+    user = relationship("User")
+
+class TaskHistory(Base):
+    """Historial completo de cambios en una tarea"""
+    __tablename__ = "task_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    field_name = Column(String(100), nullable=False)  # Campo que cambió: status, progress, description, etc.
+    old_value = Column(Text)  # Valor anterior
+    new_value = Column(Text)  # Nuevo valor
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    task = relationship("Task", back_populates="history")
     user = relationship("User")
 
 class Activity(Base):

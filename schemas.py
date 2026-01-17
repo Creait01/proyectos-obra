@@ -208,3 +208,17 @@ class ProjectEffectiveness(BaseModel):
     project_name: str
     metrics: EffectivenessMetric
     stages: List[dict] = []  # Desglose por etapas
+
+# ===================== TASK HISTORY SCHEMAS =====================
+class TaskHistoryResponse(BaseModel):
+    id: int
+    task_id: int
+    user_id: int
+    user_name: str
+    field_name: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

@@ -624,13 +624,34 @@
                     <input type="range" id="task-progress" min="0" max="100" value="0">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-danger admin-only" id="delete-task-btn" style="margin-right: auto;">
+                    <button type="button" class="btn btn-secondary" id="view-history-btn" style="margin-right: auto;">
+                        <i class="fas fa-history"></i> Historial
+                    </button>
+                    <button type="button" class="btn btn-danger admin-only" id="delete-task-btn">
                         <i class="fas fa-trash"></i> Eliminar
                     </button>
                     <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
                     <button type="submit" class="btn btn-primary admin-only">Guardar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Task History Modal -->
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal glass-card modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-history"></i> Historial de Cambios</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="history-task-title" id="history-task-title"></div>
+            <div class="history-container" id="history-container">
+                <div class="history-loading">
+                    <i class="fas fa-spinner fa-spin"></i> Cargando historial...
+                </div>
+            </div>
         </div>
     </div>
 

@@ -10,14 +10,14 @@ import os
 from datetime import datetime, timedelta
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage
+from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
     UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse, UserUpdate,
     ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse,
     ProjectMemberResponse, StageCreate, StageResponse, StageUpdate,
-    EffectivenessMetric, ProjectEffectiveness
+    EffectivenessMetric, ProjectEffectiveness, TaskHistoryResponse
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
 
@@ -80,6 +80,26 @@ def init_database():
             except Exception as e:
                 # Si ya existe, ignorar el error
                 pass
+            
+            # Crear tabla task_history si no existe
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS task_history (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        task_id INT NOT NULL,
+                        user_id INT NOT NULL,
+                        field_name VARCHAR(100) NOT NULL,
+                        old_value TEXT,
+                        new_value TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla task_history verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla task_history: {e}")
         
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
@@ -829,13 +849,118 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         if not update_fields.issubset(allowed_fields):
             raise HTTPException(status_code=403, detail="Solo puedes actualizar estado, descripción, progreso y etapa de tus tareas")
     
+    # Guardar valores anteriores para el historial
+    old_values = {
+        'status': db_task.status,
+        'progress': str(db_task.progress) if db_task.progress is not None else '0',
+        'description': db_task.description or '',
+        'title': db_task.title,
+        'priority': db_task.priority,
+        'start_date': db_task.start_date.isoformat() if db_task.start_date else None,
+        'due_date': db_task.due_date.isoformat() if db_task.due_date else None,
+        'assignee_id': str(db_task.assignee_id) if db_task.assignee_id else None,
+        'stage_id': str(db_task.stage_id) if db_task.stage_id else None
+    }
+    
     old_status = db_task.status
     
+    # Aplicar cambios
     for key, value in task.model_dump(exclude_unset=True).items():
         setattr(db_task, key, value)
     
     db.commit()
     db.refresh(db_task)
+    
+    # Registrar historial de cambios
+    field_labels = {
+        'status': 'Estado',
+        'progress': 'Progreso',
+        'description': 'Descripción',
+        'title': 'Título',
+        'priority': 'Prioridad',
+        'start_date': 'Fecha Inicio',
+        'due_date': 'Fecha Fin',
+        'assignee_id': 'Asignado',
+        'stage_id': 'Etapa'
+    }
+    
+    status_labels = {
+        'todo': 'Por Hacer',
+        'in_progress': 'En Progreso',
+        'review': 'En Revisión',
+        'done': 'Completado'
+    }
+    
+    priority_labels = {
+        'low': 'Baja',
+        'medium': 'Media',
+        'high': 'Alta'
+    }
+    
+    for key, value in task.model_dump(exclude_unset=True).items():
+        old_val = old_values.get(key)
+        
+        # Convertir valores para comparación
+        if key in ['start_date', 'due_date'] and value:
+            new_val = value.isoformat() if hasattr(value, 'isoformat') else str(value)
+        elif key == 'progress':
+            new_val = str(int(value)) if value is not None else '0'
+            old_val = str(int(float(old_val))) if old_val else '0'
+        elif key in ['assignee_id', 'stage_id']:
+            new_val = str(value) if value else None
+        else:
+            new_val = str(value) if value is not None else None
+        
+        # Solo registrar si cambió el valor
+        if str(old_val) != str(new_val):
+            # Formatear valores para mostrar
+            display_old = old_val
+            display_new = new_val
+            
+            if key == 'status':
+                display_old = status_labels.get(old_val, old_val)
+                display_new = status_labels.get(str(value), value)
+            elif key == 'priority':
+                display_old = priority_labels.get(old_val, old_val)
+                display_new = priority_labels.get(str(value), value)
+            elif key == 'progress':
+                display_old = f"{old_val}%"
+                display_new = f"{new_val}%"
+            elif key == 'assignee_id':
+                # Obtener nombre del usuario
+                if old_val:
+                    old_user = db.query(User).filter(User.id == int(old_val)).first()
+                    display_old = old_user.name if old_user else old_val
+                else:
+                    display_old = 'Sin asignar'
+                if value:
+                    new_user = db.query(User).filter(User.id == int(value)).first()
+                    display_new = new_user.name if new_user else str(value)
+                else:
+                    display_new = 'Sin asignar'
+            elif key == 'stage_id':
+                # Obtener nombre de la etapa
+                if old_val:
+                    old_stage = db.query(Stage).filter(Stage.id == int(old_val)).first()
+                    display_old = old_stage.name if old_stage else old_val
+                else:
+                    display_old = 'Sin etapa'
+                if value:
+                    new_stage = db.query(Stage).filter(Stage.id == int(value)).first()
+                    display_new = new_stage.name if new_stage else str(value)
+                else:
+                    display_new = 'Sin etapa'
+            
+            history_entry = TaskHistory(
+                task_id=task_id,
+                user_id=current_user.id,
+                field_name=field_labels.get(key, key),
+                old_value=str(display_old) if display_old else None,
+                new_value=str(display_new) if display_new else None
+            )
+            db.add(history_entry)
+    
+    db.commit()
     
     # Registrar actividad si cambió el estado
     if task.status and task.status != old_status:
@@ -878,6 +1003,34 @@ async def delete_task(task_id: int, db: Session = Depends(get_db), current_user:
     }, str(project_id))
     
     return {"message": "Tarea eliminada"}
+
+# ===================== HISTORIAL DE CAMBIOS DE TAREA =====================
+@app.get("/api/tasks/{task_id}/history")
+async def get_task_history(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener el historial de cambios de una tarea"""
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+    
+    # Obtener historial ordenado por fecha descendente
+    history = db.query(TaskHistory).filter(TaskHistory.task_id == task_id).order_by(TaskHistory.created_at.desc()).all()
+    
+    result = []
+    for entry in history:
+        user = db.query(User).filter(User.id == entry.user_id).first()
+        result.append({
+            "id": entry.id,
+            "task_id": entry.task_id,
+            "user_id": entry.user_id,
+            "user_name": user.name if user else "Usuario desconocido",
+            "user_avatar_color": user.avatar_color if user else "#6366f1",
+            "field_name": entry.field_name,
+            "old_value": entry.old_value,
+            "new_value": entry.new_value,
+            "created_at": entry.created_at.isoformat()
+        })
+    
+    return result
 
 # ===================== REGISTRO DE AVANCES =====================
 @app.post("/api/tasks/{task_id}/progress", response_model=TaskProgressResponse)

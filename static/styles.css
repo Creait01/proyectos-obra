@@ -1710,6 +1710,162 @@ body {
     max-width: 600px;
 }
 
+/* ===================== TASK HISTORY MODAL ===================== */
+.history-task-title {
+    padding: 0 24px;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.history-container {
+    padding: 15px 24px 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.history-loading,
+.history-empty,
+.history-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.history-loading i,
+.history-empty i,
+.history-error i {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+.history-empty p,
+.history-error p {
+    font-size: 1rem;
+    margin-bottom: 5px;
+}
+
+.history-empty span {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.history-error i {
+    color: var(--danger);
+}
+
+.history-date-group {
+    margin-bottom: 20px;
+}
+
+.history-date {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: capitalize;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    margin-bottom: 10px;
+}
+
+.history-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    border-left: 3px solid var(--primary);
+}
+
+.history-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.history-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+}
+
+.history-user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.history-user-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.history-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.history-change {
+    padding-left: 42px;
+}
+
+.history-field {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-light);
+    background: rgba(99, 102, 241, 0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+}
+
+.history-values {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.history-old {
+    font-size: 0.8rem;
+    color: var(--danger);
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+
+.history-old.empty {
+    text-decoration: none;
+    font-style: italic;
+    opacity: 0.5;
+}
+
+.history-values i {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.history-new {
+    font-size: 0.8rem;
+    color: var(--success);
+    font-weight: 500;
+}
+
 .modal-header {
     display: flex;
     align-items: center;
