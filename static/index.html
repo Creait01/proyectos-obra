@@ -374,13 +374,23 @@
                             <option value="">Seleccionar proyecto</option>
                         </select>
                         <div class="gantt-controls">
-                            <button class="btn btn-secondary" id="gantt-zoom-out">
+                            <!-- Navegación temporal -->
+                            <div class="gantt-navigation">
+                                <button class="gantt-nav-btn" id="gantt-prev-month" title="Mes anterior">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <span class="gantt-date-display" id="gantt-date-display">Enero 2026</span>
+                                <button class="gantt-nav-btn" id="gantt-next-month" title="Mes siguiente">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                            <button class="btn btn-secondary" id="gantt-zoom-out" title="Reducir zoom">
                                 <i class="fas fa-search-minus"></i>
                             </button>
-                            <button class="btn btn-secondary" id="gantt-zoom-in">
+                            <button class="btn btn-secondary" id="gantt-zoom-in" title="Aumentar zoom">
                                 <i class="fas fa-search-plus"></i>
                             </button>
-                            <button class="btn btn-secondary" id="gantt-today">
+                            <button class="btn btn-primary" id="gantt-today" title="Ir a hoy">
                                 <i class="fas fa-calendar-day"></i> Hoy
                             </button>
                         </div>
@@ -467,7 +477,13 @@
                                 <span class="badge" id="pending-badge">0</span>
                             </button>
                             <button class="admin-tab" data-tab="all-users">
-                                <i class="fas fa-users"></i> Todos los Usuarios
+                                <i class="fas fa-users"></i> Usuarios
+                            </button>
+                            <button class="admin-tab" data-tab="templates">
+                                <i class="fas fa-copy"></i> Plantillas
+                            </button>
+                            <button class="admin-tab" data-tab="teams">
+                                <i class="fas fa-user-friends"></i> Equipos
                             </button>
                         </div>
 
@@ -490,6 +506,59 @@
                                 <p class="admin-subtitle">Administra los usuarios del sistema</p>
                             </div>
                             <div class="all-users-list" id="all-users-list"></div>
+                        </div>
+                        
+                        <!-- Plantillas Panel -->
+                        <div class="admin-panel hidden" id="admin-templates">
+                            <div class="admin-header">
+                                <h3><i class="fas fa-copy"></i> Plantillas</h3>
+                                <p class="admin-subtitle">Crea plantillas de etapas y tareas para precargar en proyectos</p>
+                            </div>
+                            
+                            <div class="templates-section">
+                                <!-- Plantillas de Etapas -->
+                                <div class="template-category">
+                                    <div class="template-category-header">
+                                        <h4><i class="fas fa-layer-group"></i> Plantillas de Etapas</h4>
+                                        <button class="btn btn-primary btn-sm" onclick="openStageTemplateModal()">
+                                            <i class="fas fa-plus"></i> Nueva Plantilla
+                                        </button>
+                                    </div>
+                                    <div class="templates-list" id="stage-templates-list">
+                                        <div class="empty-state">
+                                            <i class="fas fa-folder-open"></i>
+                                            <p>No hay plantillas de etapas</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Plantillas de Tareas -->
+                                <div class="template-category">
+                                    <div class="template-category-header">
+                                        <h4><i class="fas fa-tasks"></i> Plantillas de Tareas</h4>
+                                        <button class="btn btn-primary btn-sm" onclick="openTaskTemplateModal()">
+                                            <i class="fas fa-plus"></i> Nueva Plantilla
+                                        </button>
+                                    </div>
+                                    <div class="templates-list" id="task-templates-list">
+                                        <div class="empty-state">
+                                            <i class="fas fa-folder-open"></i>
+                                            <p>No hay plantillas de tareas</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Equipos Panel -->
+                        <div class="admin-panel hidden" id="admin-teams">
+                            <div class="admin-header">
+                                <h3><i class="fas fa-user-friends"></i> Equipos de Administradores</h3>
+                                <p class="admin-subtitle">Asigna miembros a cada administrador</p>
+                            </div>
+                            <div class="teams-grid" id="teams-grid">
+                                <!-- Se llenará dinámicamente -->
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -756,6 +825,152 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Stage Template Modal -->
+    <div class="modal-overlay" id="stage-template-modal">
+        <div class="modal glass-card modal-lg">
+            <div class="modal-header">
+                <h2><i class="fas fa-layer-group"></i> Plantilla de Etapas</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="stage-template-form">
+                <div class="form-group">
+                    <label>Nombre de la Plantilla</label>
+                    <input type="text" id="stage-template-name" required placeholder="Ej: Obra Civil Estándar">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="stage-template-description" rows="2" placeholder="Descripción de la plantilla..."></textarea>
+                </div>
+                <div class="template-items-section">
+                    <div class="template-items-header">
+                        <h4>Etapas de la Plantilla</h4>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addStageTemplateItem()">
+                            <i class="fas fa-plus"></i> Agregar Etapa
+                        </button>
+                    </div>
+                    <div class="template-items-list" id="stage-template-items">
+                        <!-- Items dinámicos -->
+                    </div>
+                    <div class="template-total">
+                        Total: <span id="stage-template-total">0</span>%
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Plantilla
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Task Template Modal -->
+    <div class="modal-overlay" id="task-template-modal">
+        <div class="modal glass-card modal-lg">
+            <div class="modal-header">
+                <h2><i class="fas fa-tasks"></i> Plantilla de Tareas</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="task-template-form">
+                <div class="form-group">
+                    <label>Nombre de la Plantilla</label>
+                    <input type="text" id="task-template-name" required placeholder="Ej: Tareas de Fundaciones">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="task-template-description" rows="2" placeholder="Descripción de la plantilla..."></textarea>
+                </div>
+                <div class="template-items-section">
+                    <div class="template-items-header">
+                        <h4>Tareas de la Plantilla</h4>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addTaskTemplateItem()">
+                            <i class="fas fa-plus"></i> Agregar Tarea
+                        </button>
+                    </div>
+                    <div class="template-items-list" id="task-template-items">
+                        <!-- Items dinámicos -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Plantilla
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Apply Template Modal -->
+    <div class="modal-overlay" id="apply-template-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2 id="apply-template-title"><i class="fas fa-copy"></i> Aplicar Plantilla</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Selecciona el Proyecto</label>
+                    <select id="apply-template-project" class="select-styled">
+                        <option value="">Seleccionar proyecto...</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="apply-template-stage-group">
+                    <label>Etapa (opcional)</label>
+                    <select id="apply-template-stage" class="select-styled">
+                        <option value="">Sin etapa específica</option>
+                    </select>
+                </div>
+                <input type="hidden" id="apply-template-id">
+                <input type="hidden" id="apply-template-type">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="applyTemplate()">
+                    <i class="fas fa-check"></i> Aplicar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Team Member Modal -->
+    <div class="modal-overlay" id="add-team-member-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-plus"></i> Agregar Miembro al Equipo</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Administrador</label>
+                    <input type="text" id="team-admin-name" readonly class="input-readonly">
+                    <input type="hidden" id="team-admin-id">
+                </div>
+                <div class="form-group">
+                    <label>Selecciona el Usuario</label>
+                    <select id="team-member-select" class="select-styled">
+                        <option value="">Seleccionar usuario...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="addTeamMember()">
+                    <i class="fas fa-user-plus"></i> Agregar
+                </button>
+            </div>
         </div>
     </div>
 

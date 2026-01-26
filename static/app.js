@@ -232,11 +232,17 @@ function setupAdminUI() {
             const tabName = tab.dataset.tab;
             document.getElementById('admin-pending').classList.toggle('hidden', tabName !== 'pending');
             document.getElementById('admin-all-users').classList.toggle('hidden', tabName !== 'all-users');
+            document.getElementById('admin-templates').classList.toggle('hidden', tabName !== 'templates');
+            document.getElementById('admin-teams').classList.toggle('hidden', tabName !== 'teams');
             
             if (tabName === 'pending') {
                 loadPendingUsers();
-            } else {
+            } else if (tabName === 'all-users') {
                 loadAllUsersAdmin();
+            } else if (tabName === 'templates') {
+                loadTemplates();
+            } else if (tabName === 'teams') {
+                loadAdminTeams();
             }
         });
     });
@@ -2146,15 +2152,7 @@ async function downloadReport(url, filename) {
         });
         
         if (!response.ok) {
-            // Intentar leer el mensaje de error del servidor
-            let errorMsg = 'Error al generar el reporte';
-            try {
-                const errorData = await response.json();
-                errorMsg = errorData.detail || errorMsg;
-            } catch (e) {
-                errorMsg = `Error ${response.status}: ${response.statusText}`;
-            }
-            throw new Error(errorMsg);
+            throw new Error('Error al generar el reporte');
         }
         
         const blob = await response.blob();
@@ -2169,8 +2167,7 @@ async function downloadReport(url, filename) {
         
         showToast('Reporte descargado exitosamente', 'success');
     } catch (error) {
-        console.error('Error descargando reporte:', error);
-        showToast('Error: ' + error.message, 'error');
+        showToast('Error al descargar el reporte: ' + error.message, 'error');
     }
 }
 
@@ -2215,6 +2212,477 @@ function updateProjectReportButton() {
         btn.style.display = 'flex';
     } else {
         btn.style.display = 'none';
+    }
+}
+
+// ===================== GANTT NAVIGATION =====================
+let ganttCurrentDate = new Date();
+
+function updateGanttDateDisplay() {
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    document.getElementById('gantt-date-display').textContent = `${monthNames[ganttCurrentDate.getMonth()]} ${ganttCurrentDate.getFullYear()}`;
+}
+
+document.getElementById('gantt-prev-month').addEventListener('click', () => {
+    const container = document.querySelector('.gantt-container');
+    const scrollAmount = ganttScale * 30; // Aproximadamente un mes
+    container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+    ganttCurrentDate.setMonth(ganttCurrentDate.getMonth() - 1);
+    updateGanttDateDisplay();
+});
+
+document.getElementById('gantt-next-month').addEventListener('click', () => {
+    const container = document.querySelector('.gantt-container');
+    const scrollAmount = ganttScale * 30;
+    container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    ganttCurrentDate.setMonth(ganttCurrentDate.getMonth() + 1);
+    updateGanttDateDisplay();
+});
+
+// Habilitar scroll horizontal con shift+wheel
+document.querySelector('.gantt-container')?.addEventListener('wheel', (e) => {
+    if (e.shiftKey) {
+        e.preventDefault();
+        const container = e.currentTarget;
+        container.scrollLeft += e.deltaY;
+    }
+});
+
+// Inicializar display de fecha del Gantt
+updateGanttDateDisplay();
+
+// ===================== TEMPLATES =====================
+let stageTemplates = [];
+let taskTemplates = [];
+
+async function loadTemplates() {
+    try {
+        stageTemplates = await apiRequest('/api/templates/stages');
+        taskTemplates = await apiRequest('/api/templates/tasks');
+        renderStageTemplates();
+        renderTaskTemplates();
+    } catch (error) {
+        console.error('Error loading templates:', error);
+    }
+}
+
+function renderStageTemplates() {
+    const container = document.getElementById('stage-templates-list');
+    if (!stageTemplates.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <p>No hay plantillas de etapas</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = stageTemplates.map(template => `
+        <div class="template-card">
+            <div class="template-card-header">
+                <h5>${template.name}</h5>
+                <div class="template-card-actions">
+                    <button class="btn-icon" onclick="openApplyTemplateModal(${template.id}, 'stage')" title="Aplicar">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="btn-icon" onclick="deleteStageTemplate(${template.id})" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="template-card-description">${template.description || 'Sin descripción'}</p>
+            <div class="template-card-items">
+                ${template.stages.slice(0, 4).map(s => `<span class="template-item-badge">${s.name} (${s.percentage}%)</span>`).join('')}
+                ${template.stages.length > 4 ? `<span class="template-item-badge">+${template.stages.length - 4} más</span>` : ''}
+            </div>
+            <div class="template-card-footer">
+                <span class="template-card-meta">${template.stages.length} etapas</span>
+                <button class="btn btn-sm btn-primary" onclick="openApplyTemplateModal(${template.id}, 'stage')">
+                    <i class="fas fa-copy"></i> Aplicar
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderTaskTemplates() {
+    const container = document.getElementById('task-templates-list');
+    if (!taskTemplates.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <p>No hay plantillas de tareas</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = taskTemplates.map(template => `
+        <div class="template-card">
+            <div class="template-card-header">
+                <h5>${template.name}</h5>
+                <div class="template-card-actions">
+                    <button class="btn-icon" onclick="openApplyTemplateModal(${template.id}, 'task')" title="Aplicar">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="btn-icon" onclick="deleteTaskTemplate(${template.id})" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="template-card-description">${template.description || 'Sin descripción'}</p>
+            <div class="template-card-items">
+                ${template.tasks.slice(0, 3).map(t => `<span class="template-item-badge">${t.title}</span>`).join('')}
+                ${template.tasks.length > 3 ? `<span class="template-item-badge">+${template.tasks.length - 3} más</span>` : ''}
+            </div>
+            <div class="template-card-footer">
+                <span class="template-card-meta">${template.tasks.length} tareas</span>
+                <button class="btn btn-sm btn-primary" onclick="openApplyTemplateModal(${template.id}, 'task')">
+                    <i class="fas fa-copy"></i> Aplicar
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Stage Template Modal
+function openStageTemplateModal() {
+    document.getElementById('stage-template-name').value = '';
+    document.getElementById('stage-template-description').value = '';
+    document.getElementById('stage-template-items').innerHTML = '';
+    document.getElementById('stage-template-total').textContent = '0';
+    addStageTemplateItem();
+    document.getElementById('stage-template-modal').classList.add('active');
+}
+
+function addStageTemplateItem() {
+    const container = document.getElementById('stage-template-items');
+    const item = document.createElement('div');
+    item.className = 'template-item-row';
+    item.innerHTML = `
+        <input type="text" placeholder="Nombre de la etapa" class="stage-item-name" required>
+        <input type="number" placeholder="%" class="stage-item-percentage" min="0" max="100" step="0.5" onchange="updateStageTotal()">
+        <button type="button" class="btn-icon" onclick="this.parentElement.remove(); updateStageTotal();">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(item);
+}
+
+function updateStageTotal() {
+    const percentages = document.querySelectorAll('.stage-item-percentage');
+    let total = 0;
+    percentages.forEach(input => {
+        total += parseFloat(input.value) || 0;
+    });
+    const totalEl = document.getElementById('stage-template-total');
+    totalEl.textContent = total.toFixed(1);
+    totalEl.style.color = Math.abs(total - 100) < 0.1 ? 'var(--success)' : 'var(--danger)';
+}
+
+document.getElementById('stage-template-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const stages = [];
+    const rows = document.querySelectorAll('#stage-template-items .template-item-row');
+    rows.forEach((row, idx) => {
+        const name = row.querySelector('.stage-item-name').value;
+        const percentage = parseFloat(row.querySelector('.stage-item-percentage').value) || 0;
+        if (name) {
+            stages.push({ name, percentage, position: idx });
+        }
+    });
+    
+    if (stages.length === 0) {
+        showToast('Agrega al menos una etapa', 'warning');
+        return;
+    }
+    
+    try {
+        await apiRequest('/api/templates/stages', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: document.getElementById('stage-template-name').value,
+                description: document.getElementById('stage-template-description').value,
+                stages
+            })
+        });
+        showToast('Plantilla de etapas creada', 'success');
+        document.getElementById('stage-template-modal').classList.remove('active');
+        loadTemplates();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+});
+
+// Task Template Modal
+function openTaskTemplateModal() {
+    document.getElementById('task-template-name').value = '';
+    document.getElementById('task-template-description').value = '';
+    document.getElementById('task-template-items').innerHTML = '';
+    addTaskTemplateItem();
+    document.getElementById('task-template-modal').classList.add('active');
+}
+
+function addTaskTemplateItem() {
+    const container = document.getElementById('task-template-items');
+    const item = document.createElement('div');
+    item.className = 'template-item-row';
+    item.innerHTML = `
+        <input type="text" placeholder="Título de la tarea" class="task-item-title" required style="flex: 2;">
+        <select class="task-item-priority">
+            <option value="low">Baja</option>
+            <option value="medium" selected>Media</option>
+            <option value="high">Alta</option>
+        </select>
+        <input type="number" placeholder="Días" class="task-item-days" min="1" value="7" style="width: 70px;">
+        <button type="button" class="btn-icon" onclick="this.parentElement.remove();">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(item);
+}
+
+document.getElementById('task-template-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const tasks = [];
+    const rows = document.querySelectorAll('#task-template-items .template-item-row');
+    rows.forEach((row, idx) => {
+        const title = row.querySelector('.task-item-title').value;
+        const priority = row.querySelector('.task-item-priority').value;
+        const days = parseInt(row.querySelector('.task-item-days').value) || 7;
+        if (title) {
+            tasks.push({ title, priority, duration_days: days, position: idx });
+        }
+    });
+    
+    if (tasks.length === 0) {
+        showToast('Agrega al menos una tarea', 'warning');
+        return;
+    }
+    
+    try {
+        await apiRequest('/api/templates/tasks', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: document.getElementById('task-template-name').value,
+                description: document.getElementById('task-template-description').value,
+                tasks
+            })
+        });
+        showToast('Plantilla de tareas creada', 'success');
+        document.getElementById('task-template-modal').classList.remove('active');
+        loadTemplates();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+});
+
+// Apply Template
+async function openApplyTemplateModal(templateId, type) {
+    document.getElementById('apply-template-id').value = templateId;
+    document.getElementById('apply-template-type').value = type;
+    document.getElementById('apply-template-title').innerHTML = type === 'stage' 
+        ? '<i class="fas fa-layer-group"></i> Aplicar Plantilla de Etapas'
+        : '<i class="fas fa-tasks"></i> Aplicar Plantilla de Tareas';
+    
+    // Cargar proyectos
+    const select = document.getElementById('apply-template-project');
+    select.innerHTML = '<option value="">Seleccionar proyecto...</option>' + 
+        projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    
+    // Mostrar selector de etapa solo para plantillas de tareas
+    const stageGroup = document.getElementById('apply-template-stage-group');
+    if (type === 'task') {
+        stageGroup.classList.remove('hidden');
+    } else {
+        stageGroup.classList.add('hidden');
+    }
+    
+    document.getElementById('apply-template-modal').classList.add('active');
+}
+
+// Cargar etapas cuando se selecciona un proyecto
+document.getElementById('apply-template-project').addEventListener('change', async (e) => {
+    const projectId = e.target.value;
+    const stageSelect = document.getElementById('apply-template-stage');
+    
+    if (projectId && document.getElementById('apply-template-type').value === 'task') {
+        try {
+            const stages = await apiRequest(`/api/projects/${projectId}/stages`);
+            stageSelect.innerHTML = '<option value="">Sin etapa específica</option>' +
+                stages.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        } catch (error) {
+            console.error('Error loading stages:', error);
+        }
+    }
+});
+
+async function applyTemplate() {
+    const templateId = document.getElementById('apply-template-id').value;
+    const type = document.getElementById('apply-template-type').value;
+    const projectId = document.getElementById('apply-template-project').value;
+    const stageId = document.getElementById('apply-template-stage').value;
+    
+    if (!projectId) {
+        showToast('Selecciona un proyecto', 'warning');
+        return;
+    }
+    
+    try {
+        let url = type === 'stage' 
+            ? `/api/projects/${projectId}/apply-stage-template/${templateId}`
+            : `/api/projects/${projectId}/apply-task-template/${templateId}${stageId ? `?stage_id=${stageId}` : ''}`;
+        
+        const result = await apiRequest(url, { method: 'POST' });
+        showToast(result.message, 'success');
+        document.getElementById('apply-template-modal').classList.remove('active');
+        
+        // Recargar datos si es el proyecto actual
+        if (currentProject && currentProject.id == projectId) {
+            await loadProjectData(projectId);
+        }
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function deleteStageTemplate(templateId) {
+    if (!confirm('¿Estás seguro de eliminar esta plantilla?')) return;
+    
+    try {
+        await apiRequest(`/api/templates/stages/${templateId}`, { method: 'DELETE' });
+        showToast('Plantilla eliminada', 'success');
+        loadTemplates();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function deleteTaskTemplate(templateId) {
+    if (!confirm('¿Estás seguro de eliminar esta plantilla?')) return;
+    
+    try {
+        await apiRequest(`/api/templates/tasks/${templateId}`, { method: 'DELETE' });
+        showToast('Plantilla eliminada', 'success');
+        loadTemplates();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// ===================== ADMIN TEAMS =====================
+let adminTeams = [];
+
+async function loadAdminTeams() {
+    try {
+        adminTeams = await apiRequest('/api/admin/teams');
+        renderAdminTeams();
+    } catch (error) {
+        console.error('Error loading admin teams:', error);
+    }
+}
+
+function renderAdminTeams() {
+    const container = document.getElementById('teams-grid');
+    if (!adminTeams.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <p>No hay administradores registrados</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = adminTeams.map(admin => `
+        <div class="team-card">
+            <div class="team-card-header">
+                <div class="team-admin-avatar" style="background: ${admin.avatar_color || '#6366f1'}">
+                    ${getInitials(admin.admin_name)}
+                </div>
+                <div class="team-admin-info">
+                    <h4>${admin.admin_name}</h4>
+                    <span>${admin.admin_email}</span>
+                </div>
+            </div>
+            <div class="team-members-section">
+                <div class="team-members-header">
+                    <h5><i class="fas fa-users"></i> Equipo (${admin.team.length})</h5>
+                    <button class="btn btn-sm btn-secondary" onclick="openAddTeamMemberModal(${admin.admin_id}, '${admin.admin_name}')">
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                </div>
+                <div class="team-members-list">
+                    ${admin.team.length === 0 
+                        ? '<div class="team-empty"><i class="fas fa-user-slash"></i> Sin miembros asignados</div>'
+                        : admin.team.map(member => `
+                            <div class="team-member-item">
+                                <div class="team-member-avatar" style="background: ${member.avatar_color || '#6366f1'}">
+                                    ${getInitials(member.name)}
+                                </div>
+                                <div class="team-member-info">
+                                    <span>${member.name}</span>
+                                    <small>${member.email}</small>
+                                </div>
+                                <button class="btn-icon" onclick="removeTeamMember(${admin.admin_id}, ${member.id})" title="Remover del equipo">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openAddTeamMemberModal(adminId, adminName) {
+    document.getElementById('team-admin-id').value = adminId;
+    document.getElementById('team-admin-name').value = adminName;
+    
+    // Cargar usuarios disponibles (no admins y no ya en el equipo)
+    const adminTeam = adminTeams.find(t => t.admin_id === adminId);
+    const teamMemberIds = adminTeam ? adminTeam.team.map(m => m.id) : [];
+    
+    const availableUsers = users.filter(u => !u.is_admin && !teamMemberIds.includes(u.id));
+    
+    const select = document.getElementById('team-member-select');
+    select.innerHTML = '<option value="">Seleccionar usuario...</option>' +
+        availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.email})</option>`).join('');
+    
+    document.getElementById('add-team-member-modal').classList.add('active');
+}
+
+async function addTeamMember() {
+    const adminId = document.getElementById('team-admin-id').value;
+    const memberId = document.getElementById('team-member-select').value;
+    
+    if (!memberId) {
+        showToast('Selecciona un usuario', 'warning');
+        return;
+    }
+    
+    try {
+        const result = await apiRequest(`/api/admin/${adminId}/team/${memberId}`, { method: 'POST' });
+        showToast(result.message, 'success');
+        document.getElementById('add-team-member-modal').classList.remove('active');
+        loadAdminTeams();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function removeTeamMember(adminId, memberId) {
+    if (!confirm('¿Remover este miembro del equipo?')) return;
+    
+    try {
+        const result = await apiRequest(`/api/admin/${adminId}/team/${memberId}`, { method: 'DELETE' });
+        showToast(result.message, 'success');
+        loadAdminTeams();
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 

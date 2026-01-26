@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timedelta
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory
+from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
@@ -100,6 +100,105 @@ def init_database():
                 print("✅ Tabla task_history verificada")
             except Exception as e:
                 print(f"⚠️ Tabla task_history: {e}")
+            
+            # Agregar columna exclude_from_effectiveness a stages si no existe
+            try:
+                conn.execute(text("""
+                    ALTER TABLE stages ADD COLUMN exclude_from_effectiveness BOOLEAN DEFAULT FALSE
+                """))
+                conn.commit()
+                print("✅ Columna exclude_from_effectiveness agregada a stages")
+            except Exception as e:
+                pass  # Ya existe
+            
+            # Crear tabla stage_templates
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS stage_templates (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(200) NOT NULL,
+                        description TEXT,
+                        created_by INT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla stage_templates verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla stage_templates: {e}")
+            
+            # Crear tabla stage_template_items
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS stage_template_items (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        template_id INT NOT NULL,
+                        name VARCHAR(200) NOT NULL,
+                        description TEXT,
+                        percentage FLOAT NOT NULL,
+                        position INT DEFAULT 0,
+                        FOREIGN KEY (template_id) REFERENCES stage_templates(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla stage_template_items verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla stage_template_items: {e}")
+            
+            # Crear tabla task_templates
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS task_templates (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(200) NOT NULL,
+                        description TEXT,
+                        created_by INT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla task_templates verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla task_templates: {e}")
+            
+            # Crear tabla task_template_items
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS task_template_items (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        template_id INT NOT NULL,
+                        title VARCHAR(300) NOT NULL,
+                        description TEXT,
+                        priority VARCHAR(20) DEFAULT 'medium',
+                        position INT DEFAULT 0,
+                        duration_days INT DEFAULT 7,
+                        FOREIGN KEY (template_id) REFERENCES task_templates(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla task_template_items verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla task_template_items: {e}")
+            
+            # Crear tabla admin_teams
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS admin_teams (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        admin_id INT NOT NULL,
+                        member_id INT NOT NULL,
+                        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
+                        FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
+                        UNIQUE KEY unique_admin_member (admin_id, member_id)
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla admin_teams verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla admin_teams: {e}")
         
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
@@ -716,9 +815,12 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
         scheduled_progress = sum(t["scheduled_progress"] for t in task_details) / len(task_details)
         actual_progress = sum(t["actual_progress"] for t in task_details) / len(task_details)
     
-    # Si hay etapas, también calcular por etapas
+    # Si hay etapas, también calcular por etapas (excluyendo las que no tienen fechas)
     for stage in stages:
         stage_scheduled = 0.0
+        # Verificar si la etapa debe excluirse del cálculo de efectividad
+        exclude_from_calc = stage.exclude_from_effectiveness or (not stage.start_date and not stage.end_date)
+        
         if stage.start_date and stage.end_date:
             stage_start = stage.start_date.replace(hour=0, minute=0, second=0)
             stage_end = stage.end_date.replace(hour=23, minute=59, second=59)
@@ -743,7 +845,8 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
             "scheduled_progress": round(stage_scheduled, 1),
             "actual_progress": round(stage_actual, 1),
             "start_date": stage.start_date.isoformat() if stage.start_date else None,
-            "end_date": stage.end_date.isoformat() if stage.end_date else None
+            "end_date": stage.end_date.isoformat() if stage.end_date else None,
+            "exclude_from_effectiveness": exclude_from_calc
         })
     
     # Calcular efectividad global
@@ -1462,6 +1565,313 @@ async def download_general_report(db: Session = Depends(get_db), current_user: U
     except Exception as e:
         print(f"Error generando reporte: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generando reporte: {str(e)}")
+
+# ===================== PLANTILLAS DE ETAPAS =====================
+@app.get("/api/templates/stages")
+async def get_stage_templates(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener todas las plantillas de etapas"""
+    templates = db.query(StageTemplate).all()
+    result = []
+    for template in templates:
+        items = db.query(StageTemplateItem).filter(StageTemplateItem.template_id == template.id).order_by(StageTemplateItem.position).all()
+        result.append({
+            "id": template.id,
+            "name": template.name,
+            "description": template.description,
+            "created_by": template.created_by,
+            "created_at": template.created_at.isoformat() if template.created_at else None,
+            "stages": [{"id": i.id, "name": i.name, "description": i.description, "percentage": i.percentage, "position": i.position} for i in items]
+        })
+    return result
+
+@app.post("/api/templates/stages")
+async def create_stage_template(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Crear plantilla de etapas - Solo admins"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear plantillas")
+    
+    template = StageTemplate(
+        name=data.get("name"),
+        description=data.get("description"),
+        created_by=current_user.id
+    )
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    
+    # Agregar items
+    for idx, stage in enumerate(data.get("stages", [])):
+        item = StageTemplateItem(
+            template_id=template.id,
+            name=stage.get("name"),
+            description=stage.get("description"),
+            percentage=stage.get("percentage", 0),
+            position=idx
+        )
+        db.add(item)
+    db.commit()
+    
+    return {"id": template.id, "message": "Plantilla creada exitosamente"}
+
+@app.delete("/api/templates/stages/{template_id}")
+async def delete_stage_template(template_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Eliminar plantilla de etapas - Solo admins"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar plantillas")
+    
+    template = db.query(StageTemplate).filter(StageTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    
+    db.delete(template)
+    db.commit()
+    return {"message": "Plantilla eliminada"}
+
+@app.post("/api/projects/{project_id}/apply-stage-template/{template_id}")
+async def apply_stage_template(project_id: int, template_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Aplicar plantilla de etapas a un proyecto"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden aplicar plantillas")
+    
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    template = db.query(StageTemplate).filter(StageTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    
+    items = db.query(StageTemplateItem).filter(StageTemplateItem.template_id == template_id).order_by(StageTemplateItem.position).all()
+    
+    # Obtener la última posición de etapas existentes
+    last_stage = db.query(Stage).filter(Stage.project_id == project_id).order_by(Stage.position.desc()).first()
+    start_position = (last_stage.position + 1) if last_stage else 0
+    
+    created_stages = []
+    for idx, item in enumerate(items):
+        stage = Stage(
+            project_id=project_id,
+            name=item.name,
+            description=item.description,
+            percentage=item.percentage,
+            position=start_position + idx
+        )
+        db.add(stage)
+        db.commit()
+        db.refresh(stage)
+        created_stages.append({"id": stage.id, "name": stage.name})
+    
+    return {"message": f"Se crearon {len(created_stages)} etapas", "stages": created_stages}
+
+# ===================== PLANTILLAS DE TAREAS =====================
+@app.get("/api/templates/tasks")
+async def get_task_templates(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener todas las plantillas de tareas"""
+    templates = db.query(TaskTemplate).all()
+    result = []
+    for template in templates:
+        items = db.query(TaskTemplateItem).filter(TaskTemplateItem.template_id == template.id).order_by(TaskTemplateItem.position).all()
+        result.append({
+            "id": template.id,
+            "name": template.name,
+            "description": template.description,
+            "created_by": template.created_by,
+            "created_at": template.created_at.isoformat() if template.created_at else None,
+            "tasks": [{"id": i.id, "title": i.title, "description": i.description, "priority": i.priority, "position": i.position, "duration_days": i.duration_days} for i in items]
+        })
+    return result
+
+@app.post("/api/templates/tasks")
+async def create_task_template(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Crear plantilla de tareas - Solo admins"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear plantillas")
+    
+    template = TaskTemplate(
+        name=data.get("name"),
+        description=data.get("description"),
+        created_by=current_user.id
+    )
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    
+    # Agregar items
+    for idx, task in enumerate(data.get("tasks", [])):
+        item = TaskTemplateItem(
+            template_id=template.id,
+            title=task.get("title"),
+            description=task.get("description"),
+            priority=task.get("priority", "medium"),
+            duration_days=task.get("duration_days", 7),
+            position=idx
+        )
+        db.add(item)
+    db.commit()
+    
+    return {"id": template.id, "message": "Plantilla creada exitosamente"}
+
+@app.delete("/api/templates/tasks/{template_id}")
+async def delete_task_template(template_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Eliminar plantilla de tareas - Solo admins"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar plantillas")
+    
+    template = db.query(TaskTemplate).filter(TaskTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    
+    db.delete(template)
+    db.commit()
+    return {"message": "Plantilla eliminada"}
+
+@app.post("/api/projects/{project_id}/apply-task-template/{template_id}")
+async def apply_task_template(project_id: int, template_id: int, stage_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Aplicar plantilla de tareas a un proyecto"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden aplicar plantillas")
+    
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    template = db.query(TaskTemplate).filter(TaskTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    
+    items = db.query(TaskTemplateItem).filter(TaskTemplateItem.template_id == template_id).order_by(TaskTemplateItem.position).all()
+    
+    # Obtener la última posición
+    last_task = db.query(Task).filter(Task.project_id == project_id).order_by(Task.position.desc()).first()
+    start_position = (last_task.position + 1) if last_task else 0
+    
+    # Calcular fechas basadas en la fecha de inicio del proyecto
+    start_date = project.start_date or datetime.now()
+    
+    created_tasks = []
+    current_start = start_date
+    for idx, item in enumerate(items):
+        end_date = current_start + timedelta(days=item.duration_days or 7)
+        
+        task = Task(
+            project_id=project_id,
+            stage_id=stage_id,
+            title=item.title,
+            description=item.description,
+            priority=item.priority,
+            status="todo",
+            position=start_position + idx,
+            start_date=current_start,
+            due_date=end_date
+        )
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        created_tasks.append({"id": task.id, "title": task.title})
+        
+        current_start = end_date + timedelta(days=1)  # Siguiente tarea empieza al día siguiente
+    
+    return {"message": f"Se crearon {len(created_tasks)} tareas", "tasks": created_tasks}
+
+# ===================== EQUIPOS DE ADMIN =====================
+@app.get("/api/admin/teams")
+async def get_admin_teams(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener equipos de todos los admins"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver equipos")
+    
+    admins = db.query(User).filter(User.is_admin == True).all()
+    result = []
+    
+    for admin in admins:
+        team_relations = db.query(AdminTeam).filter(AdminTeam.admin_id == admin.id).all()
+        members = []
+        for relation in team_relations:
+            member = db.query(User).filter(User.id == relation.member_id).first()
+            if member:
+                members.append({
+                    "id": member.id,
+                    "name": member.name,
+                    "email": member.email,
+                    "avatar_color": member.avatar_color,
+                    "added_at": relation.added_at.isoformat() if relation.added_at else None
+                })
+        
+        result.append({
+            "admin_id": admin.id,
+            "admin_name": admin.name,
+            "admin_email": admin.email,
+            "avatar_color": admin.avatar_color,
+            "team": members
+        })
+    
+    return result
+
+@app.get("/api/admin/{admin_id}/team")
+async def get_admin_team(admin_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Obtener equipo de un admin específico"""
+    admin = db.query(User).filter(User.id == admin_id, User.is_admin == True).first()
+    if not admin:
+        raise HTTPException(status_code=404, detail="Administrador no encontrado")
+    
+    team_relations = db.query(AdminTeam).filter(AdminTeam.admin_id == admin_id).all()
+    members = []
+    for relation in team_relations:
+        member = db.query(User).filter(User.id == relation.member_id).first()
+        if member:
+            members.append({
+                "id": member.id,
+                "name": member.name,
+                "email": member.email,
+                "avatar_color": member.avatar_color,
+                "added_at": relation.added_at.isoformat() if relation.added_at else None
+            })
+    
+    return {
+        "admin_id": admin.id,
+        "admin_name": admin.name,
+        "team": members
+    }
+
+@app.post("/api/admin/{admin_id}/team/{member_id}")
+async def add_team_member(admin_id: int, member_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Agregar miembro al equipo de un admin"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden gestionar equipos")
+    
+    admin = db.query(User).filter(User.id == admin_id, User.is_admin == True).first()
+    if not admin:
+        raise HTTPException(status_code=404, detail="Administrador no encontrado")
+    
+    member = db.query(User).filter(User.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Verificar si ya está en el equipo
+    existing = db.query(AdminTeam).filter(AdminTeam.admin_id == admin_id, AdminTeam.member_id == member_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="El usuario ya está en el equipo")
+    
+    team_member = AdminTeam(admin_id=admin_id, member_id=member_id)
+    db.add(team_member)
+    db.commit()
+    
+    return {"message": f"{member.name} agregado al equipo de {admin.name}"}
+
+@app.delete("/api/admin/{admin_id}/team/{member_id}")
+async def remove_team_member(admin_id: int, member_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Remover miembro del equipo de un admin"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden gestionar equipos")
+    
+    relation = db.query(AdminTeam).filter(AdminTeam.admin_id == admin_id, AdminTeam.member_id == member_id).first()
+    if not relation:
+        raise HTTPException(status_code=404, detail="El usuario no está en el equipo")
+    
+    db.delete(relation)
+    db.commit()
+    
+    return {"message": "Miembro removido del equipo"}
 
 # ===================== WEBSOCKET =====================
 @app.websocket("/ws/{project_id}")

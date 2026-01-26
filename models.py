@@ -49,6 +49,7 @@ class Stage(Base):
     position = Column(Integer, default=0)  # Orden de la etapa
     start_date = Column(DateTime)
     end_date = Column(DateTime)
+    exclude_from_effectiveness = Column(Boolean, default=False)  # Si no tiene fechas, no afecta efectividad
     created_at = Column(DateTime, default=datetime.utcnow)
     
     project = relationship("Project", back_populates="stages")
@@ -133,3 +134,75 @@ class Activity(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="activities")
+
+
+# ==================== PLANTILLAS ====================
+class StageTemplate(Base):
+    """Plantillas de etapas que solo admins pueden crear"""
+    __tablename__ = "stage_templates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)  # Nombre de la plantilla
+    description = Column(Text)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    creator = relationship("User")
+    stages = relationship("StageTemplateItem", back_populates="template", cascade="all, delete-orphan", order_by="StageTemplateItem.position")
+
+
+class StageTemplateItem(Base):
+    """Items de una plantilla de etapas"""
+    __tablename__ = "stage_template_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("stage_templates.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(Text)
+    percentage = Column(Float, nullable=False)  # Porcentaje de la etapa
+    position = Column(Integer, default=0)
+    
+    template = relationship("StageTemplate", back_populates="stages")
+
+
+class TaskTemplate(Base):
+    """Plantillas de tareas que solo admins pueden crear"""
+    __tablename__ = "task_templates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)  # Nombre de la plantilla
+    description = Column(Text)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    creator = relationship("User")
+    tasks = relationship("TaskTemplateItem", back_populates="template", cascade="all, delete-orphan", order_by="TaskTemplateItem.position")
+
+
+class TaskTemplateItem(Base):
+    """Items de una plantilla de tareas"""
+    __tablename__ = "task_template_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("task_templates.id"), nullable=False)
+    title = Column(String(300), nullable=False)
+    description = Column(Text)
+    priority = Column(String(20), default="medium")
+    position = Column(Integer, default=0)
+    duration_days = Column(Integer, default=7)  # Duración estimada en días
+    
+    template = relationship("TaskTemplate", back_populates="tasks")
+
+
+# ==================== EQUIPOS DE ADMIN ====================
+class AdminTeam(Base):
+    """Equipos de personas asignadas a un admin"""
+    __tablename__ = "admin_teams"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # El admin líder
+    member_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Miembro del equipo
+    added_at = Column(DateTime, default=datetime.utcnow)
+    
+    admin = relationship("User", foreign_keys=[admin_id])
+    member = relationship("User", foreign_keys=[member_id])
