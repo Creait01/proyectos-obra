@@ -186,19 +186,35 @@ def init_database():
             try:
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS admin_teams (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
                         admin_id INT NOT NULL,
                         member_id INT NOT NULL,
                         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
                         FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
-                        UNIQUE KEY unique_admin_member (admin_id, member_id)
+                        UNIQUE (admin_id, member_id)
                     )
                 """))
                 conn.commit()
                 print("✅ Tabla admin_teams verificada")
             except Exception as e:
-                print(f"⚠️ Tabla admin_teams: {e}")
+                # Intentar con sintaxis MySQL si SQLite falla
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS admin_teams (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            admin_id INT NOT NULL,
+                            member_id INT NOT NULL,
+                            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
+                            FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
+                            UNIQUE KEY unique_admin_member (admin_id, member_id)
+                        )
+                    """))
+                    conn.commit()
+                    print("✅ Tabla admin_teams verificada (MySQL)")
+                except:
+                    print(f"⚠️ Tabla admin_teams: {e}")
         
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
