@@ -1454,9 +1454,8 @@ body {
 }
 
 .gantt-chart {
-    min-width: max-content;
     position: relative;
-    display: block;
+    display: table;
 }
 
 .gantt-timeline {
@@ -1464,12 +1463,11 @@ body {
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 12px;
     margin-bottom: 16px;
-    margin-left: 280px;
+    margin-left: 180px;
     position: sticky;
     top: 0;
     background: var(--bg-dark);
     z-index: 20;
-    width: max-content;
 }
 
 .gantt-day {
@@ -1532,37 +1530,37 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    width: max-content;
-    min-width: 100%;
 }
 
 .gantt-task-row {
     display: flex;
     align-items: center;
-    min-height: 60px;
-    width: max-content;
-    min-width: 100%;
+    min-height: 50px;
 }
 
 .gantt-task-info {
-    width: 280px;
-    padding: 8px 16px;
+    width: 180px;
+    min-width: 180px;
+    max-width: 180px;
+    padding: 6px 10px;
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: 8px;
     flex-shrink: 0;
+    overflow: hidden;
 }
 
 .gantt-task-details {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     min-width: 0;
     flex: 1;
+    overflow: hidden;
 }
 
 .gantt-task-name {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -1571,27 +1569,31 @@ body {
 }
 
 .gantt-task-assignee {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .gantt-task-assignee i {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
 }
 
 .gantt-task-dates {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     color: var(--primary-light);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    white-space: nowrap;
 }
 
 .gantt-task-dates i {
-    font-size: 0.6rem;
+    font-size: 0.5rem;
 }
 
 /* Métricas por tarea en el Gantt */
@@ -1625,10 +1627,9 @@ body {
 .gantt-task-bar-container {
     position: relative;
     height: 40px;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.02);
     border-radius: var(--radius-sm);
     overflow: visible;
-    flex-shrink: 0;
 }
 
 .gantt-today-line {
