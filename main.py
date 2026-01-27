@@ -1915,12 +1915,19 @@ async def get_admin_teams(db: Session = Depends(get_db), current_user: User = De
         for relation in team_relations:
             member = db.query(User).filter(User.id == relation.member_id).first()
             if member:
+                member_project_ids = db.query(ProjectMember.project_id).filter(ProjectMember.user_id == member.id).all()
+                project_ids = [p[0] for p in member_project_ids]
+                member_projects = db.query(Project).filter(Project.id.in_(project_ids)).all() if project_ids else []
                 members.append({
                     "id": member.id,
                     "name": member.name,
                     "email": member.email,
                     "avatar_color": member.avatar_color,
-                    "added_at": relation.added_at.isoformat() if relation.added_at else None
+                    "added_at": relation.added_at.isoformat() if relation.added_at else None,
+                    "projects": [
+                        {"id": p.id, "name": p.name, "color": p.color, "is_active": p.is_active}
+                        for p in member_projects
+                    ]
                 })
         
         result.append({
@@ -1945,12 +1952,19 @@ async def get_admin_team(admin_id: int, db: Session = Depends(get_db), current_u
     for relation in team_relations:
         member = db.query(User).filter(User.id == relation.member_id).first()
         if member:
+            member_project_ids = db.query(ProjectMember.project_id).filter(ProjectMember.user_id == member.id).all()
+            project_ids = [p[0] for p in member_project_ids]
+            member_projects = db.query(Project).filter(Project.id.in_(project_ids)).all() if project_ids else []
             members.append({
                 "id": member.id,
                 "name": member.name,
                 "email": member.email,
                 "avatar_color": member.avatar_color,
-                "added_at": relation.added_at.isoformat() if relation.added_at else None
+                "added_at": relation.added_at.isoformat() if relation.added_at else None,
+                "projects": [
+                    {"id": p.id, "name": p.name, "color": p.color, "is_active": p.is_active}
+                    for p in member_projects
+                ]
             })
     
     return {

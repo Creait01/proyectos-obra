@@ -3000,6 +3000,15 @@ function renderAdminTeams() {
                                 <div class="team-member-info">
                                     <span>${member.name}</span>
                                     <small>${member.email}</small>
+                                    <div class="team-member-projects">
+                                        ${(member.projects && member.projects.length)
+                                            ? member.projects.map(p => `
+                                                <span class="team-member-project-chip ${p.is_active ? '' : 'inactive'}" style="--chip-color: ${p.color}">
+                                                    <span class="dot"></span>${p.name}
+                                                </span>
+                                            `).join('')
+                                            : '<span class="team-member-project-empty">Sin proyectos</span>'}
+                                    </div>
                                 </div>
                                 <button class="btn-icon" onclick="removeTeamMember(${admin.admin_id}, ${member.id})" title="Remover del equipo">
                                     <i class="fas fa-times"></i>
