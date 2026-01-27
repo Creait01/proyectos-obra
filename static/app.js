@@ -14,6 +14,25 @@ const API_BASE = '';
 function getToken() {
     return localStorage.getItem('token');
 }
+function toggleGanttStages(event) {
+    if (event) event.preventDefault();
+    const stagesContainer = document.getElementById('gantt-stages-effectiveness');
+    const toggleBtn = document.getElementById('stages-toggle');
+    if (!stagesContainer || !toggleBtn) return;
+    stagesContainer.classList.toggle('collapsed');
+    const collapsedNow = stagesContainer.classList.contains('collapsed');
+    localStorage.setItem('gantt-stages-collapsed', collapsedNow ? 'true' : 'false');
+    const icon = toggleBtn.querySelector('i');
+    if (collapsedNow) {
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+    } else {
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+}
 
 function setToken(token) {
     localStorage.setItem('token', token);
@@ -1465,7 +1484,7 @@ async function updateGanttEffectiveness() {
                     <div class="stages-title-left">
                         <i class="fas fa-layer-group"></i> Efectividad por Etapa
                     </div>
-                    <button class="btn-icon stages-toggle" id="stages-toggle" title="Contraer/Expandir">
+                    <button class="btn-icon stages-toggle" id="stages-toggle" title="Contraer/Expandir" onclick="toggleGanttStages(event)">
                         <i class="fas fa-chevron-up"></i>
                     </button>
                 </div>
@@ -1750,22 +1769,6 @@ function renderGantt() {
                 } else {
                     toggleBtn.setAttribute('aria-expanded', 'true');
                 }
-                toggleBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    stagesContainer.classList.toggle('collapsed');
-                    const collapsedNow = stagesContainer.classList.contains('collapsed');
-                    localStorage.setItem('gantt-stages-collapsed', collapsedNow ? 'true' : 'false');
-                    const icon = toggleBtn.querySelector('i');
-                    if (collapsedNow) {
-                        icon.classList.remove('fa-chevron-up');
-                        icon.classList.add('fa-chevron-down');
-                        toggleBtn.setAttribute('aria-expanded', 'false');
-                    } else {
-                        icon.classList.remove('fa-chevron-down');
-                        icon.classList.add('fa-chevron-up');
-                        toggleBtn.setAttribute('aria-expanded', 'true');
-                    }
-                });
             }
         }
         
@@ -3133,6 +3136,7 @@ window.makeAdmin = makeAdmin;
 window.updateTempStage = updateTempStage;
 window.applyStageTemplateToProject = applyStageTemplateToProject;
 window.openQuickTaskTemplateModal = openQuickTaskTemplateModal;
+window.toggleGanttStages = toggleGanttStages;
 
 // ===================== INIT ON LOAD =====================
 document.addEventListener('DOMContentLoaded', async () => {

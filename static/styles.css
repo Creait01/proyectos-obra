@@ -3504,6 +3504,7 @@ body.user-role #add-task-btn {
     overflow: hidden;
     pointer-events: none;
     margin: 0;
+    display: none;
 }
 
 .stage-effectiveness-card {
