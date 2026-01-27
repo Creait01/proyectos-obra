@@ -328,6 +328,50 @@ body {
     box-shadow: var(--shadow-glow);
 }
 
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 26px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--border-color);
+    transition: var(--transition-fast);
+    border-radius: 999px;
+}
+
+.switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    top: 2px;
+    background: white;
+    transition: var(--transition-fast);
+    border-radius: 50%;
+}
+
+.switch input:checked + .slider {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-color: rgba(99, 102, 241, 0.6);
+}
+
+.switch input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
 /* ===================== MEMBERS SELECTOR ===================== */
 .members-selector {
     display: flex;
@@ -479,6 +523,29 @@ body {
     flex-direction: column;
     z-index: 100;
     transition: var(--transition-normal);
+}
+
+#sidebar-toggle {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+    z-index: 110;
+}
+
+#sidebar-toggle:hover {
+    transform: translateY(-50%) scale(1.05);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
+}
+
+.sidebar.collapsed #sidebar-toggle {
+    right: 8px;
 }
 
 .sidebar-header {
@@ -656,6 +723,51 @@ body {
 .project-item.active {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
+}
+
+.project-item.inactive {
+    opacity: 0.6;
+}
+
+.project-toggle {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 6px;
+}
+
+.project-toggle input {
+    display: none;
+}
+
+.project-toggle .toggle-slider {
+    width: 34px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    position: relative;
+    transition: var(--transition-fast);
+}
+
+.project-toggle .toggle-slider::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    position: absolute;
+    left: 3px;
+    top: 2px;
+    background: #fff;
+    border-radius: 50%;
+    transition: var(--transition-fast);
+}
+
+.project-toggle input:checked + .toggle-slider {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-color: rgba(99, 102, 241, 0.6);
+}
+
+.project-toggle input:checked + .toggle-slider::before {
+    transform: translateX(16px);
 }
 
 .project-item-main {
@@ -975,7 +1087,7 @@ body {
 
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 20px;
 }
 

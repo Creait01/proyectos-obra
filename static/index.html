@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3.3.0">
+    <link rel="stylesheet" href="/static/styles.css?v=3.4.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -112,6 +112,10 @@
                     <span class="badge pending-count hidden">0</span>
                 </a>
             </nav>
+
+            <button class="btn-icon" id="sidebar-toggle" title="Expandir/Contraer">
+                <i class="fas fa-angles-left"></i>
+            </button>
             
             <div class="sidebar-projects">
                 <div class="sidebar-section-header">
@@ -131,9 +135,6 @@
                         <span class="user-email"></span>
                     </div>
                 </div>
-                    <button class="btn-icon" id="sidebar-toggle" title="Expandir/Contraer">
-                        <i class="fas fa-angles-left"></i>
-                    </button>
                     <button class="btn-icon" id="logout-btn" title="Cerrar sesión">
                         <i class="fas fa-sign-out-alt"></i>
                     </button>
@@ -178,32 +179,53 @@
                 <!-- Dashboard View -->
                 <section id="dashboard-view" class="view active">
                     <div class="dashboard-grid">
-                        <div class="stats-row">
+                        <div class="stats-row projects-row">
                             <div class="stat-card glass-card">
                                 <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
                                     <i class="fas fa-project-diagram"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <span class="stat-value" id="stat-projects">0</span>
+                                    <span class="stat-value" id="stat-projects-total">0</span>
                                     <span class="stat-label">Proyectos</span>
                                 </div>
                             </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #34d399);">
+                                    <i class="fas fa-circle-check"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-projects-active">0</span>
+                                    <span class="stat-label">Activos</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #64748b, #94a3b8);">
+                                    <i class="fas fa-circle-pause"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-projects-inactive">0</span>
+                                    <span class="stat-label">Inactivos</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stats-row tasks-row">
                             <div class="stat-card glass-card">
                                 <div class="stat-icon" style="background: linear-gradient(135deg, #06b6d4, #0ea5e9);">
                                     <i class="fas fa-clipboard-list"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <span class="stat-value" id="stat-tasks">0</span>
+                                    <span class="stat-value" id="stat-tasks-total">0</span>
                                     <span class="stat-label">Total Tareas</span>
                                 </div>
                             </div>
                             <div class="stat-card glass-card">
-                                <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #34d399);">
-                                    <i class="fas fa-check-circle"></i>
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #64748b, #94a3b8);">
+                                    <i class="fas fa-list"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <span class="stat-value" id="stat-completed">0</span>
-                                    <span class="stat-label">Completadas</span>
+                                    <span class="stat-value" id="stat-tasks-todo">0</span>
+                                    <span class="stat-label">Por Hacer</span>
                                 </div>
                             </div>
                             <div class="stat-card glass-card">
@@ -211,8 +233,35 @@
                                     <i class="fas fa-spinner"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <span class="stat-value" id="stat-progress">0</span>
+                                    <span class="stat-value" id="stat-tasks-progress">0</span>
                                     <span class="stat-label">En Progreso</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #f97316);">
+                                    <i class="fas fa-eye"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-tasks-review">0</span>
+                                    <span class="stat-label">En Revisión</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #34d399);">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-tasks-done">0</span>
+                                    <span class="stat-label">Completadas</span>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);">
+                                    <i class="fas fa-rotate"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <span class="stat-value" id="stat-tasks-restart">0</span>
+                                    <span class="stat-label">Reinicio</span>
                                 </div>
                             </div>
                             <div class="stat-card glass-card">
@@ -220,7 +269,7 @@
                                     <i class="fas fa-exclamation-triangle"></i>
                                 </div>
                                 <div class="stat-info">
-                                    <span class="stat-value" id="stat-overdue">0</span>
+                                    <span class="stat-value" id="stat-tasks-overdue">0</span>
                                     <span class="stat-label">Vencidas</span>
                                 </div>
                             </div>
@@ -624,6 +673,14 @@
                         <button type="button" class="color-option" data-color="#3b82f6" style="background: #3b82f6;"></button>
                     </div>
                     <input type="hidden" id="project-color" value="#6366f1">
+                </div>
+                <div class="form-group">
+                    <label>Estado del Proyecto</label>
+                    <label class="switch">
+                        <input type="checkbox" id="project-active" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <small class="form-hint">Activo = visible en listas y selector</small>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-users"></i> Miembros del Proyecto</label>
@@ -1041,6 +1098,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=3.3.0"></script>
+    <script src="/static/app.js?v=3.4.0"></script>
 </body>
 </html>

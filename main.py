@@ -110,6 +110,16 @@ def init_database():
                 print("✅ Columna exclude_from_effectiveness agregada a stages")
             except Exception as e:
                 pass  # Ya existe
+
+            # Agregar columna is_active a projects si no existe
+            try:
+                conn.execute(text("""
+                    ALTER TABLE projects ADD COLUMN is_active BOOLEAN DEFAULT TRUE
+                """))
+                conn.commit()
+                print("✅ Columna is_active agregada a projects")
+            except Exception as e:
+                pass  # Ya existe
             
             # Crear tabla stage_templates
             try:
@@ -497,6 +507,7 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
                 "owner_id": project.owner_id,
                 "start_date": project.start_date,
                 "end_date": project.end_date,
+                "is_active": project.is_active,
                 "created_at": project.created_at,
                 "updated_at": project.updated_at,
                 "members": members
@@ -514,6 +525,7 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
             "owner_id": p.owner_id,
             "start_date": p.start_date,
             "end_date": p.end_date,
+            "is_active": p.is_active,
             "created_at": p.created_at,
             "updated_at": p.updated_at,
             "members": []
@@ -531,7 +543,8 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         color=project.color or "#6366f1",
         owner_id=current_user.id,
         start_date=project.start_date,
-        end_date=project.end_date
+        end_date=project.end_date,
+        is_active=project.is_active if project.is_active is not None else True
     )
     db.add(new_project)
     db.commit()
@@ -564,6 +577,7 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         "owner_id": new_project.owner_id,
         "start_date": new_project.start_date,
         "end_date": new_project.end_date,
+        "is_active": new_project.is_active,
         "created_at": new_project.created_at,
         "updated_at": new_project.updated_at,
         "members": [{"id": current_user.id, "name": current_user.name, "email": current_user.email, "avatar_color": current_user.avatar_color}]
@@ -611,6 +625,7 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
         "owner_id": db_project.owner_id,
         "start_date": db_project.start_date,
         "end_date": db_project.end_date,
+        "is_active": db_project.is_active,
         "created_at": db_project.created_at,
         "updated_at": db_project.updated_at,
         "members": members
@@ -1337,9 +1352,13 @@ async def get_progress_history(task_id: int, db: Session = Depends(get_db), curr
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
 async def get_dashboard_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     total_projects = db.query(Project).count()
+    active_projects = db.query(Project).filter(Project.is_active == True).count()
+    inactive_projects = db.query(Project).filter(Project.is_active == False).count()
     total_tasks = db.query(Task).count()
     completed_tasks = db.query(Task).filter(Task.status == "done").count()
     in_progress_tasks = db.query(Task).filter(Task.status == "in_progress").count()
+    review_tasks = db.query(Task).filter(Task.status == "review").count()
+    restart_tasks = db.query(Task).filter(Task.status == "restart").count()
     pending_tasks = db.query(Task).filter(Task.status == "todo").count()
     
     # Tareas por prioridad
@@ -1355,9 +1374,14 @@ async def get_dashboard_stats(db: Session = Depends(get_db), current_user: User 
     
     return DashboardStats(
         total_projects=total_projects,
+        active_projects=active_projects,
+        inactive_projects=inactive_projects,
         total_tasks=total_tasks,
+        todo_tasks=pending_tasks,
         completed_tasks=completed_tasks,
         in_progress_tasks=in_progress_tasks,
+        review_tasks=review_tasks,
+        restart_tasks=restart_tasks,
         pending_tasks=pending_tasks,
         high_priority_tasks=high_priority,
         medium_priority_tasks=medium_priority,

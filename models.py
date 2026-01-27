@@ -29,6 +29,7 @@ class Project(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     start_date = Column(DateTime)
     end_date = Column(DateTime)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

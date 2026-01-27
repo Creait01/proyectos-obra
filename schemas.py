@@ -51,6 +51,7 @@ class ProjectBase(BaseModel):
     color: Optional[str] = "#6366f1"
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    is_active: Optional[bool] = True
 
 class ProjectCreate(ProjectBase):
     pass
@@ -61,6 +62,7 @@ class ProjectUpdate(BaseModel):
     color: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
     member_ids: Optional[List[int]] = None  # Lista de IDs de usuarios miembros
 
 class ProjectMemberResponse(BaseModel):
@@ -184,9 +186,14 @@ class ActivityResponse(BaseModel):
 # ===================== DASHBOARD SCHEMAS =====================
 class DashboardStats(BaseModel):
     total_projects: int
+    active_projects: int
+    inactive_projects: int
     total_tasks: int
+    todo_tasks: int
     completed_tasks: int
     in_progress_tasks: int
+    review_tasks: int
+    restart_tasks: int
     pending_tasks: int
     high_priority_tasks: int
     medium_priority_tasks: int

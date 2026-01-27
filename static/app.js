@@ -358,14 +358,23 @@ async function loadProjects() {
 function renderProjectList() {
     const list = document.getElementById('project-list');
     const isAdmin = currentUser && currentUser.is_admin;
+
+    const sortedProjects = [...projects].sort((a, b) => {
+        if (a.is_active === b.is_active) return a.name.localeCompare(b.name);
+        return a.is_active ? -1 : 1;
+    });
     
-    list.innerHTML = projects.map(p => `
-        <div class="project-item ${currentProject?.id === p.id ? 'active' : ''}" data-id="${p.id}">
+    list.innerHTML = sortedProjects.map(p => `
+        <div class="project-item ${currentProject?.id === p.id ? 'active' : ''} ${p.is_active ? '' : 'inactive'}" data-id="${p.id}">
             <div class="project-item-main">
                 <span class="project-dot" style="background: ${p.color}"></span>
                 <span class="project-name">${p.name}</span>
             </div>
             ${isAdmin ? `
+                <label class="project-toggle" title="${p.is_active ? 'Activo' : 'Inactivo'}">
+                    <input type="checkbox" ${p.is_active ? 'checked' : ''} data-project-id="${p.id}">
+                    <span class="toggle-slider"></span>
+                </label>
                 <button class="btn-edit-project" onclick="event.stopPropagation(); editProject(${p.id})" title="Editar proyecto">
                     <i class="fas fa-pen"></i>
                 </button>
@@ -376,10 +385,34 @@ function renderProjectList() {
     list.querySelectorAll('.project-item').forEach(item => {
         item.addEventListener('click', () => selectProject(parseInt(item.dataset.id)));
     });
+
+    if (isAdmin) {
+        list.querySelectorAll('.project-toggle input').forEach(toggle => {
+            toggle.addEventListener('change', async (e) => {
+                e.stopPropagation();
+                const projectId = parseInt(toggle.dataset.projectId);
+                const isActive = toggle.checked;
+                try {
+                    await apiRequest(`/api/projects/${projectId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ is_active: isActive })
+                    });
+                    await loadProjects();
+                    loadDashboard();
+                } catch (error) {
+                    showToast(error.message, 'error');
+                }
+            });
+        });
+    }
 }
 
 function updateProjectSelects() {
-    const options = projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    const activeProjects = projects.filter(p => p.is_active);
+    let options = activeProjects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    if (currentProject && !currentProject.is_active) {
+        options = `<option value="${currentProject.id}">${currentProject.name} (Inactivo)</option>` + options;
+    }
     
     ['kanban-project-select', 'gantt-project-select'].forEach(id => {
         const select = document.getElementById(id);
@@ -683,6 +716,7 @@ document.getElementById('add-project-btn').addEventListener('click', () => {
     document.getElementById('project-form').reset();
     document.getElementById('project-modal-title').textContent = 'Nuevo Proyecto';
     document.getElementById('project-color').value = '#6366f1';
+    document.getElementById('project-active').checked = true;
     document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
     document.querySelector('.color-option[data-color="#6366f1"]').classList.add('selected');
     
@@ -709,6 +743,7 @@ async function editProject(projectId) {
     document.getElementById('project-start').value = project.start_date ? project.start_date.split('T')[0] : '';
     document.getElementById('project-end').value = project.end_date ? project.end_date.split('T')[0] : '';
     document.getElementById('project-color').value = project.color;
+    document.getElementById('project-active').checked = project.is_active !== false;
     document.getElementById('project-modal-title').textContent = 'Editar Proyecto';
     
     document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
@@ -761,6 +796,7 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
         color: document.getElementById('project-color').value,
         start_date: startDate ? new Date(startDate).toISOString() : null,
         end_date: endDate ? new Date(endDate).toISOString() : null,
+        is_active: document.getElementById('project-active').checked,
         member_ids: memberIds
     };
     
@@ -1326,11 +1362,17 @@ document.getElementById('effectiveness-project-select')?.addEventListener('chang
 });
 
 function renderStats(stats) {
-    document.getElementById('stat-projects').textContent = stats.total_projects;
-    document.getElementById('stat-tasks').textContent = stats.total_tasks;
-    document.getElementById('stat-completed').textContent = stats.completed_tasks;
-    document.getElementById('stat-progress').textContent = stats.in_progress_tasks;
-    document.getElementById('stat-overdue').textContent = stats.overdue_tasks;
+    document.getElementById('stat-projects-total').textContent = stats.total_projects;
+    document.getElementById('stat-projects-active').textContent = stats.active_projects;
+    document.getElementById('stat-projects-inactive').textContent = stats.inactive_projects;
+
+    document.getElementById('stat-tasks-total').textContent = stats.total_tasks;
+    document.getElementById('stat-tasks-todo').textContent = stats.todo_tasks;
+    document.getElementById('stat-tasks-progress').textContent = stats.in_progress_tasks;
+    document.getElementById('stat-tasks-review').textContent = stats.review_tasks;
+    document.getElementById('stat-tasks-done').textContent = stats.completed_tasks;
+    document.getElementById('stat-tasks-restart').textContent = stats.restart_tasks;
+    document.getElementById('stat-tasks-overdue').textContent = stats.overdue_tasks;
     
     // Progress ring
     const rate = stats.completion_rate;
