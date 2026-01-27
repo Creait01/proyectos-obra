@@ -828,11 +828,6 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
             "effectiveness": round(task_effectiveness, 1)
         })
     
-    # Calcular promedio global basado en tareas
-    if tasks_with_dates:
-        scheduled_progress = sum(t["scheduled_progress"] for t in task_details) / len(task_details)
-        actual_progress = sum(t["actual_progress"] for t in task_details) / len(task_details)
-    
     # Si hay etapas, también calcular por etapas (excluyendo las que no tienen fechas)
     for stage in stages:
         stage_scheduled = 0.0
@@ -866,6 +861,15 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
             "end_date": stage.end_date.isoformat() if stage.end_date else None,
             "exclude_from_effectiveness": exclude_from_calc
         })
+
+    # Calcular promedio global: preferir etapas con fechas
+    eligible_stages = [s for s in stage_details if s["start_date"] and s["end_date"] and not s["exclude_from_effectiveness"]]
+    if eligible_stages:
+        scheduled_progress = sum(s["scheduled_progress"] for s in eligible_stages) / len(eligible_stages)
+        actual_progress = sum(s["actual_progress"] for s in eligible_stages) / len(eligible_stages)
+    elif tasks_with_dates:
+        scheduled_progress = sum(t["scheduled_progress"] for t in task_details) / len(task_details)
+        actual_progress = sum(t["actual_progress"] for t in task_details) / len(task_details)
     
     # Calcular efectividad global
     if scheduled_progress > 0:
