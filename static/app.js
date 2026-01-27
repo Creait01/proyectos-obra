@@ -1472,53 +1472,32 @@ function renderGantt() {
     // Actualizar efectividad
     updateGanttEffectiveness();
     
-    // Siempre mostrar el timeline de fechas
     const timeline = document.getElementById('gantt-timeline');
     const taskRows = document.getElementById('gantt-tasks');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Definir rango de fechas: si hay tareas con fechas usarlas, si no mostrar desde hoy
-    let minDate, maxDate;
-    let tasksWithDates = [];
+    // USAR EL MES SELECCIONADO (ganttCurrentDate) como base
+    // Mostrar solo el mes seleccionado + 7 días del mes siguiente para contexto
+    const selectedYear = ganttCurrentDate.getFullYear();
+    const selectedMonth = ganttCurrentDate.getMonth();
     
+    // Primer día del mes seleccionado
+    const minDate = new Date(selectedYear, selectedMonth, 1);
+    // Último día del mes + 7 días extra
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth + 1, 0);
+    const maxDate = new Date(selectedYear, selectedMonth + 1, 7);
+    
+    // Actualizar el display del mes
+    updateGanttDateDisplay();
+    
+    // Obtener tareas con fechas
+    let tasksWithDates = [];
     if (currentProject && tasks.length > 0) {
         tasksWithDates = tasks.filter(t => t.start_date || t.due_date);
     }
     
-    if (tasksWithDates.length > 0) {
-        // Usar fechas de las tareas
-        minDate = new Date('2099-12-31');
-        maxDate = new Date('1970-01-01');
-        
-        tasksWithDates.forEach(t => {
-            if (t.start_date) {
-                const start = new Date(t.start_date);
-                if (start < minDate) minDate = new Date(start);
-                if (start > maxDate) maxDate = new Date(start);
-            }
-            if (t.due_date) {
-                const end = new Date(t.due_date);
-                if (end > maxDate) maxDate = new Date(end);
-                if (end < minDate) minDate = new Date(end);
-            }
-        });
-        
-        // Solo 7 días antes de la primera tarea
-        minDate.setDate(minDate.getDate() - 7);
-        // Solo 14 días después de la última tarea
-        maxDate.setDate(maxDate.getDate() + 14);
-    } else {
-        // Sin tareas: mostrar solo 30 días desde hoy
-        minDate = new Date(today);
-        maxDate = new Date(today);
-        maxDate.setDate(maxDate.getDate() + 30);
-    }
-    
-    // NO forzar mínimo de días - mostrar solo lo necesario
-    // El scroll permitirá navegar si hay más días
-    
-    // Render timeline - SIEMPRE mostrar las fechas
+    // Render timeline - mostrar solo el mes seleccionado
     const days = [];
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -1559,6 +1538,19 @@ function renderGantt() {
         return;
     }
     
+    // Filtrar tareas que están visibles en este rango de fechas
+    const visibleTasks = tasksWithDates.filter(t => {
+        const taskStart = t.start_date ? new Date(t.start_date) : new Date(t.due_date);
+        const taskEnd = t.due_date ? new Date(t.due_date) : new Date(t.start_date);
+        // La tarea es visible si se superpone con el rango del mes
+        return taskEnd >= minDate && taskStart <= maxDate;
+    });
+    
+    if (visibleTasks.length === 0) {
+        taskRows.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-calendar-alt" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>No hay tareas en ${monthNames[selectedMonth]} ${selectedYear}</div>`;
+        return;
+    }
+    
     // Render task bars
     const colors = {
         todo: '#64748b',
@@ -1567,10 +1559,9 @@ function renderGantt() {
         done: '#10b981'
     };
     
-    console.log('Total días:', totalDays, 'Scale:', ganttScale);
-    console.log('Total días:', totalDays, 'Scale:', ganttScale);
+    console.log('Total días:', totalDays, 'Scale:', ganttScale, 'Tareas visibles:', visibleTasks.length);
     
-    taskRows.innerHTML = tasksWithDates.map(task => {
+    taskRows.innerHTML = visibleTasks.map(task => {
         const start = task.start_date ? new Date(task.start_date) : new Date(task.due_date);
         const end = task.due_date ? new Date(task.due_date) : new Date(task.start_date);
         
@@ -1669,24 +1660,6 @@ function renderGantt() {
     taskRows.querySelectorAll('.gantt-task-bar').forEach(bar => {
         bar.addEventListener('click', () => openTaskModal(parseInt(bar.dataset.id)));
     });
-    
-    // Auto-scroll a la primera tarea o al día de hoy
-    setTimeout(() => {
-        const container = document.querySelector('.gantt-container');
-        if (container) {
-            // Encontrar la primera barra de tarea visible
-            const firstBar = taskRows.querySelector('.gantt-task-bar');
-            if (firstBar) {
-                // Obtener la posición left de la primera tarea
-                const barLeft = parseInt(firstBar.style.left) || 0;
-                // Scroll a un poco antes de la primera tarea
-                container.scrollLeft = Math.max(0, barLeft - 100);
-            } else if (todayIndex >= 0) {
-                // Si no hay tareas, ir al día de hoy
-                container.scrollLeft = Math.max(0, (todayIndex * ganttScale) - 200);
-            }
-        }
-    }, 100);
 }
 
 document.getElementById('gantt-zoom-in').addEventListener('click', () => {
@@ -1697,14 +1670,6 @@ document.getElementById('gantt-zoom-in').addEventListener('click', () => {
 document.getElementById('gantt-zoom-out').addEventListener('click', () => {
     ganttScale = Math.max(20, ganttScale - 10);
     renderGantt();
-});
-
-document.getElementById('gantt-today').addEventListener('click', () => {
-    const container = document.querySelector('.gantt-container');
-    const today = document.querySelector('.gantt-day.today');
-    if (today) {
-        today.scrollIntoView({ behavior: 'smooth', inline: 'center' });
-    }
 });
 
 // ===================== MY TASKS =====================
@@ -2390,32 +2355,37 @@ function updateGanttDateDisplay() {
 }
 
 document.getElementById('gantt-prev-month').addEventListener('click', () => {
-    const container = document.querySelector('.gantt-container');
-    const scrollAmount = ganttScale * 30; // Aproximadamente un mes
-    container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
     ganttCurrentDate.setMonth(ganttCurrentDate.getMonth() - 1);
-    updateGanttDateDisplay();
+    renderGantt();
 });
 
 document.getElementById('gantt-next-month').addEventListener('click', () => {
-    const container = document.querySelector('.gantt-container');
-    const scrollAmount = ganttScale * 30;
-    container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     ganttCurrentDate.setMonth(ganttCurrentDate.getMonth() + 1);
-    updateGanttDateDisplay();
+    renderGantt();
 });
 
-// Habilitar scroll horizontal con shift+wheel
+document.getElementById('gantt-today').addEventListener('click', () => {
+    // Ir al mes actual
+    ganttCurrentDate = new Date();
+    renderGantt();
+    // Scroll al día de hoy
+    setTimeout(() => {
+        const todayEl = document.querySelector('.gantt-day.today');
+        if (todayEl) {
+            todayEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 100);
+});
+
+// Habilitar scroll horizontal con shift+wheel o directamente con wheel
 document.querySelector('.gantt-container')?.addEventListener('wheel', (e) => {
-    if (e.shiftKey) {
+    const container = e.currentTarget;
+    // Permitir scroll horizontal siempre (con o sin Shift)
+    if (e.deltaX !== 0 || e.shiftKey) {
         e.preventDefault();
-        const container = e.currentTarget;
-        container.scrollLeft += e.deltaY;
+        container.scrollLeft += e.shiftKey ? e.deltaY : e.deltaX;
     }
 });
-
-// Inicializar display de fecha del Gantt
-updateGanttDateDisplay();
 
 // ===================== TEMPLATES =====================
 let stageTemplates = [];
