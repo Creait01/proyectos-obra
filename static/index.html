@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3.0.0">
+    <link rel="stylesheet" href="/static/styles.css?v=3.1.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -86,27 +86,27 @@
             </div>
             
             <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" data-view="dashboard">
+                <a href="#" class="nav-item active" data-view="dashboard" data-label="Dashboard">
                     <i class="fas fa-chart-pie"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="#" class="nav-item" data-view="kanban">
+                <a href="#" class="nav-item" data-view="kanban" data-label="Kanban">
                     <i class="fas fa-columns"></i>
                     <span>Kanban</span>
                 </a>
-                <a href="#" class="nav-item" data-view="gantt">
+                <a href="#" class="nav-item" data-view="gantt" data-label="Gantt">
                     <i class="fas fa-stream"></i>
                     <span>Gantt</span>
                 </a>
-                <a href="#" class="nav-item" data-view="my-tasks">
+                <a href="#" class="nav-item" data-view="my-tasks" data-label="Mis Tareas">
                     <i class="fas fa-tasks"></i>
                     <span>Mis Tareas</span>
                 </a>
-                <a href="#" class="nav-item" data-view="team">
+                <a href="#" class="nav-item" data-view="team" data-label="Equipo">
                     <i class="fas fa-users"></i>
                     <span>Equipo</span>
                 </a>
-                <a href="#" class="nav-item admin-only hidden" data-view="admin">
+                <a href="#" class="nav-item admin-only hidden" data-view="admin" data-label="Administración">
                     <i class="fas fa-user-shield"></i>
                     <span>Administración</span>
                     <span class="badge pending-count hidden">0</span>
