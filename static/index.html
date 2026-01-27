@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=2.1.0">
+    <link rel="stylesheet" href="/static/styles.css?v=2.2.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -322,9 +322,14 @@
                         <select id="kanban-project-select" class="select-styled">
                             <option value="">Seleccionar proyecto</option>
                         </select>
-                        <button class="btn btn-primary" id="add-task-btn">
-                            <i class="fas fa-plus"></i> Nueva Tarea
-                        </button>
+                        <div class="kanban-actions">
+                            <button class="btn btn-secondary" id="apply-task-template-btn" title="Cargar tareas desde plantilla">
+                                <i class="fas fa-magic"></i> Plantilla
+                            </button>
+                            <button class="btn btn-primary" id="add-task-btn">
+                                <i class="fas fa-plus"></i> Nueva Tarea
+                            </button>
+                        </div>
                     </div>
                     <div class="kanban-board" id="kanban-board">
                         <div class="kanban-column" data-status="todo">
@@ -925,6 +930,41 @@
         </div>
     </div>
 
+    <!-- Quick Task Template Modal -->
+    <div class="modal-overlay" id="quick-task-template-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2><i class="fas fa-magic"></i> Aplicar Plantilla de Tareas</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Selecciona una Plantilla</label>
+                    <select id="quick-task-template-select" class="select-styled">
+                        <option value="">Seleccionar plantilla...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Etapa (opcional)</label>
+                    <select id="quick-task-template-stage" class="select-styled">
+                        <option value="">Sin etapa específica</option>
+                    </select>
+                </div>
+                <div class="template-preview" id="quick-template-preview">
+                    <p class="text-muted">Selecciona una plantilla para ver las tareas que se crearán</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="apply-quick-template-btn">
+                    <i class="fas fa-check"></i> Aplicar al Proyecto
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Apply Template Modal -->
     <div class="modal-overlay" id="apply-template-modal">
         <div class="modal glass-card">
@@ -993,6 +1033,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=2.1.0"></script>
+    <script src="/static/app.js?v=2.2.0"></script>
 </body>
 </html>

@@ -2744,6 +2744,103 @@ async function deleteTaskTemplate(templateId) {
     }
 }
 
+// ===================== QUICK TASK TEMPLATE (desde Kanban) =====================
+function openQuickTaskTemplateModal() {
+    if (!currentProject) {
+        showToast('Primero selecciona un proyecto', 'warning');
+        return;
+    }
+    
+    if (taskTemplates.length === 0) {
+        showToast('No hay plantillas de tareas disponibles. Crea una desde Administración.', 'info');
+        return;
+    }
+    
+    // Cargar plantillas en el selector
+    const select = document.getElementById('quick-task-template-select');
+    select.innerHTML = '<option value="">Seleccionar plantilla...</option>' +
+        taskTemplates.map(t => `<option value="${t.id}">${t.name} (${t.tasks?.length || 0} tareas)</option>`).join('');
+    
+    // Cargar etapas del proyecto actual
+    loadQuickTemplateStages();
+    
+    // Limpiar preview
+    document.getElementById('quick-template-preview').innerHTML = '<p class="text-muted">Selecciona una plantilla para ver las tareas que se crearán</p>';
+    
+    openModal('quick-task-template-modal');
+}
+
+async function loadQuickTemplateStages() {
+    const stageSelect = document.getElementById('quick-task-template-stage');
+    if (!currentProject) return;
+    
+    try {
+        const stages = await apiRequest(`/api/projects/${currentProject.id}/stages`);
+        stageSelect.innerHTML = '<option value="">Sin etapa específica</option>' +
+            stages.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading stages:', error);
+    }
+}
+
+document.getElementById('quick-task-template-select')?.addEventListener('change', (e) => {
+    const templateId = parseInt(e.target.value);
+    const preview = document.getElementById('quick-template-preview');
+    
+    if (!templateId) {
+        preview.innerHTML = '<p class="text-muted">Selecciona una plantilla para ver las tareas que se crearán</p>';
+        return;
+    }
+    
+    const template = taskTemplates.find(t => t.id === templateId);
+    if (!template || !template.tasks || template.tasks.length === 0) {
+        preview.innerHTML = '<p class="text-muted">Esta plantilla no tiene tareas</p>';
+        return;
+    }
+    
+    preview.innerHTML = `
+        <div class="template-preview-title">${template.name} - ${template.tasks.length} tareas:</div>
+        <div class="template-preview-items">
+            ${template.tasks.map(task => `
+                <div class="template-preview-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>${task.title}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+});
+
+document.getElementById('apply-quick-template-btn')?.addEventListener('click', async () => {
+    const templateId = document.getElementById('quick-task-template-select').value;
+    const stageId = document.getElementById('quick-task-template-stage').value;
+    
+    if (!templateId) {
+        showToast('Selecciona una plantilla', 'warning');
+        return;
+    }
+    
+    if (!currentProject) {
+        showToast('No hay proyecto seleccionado', 'error');
+        return;
+    }
+    
+    try {
+        const url = `/api/projects/${currentProject.id}/apply-task-template/${templateId}${stageId ? `?stage_id=${stageId}` : ''}`;
+        const result = await apiRequest(url, { method: 'POST' });
+        showToast(result.message, 'success');
+        closeModal('quick-task-template-modal');
+        
+        // Recargar datos del proyecto
+        await loadProjectData(currentProject.id);
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+});
+
+// Event listener para el botón de plantilla en kanban
+document.getElementById('apply-task-template-btn')?.addEventListener('click', openQuickTaskTemplateModal);
+
 // ===================== ADMIN TEAMS =====================
 let adminTeams = [];
 
@@ -2885,6 +2982,7 @@ window.removeAdmin = removeAdmin;
 window.makeAdmin = makeAdmin;
 window.updateTempStage = updateTempStage;
 window.applyStageTemplateToProject = applyStageTemplateToProject;
+window.openQuickTaskTemplateModal = openQuickTaskTemplateModal;
 
 // ===================== INIT ON LOAD =====================
 document.addEventListener('DOMContentLoaded', async () => {
