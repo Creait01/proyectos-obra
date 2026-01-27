@@ -3429,6 +3429,7 @@ body.user-role #add-task-btn {
     max-width: 100%;
     width: 100%;
     box-sizing: border-box;
+    transition: max-height 0.35s ease, opacity 0.25s ease;
 }
 
 .gantt-stages-effectiveness::-webkit-scrollbar {
@@ -3454,10 +3455,31 @@ body.user-role #add-task-btn {
     color: var(--text-secondary);
     margin-bottom: 12px;
     padding-left: 5px;
+    justify-content: space-between;
 }
 
 .stages-effectiveness-title i {
     color: var(--primary);
+}
+
+.stages-title-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stages-toggle {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+}
+
+.stages-toggle:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .stages-effectiveness-grid {
@@ -3465,6 +3487,19 @@ body.user-role #add-task-btn {
     flex-wrap: wrap;
     gap: 8px;
     width: 100%;
+    transition: max-height 0.35s ease, opacity 0.25s ease;
+}
+
+.gantt-stages-effectiveness.collapsed {
+    max-height: 40px;
+    opacity: 0.7;
+}
+
+.gantt-stages-effectiveness.collapsed .stages-effectiveness-grid {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
 }
 
 .stage-effectiveness-card {

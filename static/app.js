@@ -1462,7 +1462,12 @@ async function updateGanttEffectiveness() {
         if (data.stages && data.stages.length > 0) {
             stagesContainer.innerHTML = `
                 <div class="stages-effectiveness-title">
-                    <i class="fas fa-layer-group"></i> Efectividad por Etapa
+                    <div class="stages-title-left">
+                        <i class="fas fa-layer-group"></i> Efectividad por Etapa
+                    </div>
+                    <button class="btn-icon stages-toggle" id="stages-toggle" title="Contraer/Expandir">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
                 </div>
                 <div class="stages-effectiveness-grid">
                     ${data.stages.map(stage => {
@@ -1732,6 +1737,30 @@ function renderGantt() {
                     </div>
                 </div>
             `;
+
+            // Toggle collapse
+            const toggleBtn = document.getElementById('stages-toggle');
+            if (toggleBtn) {
+                const isCollapsed = localStorage.getItem('gantt-stages-collapsed') === 'true';
+                if (isCollapsed) {
+                    stagesContainer.classList.add('collapsed');
+                    toggleBtn.querySelector('i').classList.remove('fa-chevron-up');
+                    toggleBtn.querySelector('i').classList.add('fa-chevron-down');
+                }
+                toggleBtn.addEventListener('click', () => {
+                    stagesContainer.classList.toggle('collapsed');
+                    const collapsedNow = stagesContainer.classList.contains('collapsed');
+                    localStorage.setItem('gantt-stages-collapsed', collapsedNow ? 'true' : 'false');
+                    const icon = toggleBtn.querySelector('i');
+                    if (collapsedNow) {
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    } else {
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    }
+                });
+            }
         }
         
         return `
