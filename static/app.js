@@ -1746,8 +1746,12 @@ function renderGantt() {
                     stagesContainer.classList.add('collapsed');
                     toggleBtn.querySelector('i').classList.remove('fa-chevron-up');
                     toggleBtn.querySelector('i').classList.add('fa-chevron-down');
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                } else {
+                    toggleBtn.setAttribute('aria-expanded', 'true');
                 }
-                toggleBtn.addEventListener('click', () => {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
                     stagesContainer.classList.toggle('collapsed');
                     const collapsedNow = stagesContainer.classList.contains('collapsed');
                     localStorage.setItem('gantt-stages-collapsed', collapsedNow ? 'true' : 'false');
@@ -1755,9 +1759,11 @@ function renderGantt() {
                     if (collapsedNow) {
                         icon.classList.remove('fa-chevron-up');
                         icon.classList.add('fa-chevron-down');
+                        toggleBtn.setAttribute('aria-expanded', 'false');
                     } else {
                         icon.classList.remove('fa-chevron-down');
                         icon.classList.add('fa-chevron-up');
+                        toggleBtn.setAttribute('aria-expanded', 'true');
                     }
                 });
             }
