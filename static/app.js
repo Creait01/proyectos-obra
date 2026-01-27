@@ -1567,13 +1567,20 @@ function renderGantt() {
         const start = task.start_date ? new Date(task.start_date) : new Date(task.due_date);
         const end = task.due_date ? new Date(task.due_date) : new Date(task.start_date);
         
-        // Calcular posición y duración
+        // Calcular posición y duración ORIGINALES
         const startDayOffset = Math.floor((start - minDate) / (1000 * 60 * 60 * 24));
         const endDayOffset = Math.floor((end - minDate) / (1000 * 60 * 60 * 24));
-        const durationDays = Math.max(1, endDayOffset - startDayOffset + 1);
         
-        const startOffset = startDayOffset * ganttScale;
-        const duration = durationDays * ganttScale;
+        // RECORTAR al rango visible (0 a totalDays)
+        const clippedStartDay = Math.max(0, Math.min(totalDays - 1, startDayOffset));
+        const clippedEndDay = Math.max(0, Math.min(totalDays - 1, endDayOffset));
+        const clippedDurationDays = Math.max(1, clippedEndDay - clippedStartDay + 1);
+        
+        // Verificar si la tarea está completamente fuera del rango visible
+        const isOutOfRange = endDayOffset < 0 || startDayOffset >= totalDays;
+        
+        const startOffset = clippedStartDay * ganttScale;
+        const duration = clippedDurationDays * ganttScale;
         
         // CALCULAR AVANCE PROGRAMADO DE ESTA TAREA
         let scheduledProgress = 0;
@@ -1616,6 +1623,17 @@ function renderGantt() {
         
         console.log(`Tarea: ${task.title}, Start: ${start.toDateString()}, End: ${end.toDateString()}, Programado: ${scheduledProgress}%, Real: ${task.progress}%, Efectividad: ${taskEffectiveness}%`);
         
+        // Indicadores de recorte (si la barra está recortada al inicio o al final)
+        const isClippedStart = startDayOffset < 0;
+        const isClippedEnd = endDayOffset >= totalDays;
+        const clipStartIndicator = isClippedStart ? '◀' : '';
+        const clipEndIndicator = isClippedEnd ? '▶' : '';
+        
+        // Bordes redondeados según recorte
+        const borderRadiusLeft = isClippedStart ? '0' : '6px';
+        const borderRadiusRight = isClippedEnd ? '0' : '6px';
+        const borderRadius = `${borderRadiusLeft} ${borderRadiusRight} ${borderRadiusRight} ${borderRadiusLeft}`;
+        
         // Get assignee name
         const assignee = task.assignee_id ? users.find(u => u.id === task.assignee_id) : null;
         const assigneeName = assignee ? assignee.name : 'Sin asignar';
@@ -1627,6 +1645,28 @@ function renderGantt() {
         // Color según estado
         const barColor = colors[task.status] || '#64748b';
         
+        // Si la tarea está completamente fuera del rango visible, mostrar indicador
+        if (isOutOfRange) {
+            return `
+                <div class="gantt-task-row">
+                    <div class="gantt-task-info">
+                        <span class="priority-dot ${task.priority}"></span>
+                        <div class="gantt-task-details">
+                            <span class="gantt-task-name">${task.title}</span>
+                            <span class="gantt-task-assignee"><i class="fas fa-user"></i> ${assigneeName}</span>
+                            <span class="gantt-task-dates"><i class="fas fa-calendar"></i> ${startDateStr} - ${endDateStr}</span>
+                        </div>
+                    </div>
+                    <div class="gantt-task-bar-container" style="width: ${timelineWidth}px;">
+                        ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${(todayIndex * ganttScale) + (ganttScale / 2)}px;"></div>` : ''}
+                        <div style="position: absolute; left: ${startDayOffset < 0 ? 0 : timelineWidth - 100}px; padding: 8px 12px; color: #94a3b8; font-size: 0.75rem; font-style: italic;">
+                            ${startDayOffset < 0 ? '◀ Antes de este período' : 'Después de este período ▶'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
         return `
             <div class="gantt-task-row">
                 <div class="gantt-task-info">
@@ -1637,20 +1677,20 @@ function renderGantt() {
                         <span class="gantt-task-dates"><i class="fas fa-calendar"></i> ${startDateStr} - ${endDateStr}</span>
                     </div>
                 </div>
-                <div class="gantt-task-bar-container" style="width: ${timelineWidth}px;">
+                <div class="gantt-task-bar-container" style="width: ${timelineWidth}px; max-width: ${timelineWidth}px; overflow: hidden;">
                     ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${(todayIndex * ganttScale) + (ganttScale / 2)}px;"></div>` : ''}
-                    <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 36px; top: 2px; background: ${barColor}; border-radius: 6px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); overflow: hidden;" 
+                    <div style="position: absolute; left: ${startOffset}px; width: ${duration}px; height: 36px; top: 2px; background: ${barColor}; border-radius: ${borderRadius}; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); overflow: hidden;" 
                          class="gantt-task-bar"
                          data-id="${task.id}" 
                          title="📅 Prog: ${scheduledProgress}% | ✅ Real: ${task.progress}% | ${effectivenessIcon} Efect: ${taskEffectiveness}%">
                         <!-- Barra de progreso programado (fondo gris más oscuro) -->
-                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${scheduledProgress}%; background: rgba(0,0,0,0.3); border-radius: 6px 0 0 6px;"></div>
+                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${scheduledProgress}%; background: rgba(0,0,0,0.3);"></div>
                         <!-- Barra de progreso real (overlay brillante) -->
-                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${task.progress}%; background: rgba(255,255,255,0.35); border-radius: 6px 0 0 6px;"></div>
+                        <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${task.progress}%; background: rgba(255,255,255,0.35);"></div>
                         <!-- Indicadores de texto -->
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 8px; position: relative; z-index: 1; height: 100%;">
-                            <span style="color: rgba(255,255,255,0.8); font-size: 0.65rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">📅${scheduledProgress}%</span>
-                            <span style="color: white; font-size: 0.8rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${task.progress}%</span>
+                            <span style="color: rgba(255,255,255,0.9); font-size: 0.65rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${clipStartIndicator} 📅${scheduledProgress}%</span>
+                            <span style="color: white; font-size: 0.8rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${task.progress}% ${clipEndIndicator}</span>
                         </div>
                     </div>
                 </div>
