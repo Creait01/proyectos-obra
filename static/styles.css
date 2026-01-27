@@ -1285,37 +1285,41 @@ body {
 .gantt-navigation {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     background: var(--bg-card);
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
 }
 
 .gantt-nav-btn {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border: none;
-    background: var(--bg-card-hover);
-    color: var(--text-primary);
+    background: var(--primary);
+    color: white;
     border-radius: var(--radius-sm);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: var(--transition-fast);
+    font-size: 0.8rem;
+    font-weight: bold;
 }
 
 .gantt-nav-btn:hover {
-    background: var(--primary);
-    color: white;
+    background: var(--primary-light);
+    transform: scale(1.05);
 }
 
 .gantt-date-display {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    min-width: 150px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    min-width: 120px;
     text-align: center;
+    padding: 0 8px;
 }
 
 .gantt-container {

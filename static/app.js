@@ -1332,63 +1332,54 @@ function renderGantt() {
     // Actualizar efectividad
     updateGanttEffectiveness();
     
-    if (!currentProject) {
-        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Selecciona un proyecto para ver el Gantt</p>';
-        document.getElementById('gantt-tasks').innerHTML = '';
-        return;
-    }
-    
-    if (tasks.length === 0) {
-        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Este proyecto no tiene tareas</p>';
-        document.getElementById('gantt-tasks').innerHTML = '';
-        return;
-    }
-    
-    // Find date range
-    const tasksWithDates = tasks.filter(t => t.start_date || t.due_date);
-    console.log('Tareas con fechas:', tasksWithDates.length);
-    
-    if (tasksWithDates.length === 0) {
-        document.getElementById('gantt-timeline').innerHTML = '<p style="padding: 20px; color: var(--text-muted);">Las tareas necesitan fechas de inicio o fin para mostrar el Gantt</p>';
-        document.getElementById('gantt-tasks').innerHTML = '';
-        return;
-    }
-    
-    // Inicializar con fechas extremas para encontrar el rango real
-    let minDate = new Date('2099-12-31');
-    let maxDate = new Date('1970-01-01');
-    
-    tasksWithDates.forEach(t => {
-        if (t.start_date) {
-            const start = new Date(t.start_date);
-            if (start < minDate) minDate = new Date(start);
-            if (start > maxDate) maxDate = new Date(start);
-        }
-        if (t.due_date) {
-            const end = new Date(t.due_date);
-            if (end > maxDate) maxDate = new Date(end);
-            if (end < minDate) minDate = new Date(end);
-        }
-    });
-    
-    console.log('Rango de fechas - Min:', minDate, 'Max:', maxDate);
-    
-    // Add padding - mostrar al menos 90 días
-    minDate.setDate(minDate.getDate() - 7);
-    maxDate.setDate(maxDate.getDate() + 90);
-    
-    // Asegurar mínimo 120 días de visualización
-    const diffDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
-    if (diffDays < 120) {
-        maxDate.setDate(maxDate.getDate() + (120 - diffDays));
-    }
-    
-    // Render timeline with full dates
+    // Siempre mostrar el timeline de fechas
     const timeline = document.getElementById('gantt-timeline');
-    const days = [];
+    const taskRows = document.getElementById('gantt-tasks');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
+    // Definir rango de fechas: si hay tareas con fechas usarlas, si no mostrar 3 meses desde hoy
+    let minDate, maxDate;
+    let tasksWithDates = [];
+    
+    if (currentProject && tasks.length > 0) {
+        tasksWithDates = tasks.filter(t => t.start_date || t.due_date);
+    }
+    
+    if (tasksWithDates.length > 0) {
+        // Usar fechas de las tareas
+        minDate = new Date('2099-12-31');
+        maxDate = new Date('1970-01-01');
+        
+        tasksWithDates.forEach(t => {
+            if (t.start_date) {
+                const start = new Date(t.start_date);
+                if (start < minDate) minDate = new Date(start);
+                if (start > maxDate) maxDate = new Date(start);
+            }
+            if (t.due_date) {
+                const end = new Date(t.due_date);
+                if (end > maxDate) maxDate = new Date(end);
+                if (end < minDate) minDate = new Date(end);
+            }
+        });
+        
+        minDate.setDate(minDate.getDate() - 7);
+        maxDate.setDate(maxDate.getDate() + 90);
+    } else {
+        // Sin tareas: mostrar 3 meses desde el inicio del mes actual
+        minDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        maxDate = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+    }
+    
+    // Asegurar mínimo 90 días de visualización
+    const diffDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
+    if (diffDays < 90) {
+        maxDate.setDate(maxDate.getDate() + (90 - diffDays));
+    }
+    
+    // Render timeline - SIEMPRE mostrar las fechas
+    const days = [];
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     
@@ -1410,8 +1401,25 @@ function renderGantt() {
     }
     timeline.innerHTML = days.join('');
     
-    // Render task bars with assignee name
-    const taskRows = document.getElementById('gantt-tasks');
+    const totalDays = dayIndex;
+    
+    // Mostrar mensaje si no hay proyecto o tareas
+    if (!currentProject) {
+        taskRows.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-hand-pointer" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>Selecciona un proyecto para ver las tareas</div>';
+        return;
+    }
+    
+    if (tasks.length === 0) {
+        taskRows.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-tasks" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>Este proyecto no tiene tareas</div>';
+        return;
+    }
+    
+    if (tasksWithDates.length === 0) {
+        taskRows.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-calendar-plus" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>Las tareas necesitan fechas para mostrar el Gantt</div>';
+        return;
+    }
+    
+    // Render task bars
     const colors = {
         todo: '#64748b',
         in_progress: '#06b6d4',
@@ -1419,7 +1427,7 @@ function renderGantt() {
         done: '#10b981'
     };
     
-    const totalDays = dayIndex;
+    console.log('Total días:', totalDays, 'Scale:', ganttScale);
     console.log('Total días:', totalDays, 'Scale:', ganttScale);
     
     taskRows.innerHTML = tasksWithDates.map(task => {
@@ -2381,7 +2389,7 @@ function updateStageTotal() {
     totalEl.style.color = Math.abs(total - 100) < 0.1 ? 'var(--success)' : 'var(--danger)';
 }
 
-document.getElementById('stage-template-form').addEventListener('submit', async (e) => {
+document.getElementById('stage-template-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const stages = [];
@@ -2444,7 +2452,7 @@ function addTaskTemplateItem() {
     container.appendChild(item);
 }
 
-document.getElementById('task-template-form').addEventListener('submit', async (e) => {
+document.getElementById('task-template-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const tasks = [];
@@ -2505,7 +2513,7 @@ async function openApplyTemplateModal(templateId, type) {
 }
 
 // Cargar etapas cuando se selecciona un proyecto
-document.getElementById('apply-template-project').addEventListener('change', async (e) => {
+document.getElementById('apply-template-project')?.addEventListener('change', async (e) => {
     const projectId = e.target.value;
     const stageSelect = document.getElementById('apply-template-stage');
     
@@ -2685,6 +2693,33 @@ async function removeTeamMember(adminId, memberId) {
         showToast(error.message, 'error');
     }
 }
+
+// ===================== EXPONER FUNCIONES GLOBALES =====================
+// Exponer funciones para onclick en HTML
+window.openStageTemplateModal = openStageTemplateModal;
+window.openTaskTemplateModal = openTaskTemplateModal;
+window.addStageTemplateItem = addStageTemplateItem;
+window.addTaskTemplateItem = addTaskTemplateItem;
+window.updateStageTotal = updateStageTotal;
+window.openApplyTemplateModal = openApplyTemplateModal;
+window.applyTemplate = applyTemplate;
+window.deleteStageTemplate = deleteStageTemplate;
+window.deleteTaskTemplate = deleteTaskTemplate;
+window.openAddTeamMemberModal = openAddTeamMemberModal;
+window.addTeamMember = addTeamMember;
+window.removeTeamMember = removeTeamMember;
+window.openTaskModal = openTaskModal;
+window.openProgressModal = openProgressModal;
+window.openProgressHistory = openProgressHistory;
+window.approveUser = approveUser;
+window.rejectUser = rejectUser;
+window.toggleUserAdmin = toggleUserAdmin;
+window.deleteUser = deleteUser;
+window.openEditUserModal = openEditUserModal;
+window.editProject = editProject;
+window.removeTempStage = removeTempStage;
+window.removeAdmin = removeAdmin;
+window.makeAdmin = makeAdmin;
 
 // ===================== INIT ON LOAD =====================
 document.addEventListener('DOMContentLoaded', async () => {
