@@ -3000,6 +3000,25 @@ body.user-role #add-task-btn {
 /* Efectividad por Etapas */
 .gantt-stages-effectiveness {
     margin-bottom: 15px;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary) var(--bg-card);
+}
+
+.gantt-stages-effectiveness::-webkit-scrollbar {
+    height: 8px;
+}
+
+.gantt-stages-effectiveness::-webkit-scrollbar-track {
+    background: var(--bg-card);
+    border-radius: 4px;
+}
+
+.gantt-stages-effectiveness::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    border-radius: 4px;
 }
 
 .stages-effectiveness-title {
@@ -3018,12 +3037,15 @@ body.user-role #add-task-btn {
 }
 
 .stages-effectiveness-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
     gap: 12px;
+    min-width: max-content;
 }
 
 .stage-effectiveness-card {
+    min-width: 220px;
+    flex-shrink: 0;
     background: var(--bg-card);
     border-radius: var(--radius-md);
     padding: 12px;
