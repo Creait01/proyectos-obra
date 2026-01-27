@@ -226,20 +226,34 @@ function setupAdminUI() {
     // Setup admin tabs
     document.querySelectorAll('.admin-tab').forEach(tab => {
         tab.addEventListener('click', () => {
+            console.log('Tab clicked:', tab.dataset.tab);
             document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             
             const tabName = tab.dataset.tab;
-            document.getElementById('admin-pending').classList.toggle('hidden', tabName !== 'pending');
-            document.getElementById('admin-all-users').classList.toggle('hidden', tabName !== 'all-users');
-            document.getElementById('admin-templates').classList.toggle('hidden', tabName !== 'templates');
-            document.getElementById('admin-teams').classList.toggle('hidden', tabName !== 'teams');
+            const adminPending = document.getElementById('admin-pending');
+            const adminAllUsers = document.getElementById('admin-all-users');
+            const adminTemplates = document.getElementById('admin-templates');
+            const adminTeams = document.getElementById('admin-teams');
+            
+            console.log('Elementos encontrados:', {
+                pending: !!adminPending,
+                allUsers: !!adminAllUsers,
+                templates: !!adminTemplates,
+                teams: !!adminTeams
+            });
+            
+            adminPending?.classList.toggle('hidden', tabName !== 'pending');
+            adminAllUsers?.classList.toggle('hidden', tabName !== 'all-users');
+            adminTemplates?.classList.toggle('hidden', tabName !== 'templates');
+            adminTeams?.classList.toggle('hidden', tabName !== 'teams');
             
             if (tabName === 'pending') {
                 loadPendingUsers();
             } else if (tabName === 'all-users') {
                 loadAllUsersAdmin();
             } else if (tabName === 'templates') {
+                console.log('Cargando plantillas...');
                 loadTemplates();
             } else if (tabName === 'teams') {
                 loadAdminTeams();
@@ -2265,17 +2279,36 @@ let taskTemplates = [];
 
 async function loadTemplates() {
     try {
+        console.log('Cargando plantillas...');
         stageTemplates = await apiRequest('/api/templates/stages');
+        console.log('Plantillas de etapas:', stageTemplates);
         taskTemplates = await apiRequest('/api/templates/tasks');
+        console.log('Plantillas de tareas:', taskTemplates);
         renderStageTemplates();
         renderTaskTemplates();
     } catch (error) {
         console.error('Error loading templates:', error);
+        // Mostrar mensaje de error en la UI
+        const stageContainer = document.getElementById('stage-templates-list');
+        const taskContainer = document.getElementById('task-templates-list');
+        const errorHtml = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i>
+                <p>Error al cargar plantillas</p>
+                <small style="color: var(--text-muted);">Verifica la conexión con el servidor</small>
+            </div>
+        `;
+        if (stageContainer) stageContainer.innerHTML = errorHtml;
+        if (taskContainer) taskContainer.innerHTML = errorHtml;
     }
 }
 
 function renderStageTemplates() {
     const container = document.getElementById('stage-templates-list');
+    if (!container) {
+        console.error('Container stage-templates-list no encontrado');
+        return;
+    }
     if (!stageTemplates.length) {
         container.innerHTML = `
             <div class="empty-state">
@@ -2316,6 +2349,10 @@ function renderStageTemplates() {
 
 function renderTaskTemplates() {
     const container = document.getElementById('task-templates-list');
+    if (!container) {
+        console.error('Container task-templates-list no encontrado');
+        return;
+    }
     if (!taskTemplates.length) {
         container.innerHTML = `
             <div class="empty-state">
