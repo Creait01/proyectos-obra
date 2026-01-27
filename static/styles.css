@@ -1369,19 +1369,19 @@ body {
     padding: 0 8px;
 }
 
+/* Contenedor principal del Gantt con scroll */
 .gantt-container {
-    overflow-x: auto !important;
+    overflow-x: scroll !important;
     overflow-y: auto;
     padding: 24px;
     position: relative;
-    /* Scroll suave con mouse wheel */
     scroll-behavior: smooth;
-    /* Indicador visual de scroll */
     scrollbar-width: thin;
     scrollbar-color: var(--primary) var(--bg-card);
-    /* Asegurar que el scroll funcione */
-    max-width: 100%;
     -webkit-overflow-scrolling: touch;
+    /* Limitar el ancho para forzar el scroll */
+    max-width: calc(100vw - var(--sidebar-width) - 100px);
+    width: 100%;
 }
 
 /* Scrollbar personalizado */
@@ -1432,7 +1432,7 @@ body {
 .gantt-chart {
     min-width: max-content;
     position: relative;
-    display: inline-block;
+    display: block;
 }
 
 .gantt-timeline {
@@ -1445,6 +1445,7 @@ body {
     top: 0;
     background: var(--bg-dark);
     z-index: 20;
+    width: max-content;
 }
 
 .gantt-day {

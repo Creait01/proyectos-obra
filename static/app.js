@@ -1478,7 +1478,7 @@ function renderGantt() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Definir rango de fechas: si hay tareas con fechas usarlas, si no mostrar 3 meses desde hoy
+    // Definir rango de fechas: si hay tareas con fechas usarlas, si no mostrar desde hoy
     let minDate, maxDate;
     let tasksWithDates = [];
     
@@ -1504,19 +1504,19 @@ function renderGantt() {
             }
         });
         
+        // Solo 7 días antes de la primera tarea
         minDate.setDate(minDate.getDate() - 7);
-        maxDate.setDate(maxDate.getDate() + 90);
+        // Solo 14 días después de la última tarea
+        maxDate.setDate(maxDate.getDate() + 14);
     } else {
-        // Sin tareas: mostrar 3 meses desde el inicio del mes actual
-        minDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        maxDate = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+        // Sin tareas: mostrar solo 30 días desde hoy
+        minDate = new Date(today);
+        maxDate = new Date(today);
+        maxDate.setDate(maxDate.getDate() + 30);
     }
     
-    // Asegurar mínimo 90 días de visualización
-    const diffDays = Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24));
-    if (diffDays < 90) {
-        maxDate.setDate(maxDate.getDate() + (90 - diffDays));
-    }
+    // NO forzar mínimo de días - mostrar solo lo necesario
+    // El scroll permitirá navegar si hay más días
     
     // Render timeline - SIEMPRE mostrar las fechas
     const days = [];
@@ -1669,6 +1669,24 @@ function renderGantt() {
     taskRows.querySelectorAll('.gantt-task-bar').forEach(bar => {
         bar.addEventListener('click', () => openTaskModal(parseInt(bar.dataset.id)));
     });
+    
+    // Auto-scroll a la primera tarea o al día de hoy
+    setTimeout(() => {
+        const container = document.querySelector('.gantt-container');
+        if (container) {
+            // Encontrar la primera barra de tarea visible
+            const firstBar = taskRows.querySelector('.gantt-task-bar');
+            if (firstBar) {
+                // Obtener la posición left de la primera tarea
+                const barLeft = parseInt(firstBar.style.left) || 0;
+                // Scroll a un poco antes de la primera tarea
+                container.scrollLeft = Math.max(0, barLeft - 100);
+            } else if (todayIndex >= 0) {
+                // Si no hay tareas, ir al día de hoy
+                container.scrollLeft = Math.max(0, (todayIndex * ganttScale) - 200);
+            }
+        }
+    }, 100);
 }
 
 document.getElementById('gantt-zoom-in').addEventListener('click', () => {
