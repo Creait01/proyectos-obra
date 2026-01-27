@@ -17,6 +17,7 @@ DANGER_COLOR = colors.HexColor('#ef4444')
 GRAY_DARK = colors.HexColor('#1f2937')
 GRAY_LIGHT = colors.HexColor('#f3f4f6')
 WHITE = colors.white
+MID_GRAY = colors.HexColor('#e5e7eb')
 
 def create_styles():
     """Crear estilos personalizados para el PDF"""
@@ -25,20 +26,18 @@ def create_styles():
     styles.add(ParagraphStyle(
         name='MainTitle',
         parent=styles['Heading1'],
-        fontSize=24,
-        textColor=PRIMARY_COLOR,
-        spaceAfter=20,
-        alignment=TA_CENTER,
+        fontSize=22,
+        textColor=WHITE,
+        alignment=TA_LEFT,
         fontName='Helvetica-Bold'
     ))
     
     styles.add(ParagraphStyle(
         name='Subtitle',
         parent=styles['Normal'],
-        fontSize=14,
-        textColor=GRAY_DARK,
-        spaceAfter=30,
-        alignment=TA_CENTER
+        fontSize=11,
+        textColor=WHITE,
+        alignment=TA_LEFT
     ))
     
     styles.add(ParagraphStyle(
@@ -46,7 +45,7 @@ def create_styles():
         parent=styles['Heading2'],
         fontSize=14,
         textColor=PRIMARY_DARK,
-        spaceBefore=25,
+        spaceBefore=18,
         spaceAfter=15,
         fontName='Helvetica-Bold',
         borderPadding=(0, 0, 5, 0)
@@ -101,19 +100,26 @@ def create_header(styles, title, subtitle=None):
     """Crear encabezado del reporte"""
     elements = []
     
-    # Linea decorativa superior
-    elements.append(HRFlowable(width="100%", thickness=3, color=PRIMARY_COLOR, spaceAfter=20))
-    
-    # Titulo principal
-    elements.append(Paragraph(title, styles['MainTitle']))
-    
-    if subtitle:
-        elements.append(Paragraph(subtitle, styles['Subtitle']))
-    
-    # Fecha de generacion
+    # Banner superior
     fecha = datetime.now().strftime("%d/%m/%Y - %H:%M hrs")
-    elements.append(Paragraph(f"Generado el: {fecha}", styles['SmallText']))
-    elements.append(Spacer(1, 20))
+    banner_data = [[
+        Paragraph(f"{title}", styles['MainTitle']),
+        Paragraph(f"{subtitle or ''}<br/><font size='8'>Generado el: {fecha}</font>", styles['Subtitle'])
+    ]]
+    banner = Table(banner_data, colWidths=[280, 240])
+    banner.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), PRIMARY_COLOR),
+        ('TEXTCOLOR', (0, 0), (-1, -1), WHITE),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 18),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 18),
+        ('TOPPADDING', (0, 0), (-1, -1), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
+    ]))
+    elements.append(banner)
+    elements.append(Spacer(1, 18))
     
     return elements
 
@@ -123,7 +129,12 @@ def create_metrics_table(metrics_data):
         return Spacer(1, 10)
     
     # Crear tabla horizontal de metricas
-    values_row = [Paragraph(f"<font size='20' color='#6366f1'><b>{m['value']}</b></font>", getSampleStyleSheet()['Normal']) for m in metrics_data]
+    values_row = [
+        Paragraph(
+            f"<font size='18' color='{m.get('color', '#6366f1')}'><b>{m['value']}</b></font>",
+            getSampleStyleSheet()['Normal']
+        ) for m in metrics_data
+    ]
     labels_row = [Paragraph(f"<font size='9' color='#6b7280'>{m['label']}</font>", getSampleStyleSheet()['Normal']) for m in metrics_data]
     
     table = Table([values_row, labels_row], colWidths=[120] * len(metrics_data))
@@ -131,7 +142,7 @@ def create_metrics_table(metrics_data):
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('BACKGROUND', (0, 0), (-1, -1), GRAY_LIGHT),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+        ('BOX', (0, 0), (-1, -1), 1, MID_GRAY),
         ('TOPPADDING', (0, 0), (-1, 0), 15),
         ('BOTTOMPADDING', (0, 1), (-1, 1), 15),
         ('LEFTPADDING', (0, 0), (-1, -1), 10),
@@ -171,7 +182,7 @@ def create_effectiveness_box(scheduled, actual, effectiveness, status):
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('BACKGROUND', (0, 0), (-1, -1), GRAY_LIGHT),
         ('BOX', (0, 0), (-1, -1), 2, PRIMARY_COLOR),
-        ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#e5e7eb')),
+        ('LINEBELOW', (0, 0), (-1, 0), 1, MID_GRAY),
         ('TOPPADDING', (0, 0), (-1, -1), 12),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
     ]))
@@ -187,7 +198,8 @@ def create_tasks_table(tasks, styles):
         'todo': 'Por Hacer',
         'in_progress': 'En Progreso',
         'review': 'En Revision',
-        'done': 'Completado'
+        'done': 'Completado',
+        'restart': 'Reinicio'
     }
     
     priority_labels = {
@@ -233,8 +245,8 @@ def create_tasks_table(tasks, styles):
         ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
         
         # Bordes
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
-        ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('BOX', (0, 0), (-1, -1), 1, MID_GRAY),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, MID_GRAY),
         
         # Alternar colores de fila
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -253,6 +265,8 @@ def create_tasks_table(tasks, styles):
             style.add('TEXTCOLOR', (1, i), (1, i), colors.HexColor('#0891b2'))
         elif task.status == 'review':
             style.add('TEXTCOLOR', (1, i), (1, i), WARNING_COLOR)
+        elif task.status == 'restart':
+            style.add('TEXTCOLOR', (1, i), (1, i), PRIMARY_DARK)
     
     table.setStyle(style)
     return table
@@ -266,7 +280,7 @@ def create_stages_table(stages, styles):
     data = [headers]
     
     for stage in stages:
-        eff = round((stage['actual_progress'] / stage['scheduled_progress'] * 100), 1) if stage['scheduled_progress'] > 0 else 100
+        eff = round((stage['actual_progress'] / stage['scheduled_progress'] * 100), 1) if stage['scheduled_progress'] > 0 else 0
         data.append([
             stage['name'][:30] + "..." if len(stage['name']) > 30 else stage['name'],
             f"{stage['percentage']}%",
@@ -287,8 +301,8 @@ def create_stages_table(stages, styles):
         ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('TOPPADDING', (0, 0), (-1, -1), 10),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
-        ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('BOX', (0, 0), (-1, -1), 1, MID_GRAY),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, MID_GRAY),
     ])
     
     for i in range(1, len(data)):
@@ -372,10 +386,10 @@ def generate_project_report(project, tasks, effectiveness_data, stages):
     done_count = len([t for t in tasks if t.status == 'done'])
     
     summary_metrics = [
-        {'value': str(todo_count), 'label': 'Por Hacer'},
-        {'value': str(in_progress_count), 'label': 'En Progreso'},
-        {'value': str(review_count), 'label': 'En Revision'},
-        {'value': str(done_count), 'label': 'Completadas'},
+        {'value': str(todo_count), 'label': 'Por Hacer', 'color': '#64748b'},
+        {'value': str(in_progress_count), 'label': 'En Progreso', 'color': '#06b6d4'},
+        {'value': str(review_count), 'label': 'En Revision', 'color': '#f59e0b'},
+        {'value': str(done_count), 'label': 'Completadas', 'color': '#10b981'},
     ]
     elements.append(create_metrics_table(summary_metrics))
     elements.append(Spacer(1, 20))
@@ -427,10 +441,10 @@ def generate_general_report(projects_data):
     avg_effectiveness = sum(p['effectiveness'] for p in projects_data) / len(projects_data) if projects_data else 0
     
     summary_metrics = [
-        {'value': str(len(projects_data)), 'label': 'Proyectos'},
-        {'value': str(total_tasks), 'label': 'Total Tareas'},
-        {'value': str(completed_tasks), 'label': 'Completadas'},
-        {'value': f"{avg_effectiveness:.1f}%", 'label': 'Efectividad Prom.'},
+        {'value': str(len(projects_data)), 'label': 'Proyectos', 'color': '#6366f1'},
+        {'value': str(total_tasks), 'label': 'Total Tareas', 'color': '#06b6d4'},
+        {'value': str(completed_tasks), 'label': 'Completadas', 'color': '#10b981'},
+        {'value': f"{avg_effectiveness:.1f}%", 'label': 'Efectividad Prom.', 'color': '#8b5cf6'},
     ]
     elements.append(create_metrics_table(summary_metrics))
     elements.append(Spacer(1, 30))
