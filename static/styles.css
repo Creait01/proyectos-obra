@@ -729,45 +729,15 @@ body {
     opacity: 0.6;
 }
 
-.project-toggle {
-    display: inline-flex;
-    align-items: center;
-    margin-right: 6px;
-}
 
-.project-toggle input {
-    display: none;
-}
-
-.project-toggle .toggle-slider {
-    width: 34px;
-    height: 18px;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid var(--border-color);
-    border-radius: 999px;
-    position: relative;
-    transition: var(--transition-fast);
-}
-
-.project-toggle .toggle-slider::before {
-    content: "";
+.sidebar.collapsed .project-dot {
     width: 12px;
     height: 12px;
-    position: absolute;
-    left: 3px;
-    top: 2px;
-    background: #fff;
-    border-radius: 50%;
-    transition: var(--transition-fast);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.06);
 }
 
-.project-toggle input:checked + .toggle-slider {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    border-color: rgba(99, 102, 241, 0.6);
-}
-
-.project-toggle input:checked + .toggle-slider::before {
-    transform: translateX(16px);
+.sidebar.collapsed .project-item-main {
+    gap: 0;
 }
 
 .project-item-main {

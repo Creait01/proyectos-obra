@@ -371,10 +371,6 @@ function renderProjectList() {
                 <span class="project-name">${p.name}</span>
             </div>
             ${isAdmin ? `
-                <label class="project-toggle" title="${p.is_active ? 'Activo' : 'Inactivo'}">
-                    <input type="checkbox" ${p.is_active ? 'checked' : ''} data-project-id="${p.id}">
-                    <span class="toggle-slider"></span>
-                </label>
                 <button class="btn-edit-project" onclick="event.stopPropagation(); editProject(${p.id})" title="Editar proyecto">
                     <i class="fas fa-pen"></i>
                 </button>
@@ -386,25 +382,6 @@ function renderProjectList() {
         item.addEventListener('click', () => selectProject(parseInt(item.dataset.id)));
     });
 
-    if (isAdmin) {
-        list.querySelectorAll('.project-toggle input').forEach(toggle => {
-            toggle.addEventListener('change', async (e) => {
-                e.stopPropagation();
-                const projectId = parseInt(toggle.dataset.projectId);
-                const isActive = toggle.checked;
-                try {
-                    await apiRequest(`/api/projects/${projectId}`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ is_active: isActive })
-                    });
-                    await loadProjects();
-                    loadDashboard();
-                } catch (error) {
-                    showToast(error.message, 'error');
-                }
-            });
-        });
-    }
 }
 
 function updateProjectSelects() {
@@ -717,6 +694,7 @@ document.getElementById('add-project-btn').addEventListener('click', () => {
     document.getElementById('project-modal-title').textContent = 'Nuevo Proyecto';
     document.getElementById('project-color').value = '#6366f1';
     document.getElementById('project-active').checked = true;
+    document.getElementById('project-active').disabled = !(currentUser && currentUser.is_admin);
     document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
     document.querySelector('.color-option[data-color="#6366f1"]').classList.add('selected');
     
@@ -744,6 +722,7 @@ async function editProject(projectId) {
     document.getElementById('project-end').value = project.end_date ? project.end_date.split('T')[0] : '';
     document.getElementById('project-color').value = project.color;
     document.getElementById('project-active').checked = project.is_active !== false;
+    document.getElementById('project-active').disabled = !(currentUser && currentUser.is_admin);
     document.getElementById('project-modal-title').textContent = 'Editar Proyecto';
     
     document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
