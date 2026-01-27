@@ -1447,7 +1447,7 @@ async function updateGanttEffectiveness() {
                     ${data.stages.map(stage => {
                         const stageEffectiveness = stage.scheduled_progress > 0 
                             ? Math.round((stage.actual_progress / stage.scheduled_progress) * 100) 
-                            : (stage.actual_progress > 0 ? 100 : 100);
+                            : 0;
                         
                         let statusClass = 'adelantado';
                         let statusIcon = '🚀';
