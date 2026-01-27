@@ -182,8 +182,9 @@ def init_database():
             except Exception as e:
                 print(f"⚠️ Tabla task_template_items: {e}")
             
-            # Crear tabla admin_teams
+            # Crear tabla admin_teams - Compatible con SQLite y MySQL
             try:
+                # Primero intentar sintaxis SQLite
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS admin_teams (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,9 +197,9 @@ def init_database():
                     )
                 """))
                 conn.commit()
-                print("✅ Tabla admin_teams verificada")
-            except Exception as e:
-                # Intentar con sintaxis MySQL si SQLite falla
+                print("✅ Tabla admin_teams verificada (SQLite)")
+            except Exception as sqlite_err:
+                # Si falla SQLite, intentar MySQL
                 try:
                     conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS admin_teams (
@@ -213,8 +214,9 @@ def init_database():
                     """))
                     conn.commit()
                     print("✅ Tabla admin_teams verificada (MySQL)")
-                except:
-                    print(f"⚠️ Tabla admin_teams: {e}")
+                except Exception as mysql_err:
+                    print(f"⚠️ Tabla admin_teams SQLite: {sqlite_err}")
+                    print(f"⚠️ Tabla admin_teams MySQL: {mysql_err}")
         
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
@@ -1342,6 +1344,33 @@ async def test_reports():
         return {"status": "ok", "message": "ReportLab funciona correctamente"}
     except Exception as e:
         return {"status": "error", "message": f"Error en ReportLab: {str(e)}"}
+
+@app.get("/api/debug/tables")
+async def debug_tables(db: Session = Depends(get_db)):
+    """Verificar qué tablas existen en la base de datos"""
+    from sqlalchemy import text
+    try:
+        # Intentar MySQL primero
+        result = db.execute(text("SHOW TABLES")).fetchall()
+        tables = [row[0] for row in result]
+    except:
+        try:
+            # SQLite fallback
+            result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
+            tables = [row[0] for row in result]
+        except Exception as e:
+            return {"error": str(e)}
+    
+    # Verificar tablas específicas
+    expected = ['stage_templates', 'stage_template_items', 'task_templates', 'task_template_items', 'admin_teams']
+    missing = [t for t in expected if t not in tables]
+    
+    return {
+        "tables": tables,
+        "expected_new_tables": expected,
+        "missing_tables": missing,
+        "all_ok": len(missing) == 0
+    }
 
 @app.get("/api/reports/debug")
 async def debug_report(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
