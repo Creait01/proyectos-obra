@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3.2.0">
+    <link rel="stylesheet" href="/static/styles.css?v=3.3.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -365,6 +365,16 @@
                             </div>
                             <div class="column-content" id="column-review"></div>
                         </div>
+                        <div class="kanban-column" data-status="restart">
+                            <div class="column-header">
+                                <div class="column-title">
+                                    <span class="column-dot restart"></span>
+                                    <h3>Reinicio</h3>
+                                    <span class="task-count" id="count-restart">0</span>
+                                </div>
+                            </div>
+                            <div class="column-content" id="column-restart"></div>
+                        </div>
                         <div class="kanban-column" data-status="done">
                             <div class="column-header">
                                 <div class="column-title">
@@ -682,6 +692,7 @@
                             <option value="todo">Por Hacer</option>
                             <option value="in_progress">En Progreso</option>
                             <option value="review">En Revisión</option>
+                            <option value="restart">Reinicio</option>
                             <option value="done">Completado</option>
                         </select>
                     </div>
@@ -1030,6 +1041,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=3.0.0"></script>
+    <script src="/static/app.js?v=3.3.0"></script>
 </body>
 </html>

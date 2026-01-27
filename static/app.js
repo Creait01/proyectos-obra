@@ -848,7 +848,7 @@ async function loadTasks() {
 }
 
 function renderKanban() {
-    const statuses = ['todo', 'in_progress', 'review', 'done'];
+    const statuses = ['todo', 'in_progress', 'review', 'restart', 'done'];
     const isAdmin = currentUser && currentUser.is_admin;
     
     statuses.forEach(status => {
@@ -859,14 +859,16 @@ function renderKanban() {
         
         column.innerHTML = statusTasks.map(task => {
             const assignee = users.find(u => u.id === task.assignee_id);
-            const overdue = task.status !== 'done' && isOverdue(task.due_date);
+            const overdue = task.status !== 'done' && task.status !== 'restart' && isOverdue(task.due_date);
             const isMyTask = task.assignee_id === currentUser?.id;
-            const canUpdateProgress = isMyTask || isAdmin;
+            const canUpdateProgress = (isMyTask || isAdmin) && !(task.status === 'restart' && !isAdmin);
+            const isRestart = task.status === 'restart';
             
             return `
-                <div class="task-card" data-id="${task.id}" draggable="${isAdmin}">
+                <div class="task-card ${isRestart ? 'restart' : ''}" data-id="${task.id}" draggable="${isAdmin}">
                     <div class="task-card-header">
                         <span class="task-priority ${task.priority}">${task.priority}</span>
+                        ${isRestart ? `<span class="task-status-badge restart">Reinicio</span>` : ''}
                         ${task.progress > 0 ? `<span class="task-progress-badge">${task.progress}%</span>` : ''}
                     </div>
                     <div class="task-title">${task.title}</div>
@@ -916,6 +918,10 @@ function renderKanban() {
                 if (isAdmin) {
                     openTaskModal(taskId);
                 } else if (task.assignee_id === currentUser?.id) {
+                    if (task.status === 'restart') {
+                        showToast('Tarea en reinicio: solo administradores pueden modificarla', 'info');
+                        return;
+                    }
                     openProgressModal(task);
                 }
             });
@@ -1023,6 +1029,7 @@ function openTaskModal(taskId) {
     // Configurar visibilidad según rol
     const isAdmin = currentUser && currentUser.is_admin;
     const isMyTask = task.assignee_id === currentUser?.id;
+    const isRestart = task.status === 'restart';
     
     // Mostrar botón de historial (siempre visible para tareas existentes)
     document.getElementById('view-history-btn').style.display = 'inline-flex';
@@ -1038,7 +1045,7 @@ function openTaskModal(taskId) {
     document.getElementById('task-assignee').disabled = !isAdmin;
     
     // Campos que usuarios normales pueden editar (si es su tarea)
-    const canEdit = isAdmin || isMyTask;
+    const canEdit = isAdmin || (isMyTask && !isRestart);
     document.getElementById('task-status').disabled = !canEdit;
     document.getElementById('task-description').disabled = !canEdit;
     document.getElementById('task-progress').disabled = !canEdit;
@@ -1596,7 +1603,8 @@ function renderGantt() {
         todo: '#64748b',
         in_progress: '#06b6d4',
         review: '#f59e0b',
-        done: '#10b981'
+        done: '#10b981',
+        restart: '#8b5cf6'
     };
     
     console.log('Total días:', totalDays, 'Scale:', ganttScale, 'Timeline width:', timelineWidth, 'Tareas visibles:', visibleTasks.length);
@@ -1773,7 +1781,7 @@ function renderMyTasks(taskList) {
     
     list.innerHTML = filtered.map(task => `
         <div class="task-list-item" data-id="${task.id}">
-            <div class="task-checkbox ${task.status === 'done' ? 'checked' : ''}" data-task-id="${task.id}">
+            <div class="task-checkbox ${task.status === 'done' ? 'checked' : ''} ${task.status === 'restart' ? 'disabled' : ''}" data-task-id="${task.id}">
                 <i class="fas fa-check"></i>
             </div>
             <div class="task-list-content">
@@ -1784,11 +1792,12 @@ function renderMyTasks(taskList) {
                         ${task.project.name}
                     </span>
                     ${task.due_date ? `
-                        <span class="${isOverdue(task.due_date) && task.status !== 'done' ? 'overdue' : ''}">
+                        <span class="${isOverdue(task.due_date) && task.status !== 'done' && task.status !== 'restart' ? 'overdue' : ''}">
                             <i class="fas fa-calendar"></i> ${formatDate(task.due_date)}
                         </span>
                     ` : ''}
                     <span class="task-priority ${task.priority}">${task.priority}</span>
+                    ${task.status === 'restart' ? '<span class="task-status-badge restart">Reinicio</span>' : ''}
                 </div>
             </div>
         </div>
@@ -1797,6 +1806,10 @@ function renderMyTasks(taskList) {
     list.querySelectorAll('.task-checkbox').forEach(checkbox => {
         checkbox.addEventListener('click', async (e) => {
             e.stopPropagation();
+            if (checkbox.classList.contains('disabled')) {
+                showToast('Tarea en reinicio: solo administradores pueden modificarla', 'info');
+                return;
+            }
             const taskId = parseInt(checkbox.dataset.taskId);
             const newStatus = checkbox.classList.contains('checked') ? 'todo' : 'done';
             

@@ -73,7 +73,7 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(300), nullable=False)
     description = Column(Text)
-    status = Column(String(50), default="todo")  # todo, in_progress, review, done
+    status = Column(String(50), default="todo")  # todo, in_progress, review, done, restart
     priority = Column(String(20), default="medium")  # low, medium, high
     position = Column(Integer, default=0)
     progress = Column(Float, default=0)  # 0-100 para Gantt

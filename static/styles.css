@@ -1291,9 +1291,12 @@ body {
 
 .kanban-board {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 20px;
     height: calc(100vh - 220px);
+    overflow-y: auto;
+    align-content: start;
+    padding-right: 4px;
 }
 
 .kanban-column {
@@ -1302,6 +1305,7 @@ body {
     background: rgba(255, 255, 255, 0.02);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
+    min-height: 0;
 }
 
 .column-header {
@@ -1324,6 +1328,7 @@ body {
 .column-dot.todo { background: var(--text-muted); }
 .column-dot.in_progress { background: var(--info); }
 .column-dot.review { background: var(--warning); }
+.column-dot.restart { background: var(--secondary); }
 .column-dot.done { background: var(--success); }
 
 .column-title h3 {
@@ -1347,6 +1352,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-height: 0;
 }
 
 /* Task Card */
@@ -1357,6 +1363,21 @@ body {
     padding: 16px;
     cursor: grab;
     transition: var(--transition-fast);
+}
+
+.task-card.restart {
+    border-style: dashed;
+    opacity: 0.85;
+}
+
+.task-status-badge.restart {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--secondary);
 }
 
 .task-card:hover {
@@ -1910,6 +1931,11 @@ body {
     cursor: pointer;
     transition: var(--transition-fast);
     flex-shrink: 0;
+}
+
+.task-checkbox.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 .task-checkbox.checked {

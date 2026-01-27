@@ -639,7 +639,7 @@ async def get_stages(project_id: int, db: Session = Depends(get_db), current_use
     # Calcular progreso de cada etapa basado en sus tareas
     result = []
     for stage in stages:
-        stage_tasks = db.query(Task).filter(Task.stage_id == stage.id).all()
+        stage_tasks = db.query(Task).filter(Task.stage_id == stage.id, Task.status != "restart").all()
         if stage_tasks:
             avg_progress = sum(t.progress for t in stage_tasks) / len(stage_tasks)
         else:
@@ -744,7 +744,7 @@ async def update_stage(stage_id: int, stage: StageUpdate, db: Session = Depends(
     db.refresh(db_stage)
     
     # Calcular progreso
-    stage_tasks = db.query(Task).filter(Task.stage_id == stage_id).all()
+    stage_tasks = db.query(Task).filter(Task.stage_id == stage_id, Task.status != "restart").all()
     progress = sum(t.progress for t in stage_tasks) / len(stage_tasks) if stage_tasks else 0
     
     return {
@@ -796,7 +796,7 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
     
     # Calcular efectividad basada en todas las tareas del proyecto
     all_tasks = db.query(Task).filter(Task.project_id == project_id).all()
-    tasks_with_dates = [t for t in all_tasks if t.start_date and t.due_date]
+    tasks_with_dates = [t for t in all_tasks if t.start_date and t.due_date and t.status != "restart"]
     
     for task in tasks_with_dates:
         task_scheduled = 0.0
@@ -850,7 +850,7 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
                 elapsed_days = (today - stage_start).days + 1
                 stage_scheduled = min(100.0, (elapsed_days / total_days) * 100)
         
-        stage_tasks = db.query(Task).filter(Task.stage_id == stage.id).all()
+        stage_tasks = db.query(Task).filter(Task.stage_id == stage.id, Task.status != "restart").all()
         if stage_tasks:
             stage_actual = sum(t.progress for t in stage_tasks) / len(stage_tasks)
         else:
@@ -964,6 +964,10 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
     if not current_user.is_admin:
         if db_task.assignee_id != current_user.id:
             raise HTTPException(status_code=403, detail="Solo puedes actualizar tareas asignadas a ti")
+        if db_task.status == "restart":
+            raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")
+        if task.status == "restart":
+            raise HTTPException(status_code=403, detail="Solo un administrador puede marcar una tarea como reinicio")
         # Usuarios normales pueden cambiar: estado, descripción, progreso y etapa
         allowed_fields = {'status', 'description', 'progress', 'stage_id'}
         update_fields = set(task.model_dump(exclude_unset=True).keys())
@@ -991,6 +995,49 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
     
     db.commit()
     db.refresh(db_task)
+
+    # Si se marcó como reinicio, crear una copia para rehacer la tarea
+    if current_user.is_admin and old_status != "restart" and db_task.status == "restart":
+        last_task = db.query(Task).filter(
+            Task.project_id == db_task.project_id,
+            Task.status == "todo"
+        ).order_by(Task.position.desc()).first()
+        new_position = (last_task.position + 1) if last_task else 0
+
+        new_task = Task(
+            title=f"{db_task.title} (Reinicio)",
+            description=db_task.description,
+            status="todo",
+            priority=db_task.priority,
+            project_id=db_task.project_id,
+            stage_id=db_task.stage_id,
+            assignee_id=db_task.assignee_id,
+            position=new_position,
+            start_date=db_task.start_date,
+            due_date=db_task.due_date,
+            progress=0
+        )
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+
+        # Registrar actividad para la nueva tarea
+        activity_new = Activity(
+            action="created",
+            entity_type="task",
+            entity_id=new_task.id,
+            entity_name=new_task.title,
+            user_id=current_user.id,
+            details="Creada por reinicio"
+        )
+        db.add(activity_new)
+        db.commit()
+
+        # Broadcast de la nueva tarea
+        await manager.broadcast({
+            "type": "task_created",
+            "task": TaskResponse.model_validate(new_task).model_dump(mode='json')
+        }, str(db_task.project_id))
     
     # Registrar historial de cambios
     field_labels = {
@@ -1009,7 +1056,8 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         'todo': 'Por Hacer',
         'in_progress': 'En Progreso',
         'review': 'En Revisión',
-        'done': 'Completado'
+        'done': 'Completado',
+        'restart': 'Reinicio'
     }
     
     priority_labels = {
@@ -1191,6 +1239,8 @@ async def register_progress(task_id: int, progress_data: TaskProgressCreate, db:
     # Solo el asignado o admin pueden registrar avance
     if not current_user.is_admin and db_task.assignee_id != current_user.id:
         raise HTTPException(status_code=403, detail="Solo puedes registrar avance en tareas asignadas a ti")
+    if not current_user.is_admin and db_task.status == "restart":
+        raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")
     
     # Validar progreso
     if progress_data.progress < 0 or progress_data.progress > 100:
@@ -1213,10 +1263,11 @@ async def register_progress(task_id: int, progress_data: TaskProgressCreate, db:
     db_task.progress = progress_data.progress
     
     # Si llega a 100%, marcar como completada
-    if progress_data.progress == 100:
-        db_task.status = "done"
-    elif progress_data.progress > 0 and db_task.status == "todo":
-        db_task.status = "in_progress"
+    if db_task.status != "restart":
+        if progress_data.progress == 100:
+            db_task.status = "done"
+        elif progress_data.progress > 0 and db_task.status == "todo":
+            db_task.status = "in_progress"
     
     # Registrar actividad
     activity = Activity(
