@@ -871,10 +871,12 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
     if scheduled_progress > 0:
         effectiveness = (actual_progress / scheduled_progress) * 100
     else:
-        effectiveness = 100.0 if actual_progress == 0 else 0.0
+        effectiveness = 0.0
     
     # Determinar estado
-    if effectiveness >= 100:
+    if scheduled_progress == 0 and actual_progress == 0:
+        status = "en_tiempo"
+    elif effectiveness >= 100:
         status = "adelantado"
     elif effectiveness >= 90:
         status = "en_tiempo"
