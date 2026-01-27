@@ -842,6 +842,7 @@ body {
     display: none;
     max-width: 100%;
     overflow: hidden;
+    width: 100%;
 }
 
 #gantt-view.active {
@@ -849,6 +850,8 @@ body {
     flex-direction: column;
     height: calc(100vh - var(--topbar-height) - 48px);
     overflow: hidden;
+    width: 100%;
+    max-width: 100%;
 }
 
 @keyframes fadeIn {
@@ -1339,11 +1342,13 @@ body {
     flex-wrap: wrap;
     gap: 16px;
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 100;
     background: var(--bg-dark);
     padding: 8px 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .gantt-controls {
@@ -1406,6 +1411,9 @@ body {
     flex: 1;
     min-height: 0;
     max-height: calc(100vh - 450px);
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Scrollbar personalizado */
@@ -1456,8 +1464,9 @@ body {
 .gantt-chart {
     position: relative;
     display: block;
-    width: fit-content;
-    min-width: 100%;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .gantt-timeline {
@@ -1470,7 +1479,9 @@ body {
     top: 0;
     background: var(--bg-dark);
     z-index: 20;
-    width: fit-content;
+    width: max-content;
+    max-width: none;
+    flex-shrink: 0;
 }
 
 .gantt-day {
@@ -1535,13 +1546,15 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    width: max-content;
+    min-width: 100%;
 }
 
 .gantt-task-row {
     display: flex;
     align-items: center;
     min-height: 50px;
-    width: fit-content;
+    width: max-content;
 }
 
 .gantt-task-info {
@@ -3064,6 +3077,8 @@ body.user-role #add-task-btn {
     flex-shrink: 0;
     flex-wrap: wrap;
     overflow: hidden;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .gantt-effectiveness-item {
@@ -3121,6 +3136,8 @@ body.user-role #add-task-btn {
     border: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
     overflow: hidden;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .legend-item {
@@ -3145,12 +3162,14 @@ body.user-role #add-task-btn {
 .gantt-stages-effectiveness {
     margin-bottom: 15px;
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: hidden;
     padding-bottom: 8px;
     scrollbar-width: thin;
     scrollbar-color: var(--primary) var(--bg-card);
     flex-shrink: 0;
     max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .gantt-stages-effectiveness::-webkit-scrollbar {
