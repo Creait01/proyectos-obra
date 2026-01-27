@@ -449,7 +449,8 @@ function renderStagesList() {
     if (!container) return;
     
     container.innerHTML = tempStages.map((stage, index) => `
-        <div class="stage-item" data-index="${index}">
+        <div class="stage-item" data-index="${index}" draggable="true">
+            <span class="stage-drag-handle"><i class="fas fa-grip-vertical"></i></span>
             <div class="stage-item-header">
                 <input type="text" placeholder="Nombre de la etapa" value="${stage.name || ''}" 
                        onchange="updateTempStage(${index}, 'name', this.value)">
@@ -470,7 +471,123 @@ function renderStagesList() {
         </div>
     `).join('');
     
+    // Agregar eventos de drag & drop
+    initStageDragAndDrop();
     updateStagesTotalDisplay();
+}
+
+// ===================== DRAG & DROP PARA ETAPAS =====================
+function initStageDragAndDrop() {
+    const container = document.getElementById('project-stages-container');
+    if (!container) return;
+    
+    const items = container.querySelectorAll('.stage-item');
+    let draggedItem = null;
+    
+    items.forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+            draggedItem = item;
+            item.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', item.dataset.index);
+        });
+        
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            items.forEach(i => i.classList.remove('drag-over'));
+            draggedItem = null;
+        });
+        
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (item !== draggedItem) {
+                item.classList.add('drag-over');
+            }
+        });
+        
+        item.addEventListener('dragleave', () => {
+            item.classList.remove('drag-over');
+        });
+        
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            item.classList.remove('drag-over');
+            
+            if (draggedItem && item !== draggedItem) {
+                const fromIndex = parseInt(draggedItem.dataset.index);
+                const toIndex = parseInt(item.dataset.index);
+                
+                // Reordenar el array de etapas
+                const [movedStage] = tempStages.splice(fromIndex, 1);
+                tempStages.splice(toIndex, 0, movedStage);
+                
+                renderStagesList();
+                showToast('Etapa reordenada', 'success');
+            }
+        });
+    });
+}
+
+// ===================== PLANTILLAS DE ETAPAS EN PROYECTO =====================
+function loadStageTemplatesSelector() {
+    const select = document.getElementById('stage-template-select');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">-- Cargar desde plantilla (opcional) --</option>';
+    
+    stageTemplates.forEach(template => {
+        const option = document.createElement('option');
+        option.value = template.id;
+        option.textContent = `${template.name} (${template.items?.length || 0} etapas)`;
+        select.appendChild(option);
+    });
+}
+
+function applyStageTemplateToProject() {
+    const select = document.getElementById('stage-template-select');
+    if (!select) return;
+    
+    const templateId = parseInt(select.value);
+    if (!templateId) {
+        showToast('Selecciona una plantilla primero', 'warning');
+        return;
+    }
+    
+    const template = stageTemplates.find(t => t.id === templateId);
+    if (!template || !template.items || template.items.length === 0) {
+        showToast('La plantilla no tiene etapas', 'error');
+        return;
+    }
+    
+    // Preguntar si desea agregar o reemplazar
+    const action = tempStages.length > 0 
+        ? confirm('¿Deseas REEMPLAZAR las etapas actuales? (Cancelar para AGREGAR al final)')
+        : true;
+    
+    if (action === true || action === null) {
+        // Reemplazar
+        tempStages = template.items.map(item => ({
+            name: item.name,
+            percentage: item.percentage,
+            start_date: '',
+            end_date: ''
+        }));
+    } else {
+        // Agregar al final
+        template.items.forEach(item => {
+            tempStages.push({
+                name: item.name,
+                percentage: item.percentage,
+                start_date: '',
+                end_date: ''
+            });
+        });
+    }
+    
+    renderStagesList();
+    showToast(`Plantilla "${template.name}" aplicada`, 'success');
+    select.value = '';
 }
 
 function updateTempStage(index, field, value) {
@@ -530,6 +647,9 @@ async function loadProjectStages(projectId) {
 // Event listener para agregar etapa
 document.getElementById('add-stage-btn')?.addEventListener('click', addTempStage);
 
+// Event listener para aplicar plantilla de etapas
+document.getElementById('apply-stage-template-btn')?.addEventListener('click', applyStageTemplateToProject);
+
 document.getElementById('add-project-btn').addEventListener('click', () => {
     document.getElementById('project-id').value = '';
     document.getElementById('project-form').reset();
@@ -543,6 +663,9 @@ document.getElementById('add-project-btn').addEventListener('click', () => {
     
     // Inicializar etapas vacías
     renderStagesEditor([]);
+    
+    // Cargar plantillas en el selector
+    loadStageTemplatesSelector();
     
     openModal('project-modal');
 });
@@ -571,6 +694,9 @@ async function editProject(projectId) {
     // Cargar etapas existentes
     const existingStages = await loadProjectStages(projectId);
     renderStagesEditor(existingStages);
+    
+    // Cargar plantillas en el selector
+    loadStageTemplatesSelector();
     
     openModal('project-modal');
 }
@@ -2757,6 +2883,8 @@ window.editProject = editProject;
 window.removeTempStage = removeTempStage;
 window.removeAdmin = removeAdmin;
 window.makeAdmin = makeAdmin;
+window.updateTempStage = updateTempStage;
+window.applyStageTemplateToProject = applyStageTemplateToProject;
 
 // ===================== INIT ON LOAD =====================
 document.addEventListener('DOMContentLoaded', async () => {

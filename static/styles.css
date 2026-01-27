@@ -1323,7 +1323,7 @@ body {
 }
 
 .gantt-container {
-    overflow-x: auto;
+    overflow-x: auto !important;
     overflow-y: auto;
     padding: 24px;
     position: relative;
@@ -1332,6 +1332,9 @@ body {
     /* Indicador visual de scroll */
     scrollbar-width: thin;
     scrollbar-color: var(--primary) var(--bg-card);
+    /* Asegurar que el scroll funcione */
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Scrollbar personalizado */
@@ -1380,8 +1383,9 @@ body {
 }
 
 .gantt-chart {
-    min-width: 100%;
+    min-width: max-content;
     position: relative;
+    display: inline-block;
 }
 
 .gantt-timeline {
@@ -2719,6 +2723,22 @@ body.user-role #add-task-btn {
 }
 
 /* ===================== ETAPAS DEL PROYECTO ===================== */
+/* Selector de plantilla de etapas */
+.template-selector-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+}
+
+.template-selector-container select {
+    flex: 1;
+}
+
+.stages-actions {
+    margin-bottom: 10px;
+}
+
 .stages-container {
     max-height: 300px;
     overflow-y: auto;
@@ -2731,6 +2751,42 @@ body.user-role #add-task-btn {
     padding: 12px;
     margin-bottom: 10px;
     border: 1px solid var(--border-color);
+    cursor: grab;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.stage-item:hover {
+    border-color: var(--primary);
+}
+
+.stage-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    border: 2px dashed var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.stage-item.drag-over {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.1);
+    transform: translateY(2px);
+}
+
+.stage-drag-handle {
+    position: absolute;
+    left: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    opacity: 0.5;
+    cursor: grab;
+}
+
+.stage-item:hover .stage-drag-handle {
+    opacity: 1;
+    color: var(--primary);
 }
 
 .stage-item-header {

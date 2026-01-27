@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=2.0.1">
+    <link rel="stylesheet" href="/static/styles.css?v=2.1.0">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -622,13 +622,26 @@
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-layer-group"></i> Etapas del Proyecto</label>
+                    
+                    <!-- Selector de Plantilla de Etapas -->
+                    <div class="template-selector-container">
+                        <select id="stage-template-select" class="select-styled">
+                            <option value="">-- Cargar desde plantilla (opcional) --</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm" id="apply-stage-template-btn" title="Aplicar plantilla seleccionada">
+                            <i class="fas fa-magic"></i> Aplicar
+                        </button>
+                    </div>
+                    
                     <div class="stages-container" id="project-stages-container">
                         <!-- Se llenará con JavaScript -->
                     </div>
-                    <button type="button" class="btn btn-secondary btn-sm" id="add-stage-btn">
-                        <i class="fas fa-plus"></i> Agregar Etapa
-                    </button>
-                    <small class="form-hint">Las etapas deben sumar 100%</small>
+                    <div class="stages-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" id="add-stage-btn">
+                            <i class="fas fa-plus"></i> Agregar Etapa
+                        </button>
+                    </div>
+                    <small class="form-hint">Arrastra las etapas para reordenarlas. Deben sumar 100%</small>
                     <div class="stages-total">
                         <span>Total: <strong id="stages-total-percentage">0%</strong></span>
                     </div>
@@ -980,6 +993,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=2.0.1"></script>
+    <script src="/static/app.js?v=2.1.0"></script>
 </body>
 </html>
