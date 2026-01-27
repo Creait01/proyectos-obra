@@ -1474,6 +1474,7 @@ function renderGantt() {
     
     const timeline = document.getElementById('gantt-timeline');
     const taskRows = document.getElementById('gantt-tasks');
+    const ganttContainer = document.querySelector('.gantt-container');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -1496,6 +1497,15 @@ function renderGantt() {
     if (currentProject && tasks.length > 0) {
         tasksWithDates = tasks.filter(t => t.start_date || t.due_date);
     }
+    
+    // Calcular días totales primero para determinar el scale
+    const totalDaysTemp = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // CALCULAR ESCALA AUTOMÁTICAMENTE basado en el ancho disponible
+    const taskInfoWidth = 180; // Ancho de la columna de info
+    const containerWidth = ganttContainer ? ganttContainer.clientWidth - 50 : 800; // -50 para padding
+    const availableWidth = containerWidth - taskInfoWidth;
+    ganttScale = Math.max(18, Math.floor(availableWidth / totalDaysTemp)); // Mínimo 18px por día
     
     // Render timeline - mostrar solo el mes seleccionado
     const days = [];
@@ -1703,16 +1713,6 @@ function renderGantt() {
         bar.addEventListener('click', () => openTaskModal(parseInt(bar.dataset.id)));
     });
 }
-
-document.getElementById('gantt-zoom-in').addEventListener('click', () => {
-    ganttScale = Math.min(80, ganttScale + 10);
-    renderGantt();
-});
-
-document.getElementById('gantt-zoom-out').addEventListener('click', () => {
-    ganttScale = Math.max(20, ganttScale - 10);
-    renderGantt();
-});
 
 // ===================== MY TASKS =====================
 async function loadMyTasks() {
@@ -3028,4 +3028,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         showAuthScreen();
     }
+});
+
+// Recalcular Gantt cuando cambie el tamaño de la ventana
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        const ganttView = document.getElementById('gantt-view');
+        if (ganttView && ganttView.classList.contains('active')) {
+            renderGantt();
+        }
+    }, 250);
 });
