@@ -2120,6 +2120,50 @@ body {
     margin-bottom: 16px;
 }
 
+.team-projects {
+    margin: 12px 0 16px;
+    text-align: left;
+}
+
+.team-projects-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.team-projects-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.team-project-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.team-project-chip .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--chip-color, var(--primary));
+}
+
+.team-project-empty {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 .team-stats {
     display: flex;
     justify-content: center;

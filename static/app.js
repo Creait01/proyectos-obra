@@ -1880,6 +1880,14 @@ async function loadTeam() {
     grid.innerHTML = users.map(user => {
         const userTasks = allTasks.filter(t => t.assignee_id === user.id);
         const completedTasks = userTasks.filter(t => t.status === 'done').length;
+        const userProjects = projects.filter(p => (p.members || []).some(m => m.id === user.id));
+        const projectsHtml = userProjects.length
+            ? userProjects.map(p => `
+                <span class="team-project-chip" style="--chip-color: ${p.color}">
+                    <span class="dot"></span>${p.name}
+                </span>
+            `).join('')
+            : '<span class="team-project-empty">Sin proyectos</span>';
         
         return `
             <div class="team-card">
@@ -1888,6 +1896,12 @@ async function loadTeam() {
                 </div>
                 <div class="team-name">${user.name}</div>
                 <div class="team-email">${user.email}</div>
+                <div class="team-projects">
+                    <div class="team-projects-title">Proyectos asignados</div>
+                    <div class="team-projects-list">
+                        ${projectsHtml}
+                    </div>
+                </div>
                 <div class="team-stats">
                     <div class="team-stat">
                         <div class="team-stat-value">${userTasks.length}</div>
