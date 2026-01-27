@@ -186,6 +186,7 @@ async function initApp() {
     showMainApp();
     updateUserInfo();
     setupAdminUI();
+    initSidebarToggle();
     
     try {
         await Promise.all([
@@ -201,6 +202,33 @@ async function initApp() {
     } catch (error) {
         console.error('Error initializing:', error);
     }
+}
+
+function initSidebarToggle() {
+    const sidebar = document.querySelector('.sidebar');
+    const toggleBtn = document.getElementById('sidebar-toggle');
+    if (!sidebar || !toggleBtn) return;
+
+    const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+    if (isCollapsed) {
+        sidebar.classList.add('collapsed');
+        toggleBtn.querySelector('i').classList.remove('fa-angles-left');
+        toggleBtn.querySelector('i').classList.add('fa-angles-right');
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        const collapsedNow = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebar-collapsed', collapsedNow ? 'true' : 'false');
+        const icon = toggleBtn.querySelector('i');
+        if (collapsedNow) {
+            icon.classList.remove('fa-angles-left');
+            icon.classList.add('fa-angles-right');
+        } else {
+            icon.classList.remove('fa-angles-right');
+            icon.classList.add('fa-angles-left');
+        }
+    });
 }
 
 function setupAdminUI() {
