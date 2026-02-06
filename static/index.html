@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3.6.0">
+    <link rel="stylesheet" href="/static/styles.css?v=3.6.1">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -456,6 +456,9 @@
                             </div>
                             <button class="btn btn-primary" id="gantt-today" title="Ir a hoy">
                                 <i class="fas fa-calendar-day"></i> Hoy
+                            </button>
+                            <button class="btn btn-success admin-only" id="gantt-add-task" title="Nueva actividad">
+                                <i class="fas fa-plus"></i> Nueva Actividad
                             </button>
                         </div>
                     </div>
@@ -1099,6 +1102,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=3.6.0"></script>
+    <script src="/static/app.js?v=3.6.1"></script>
 </body>
 </html>

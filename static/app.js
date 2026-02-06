@@ -2636,6 +2636,57 @@ document.getElementById('gantt-today').addEventListener('click', () => {
     }, 100);
 });
 
+// Botón para agregar nueva actividad desde Gantt
+document.getElementById('gantt-add-task')?.addEventListener('click', () => {
+    // Verificar si hay un proyecto seleccionado en el Gantt
+    const ganttProjectSelect = document.getElementById('gantt-project-select');
+    const selectedProjectId = ganttProjectSelect?.value;
+    
+    if (!selectedProjectId) {
+        showToast('Selecciona un proyecto primero', 'warning');
+        return;
+    }
+    
+    // Verificar si el usuario es admin
+    if (!currentUser?.is_admin) {
+        showToast('Solo administradores pueden crear tareas', 'error');
+        return;
+    }
+    
+    // Cambiar al proyecto seleccionado si es diferente
+    const projectId = parseInt(selectedProjectId);
+    if (currentProject?.id !== projectId) {
+        const project = projects.find(p => p.id === projectId);
+        if (project) {
+            currentProject = project;
+        }
+    }
+    
+    // Precargar fechas del mes visible en el Gantt
+    const startDate = new Date(ganttCurrentDate.getFullYear(), ganttCurrentDate.getMonth(), 1);
+    const endDate = new Date(ganttCurrentDate.getFullYear(), ganttCurrentDate.getMonth() + 1, 0);
+    
+    // Abrir modal de nueva tarea
+    document.getElementById('task-id').value = '';
+    document.getElementById('task-title').value = '';
+    document.getElementById('task-description').value = '';
+    document.getElementById('task-status').value = 'todo';
+    document.getElementById('task-priority').value = 'medium';
+    document.getElementById('task-start').value = startDate.toISOString().split('T')[0];
+    document.getElementById('task-due').value = endDate.toISOString().split('T')[0];
+    document.getElementById('task-progress').value = 0;
+    document.getElementById('progress-value').textContent = '0';
+    document.getElementById('task-assignee').value = '';
+    document.getElementById('assignee-chips-container').classList.remove('disabled');
+    document.getElementById('task-modal-title').textContent = 'Nueva Actividad';
+    document.getElementById('delete-task-btn').style.display = 'none';
+    document.getElementById('view-history-btn').style.display = 'none';
+    
+    updateAssigneeSelect();
+    updateStageSelect();
+    openModal('task-modal');
+});
+
 // Habilitar scroll horizontal con shift+wheel o directamente con wheel
 document.querySelector('.gantt-container')?.addEventListener('wheel', (e) => {
     const container = e.currentTarget;
