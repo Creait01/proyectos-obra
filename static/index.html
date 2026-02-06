@@ -774,9 +774,10 @@
                 </div>
                 <div class="form-group">
                     <label>Asignar a</label>
-                    <select id="task-assignee">
-                        <option value="">Sin asignar</option>
-                    </select>
+                    <input type="hidden" id="task-assignee" value="">
+                    <div class="assignee-chips-container" id="assignee-chips-container">
+                        <!-- Los chips se generan dinámicamente -->
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Etapa del Proyecto</label>

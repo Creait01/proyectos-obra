@@ -34,6 +34,17 @@ function toggleGanttStages(event) {
     }
 }
 
+function toggleGanttStageGroup(stageId) {
+    const group = document.querySelector(`.gantt-stage-group[data-stage-id="${stageId}"]`);
+    if (!group) return;
+    group.classList.toggle('collapsed');
+    
+    // Guardar estado en localStorage
+    const collapsedStages = JSON.parse(localStorage.getItem('gantt-collapsed-stages') || '{}');
+    collapsedStages[stageId] = group.classList.contains('collapsed');
+    localStorage.setItem('gantt-collapsed-stages', JSON.stringify(collapsedStages));
+}
+
 function setToken(token) {
     localStorage.setItem('token', token);
 }
@@ -1027,15 +1038,54 @@ document.getElementById('add-task-btn').addEventListener('click', () => {
     document.getElementById('delete-task-btn').style.display = 'none';
     document.getElementById('view-history-btn').style.display = 'none'; // Ocultar historial para tareas nuevas
     document.getElementById('progress-value').textContent = '0';
+    document.getElementById('task-assignee').value = ''; // Resetear asignado
+    document.getElementById('assignee-chips-container').classList.remove('disabled'); // Habilitar chips para nueva tarea
     updateAssigneeSelect();
     updateStageSelect();
     openModal('task-modal');
 });
 
 function updateAssigneeSelect() {
-    const select = document.getElementById('task-assignee');
-    select.innerHTML = '<option value="">Sin asignar</option>' +
-        users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+    const container = document.getElementById('assignee-chips-container');
+    const hiddenInput = document.getElementById('task-assignee');
+    const currentValue = hiddenInput.value;
+    
+    // Crear chip para "Sin asignar"
+    let chipsHtml = `
+        <div class="assignee-chip assignee-chip-unassigned ${!currentValue ? 'selected' : ''}" data-user-id="">
+            <div class="assignee-chip-avatar">
+                <i class="fas fa-user-slash"></i>
+            </div>
+            <span class="assignee-chip-name">Sin asignar</span>
+        </div>
+    `;
+    
+    // Crear chips para cada usuario
+    chipsHtml += users.map(u => `
+        <div class="assignee-chip ${currentValue == u.id ? 'selected' : ''}" data-user-id="${u.id}">
+            <div class="assignee-chip-avatar" style="background: ${u.avatar_color}">
+                ${getInitials(u.name)}
+            </div>
+            <span class="assignee-chip-name">${u.name}</span>
+        </div>
+    `).join('');
+    
+    container.innerHTML = chipsHtml;
+    
+    // Agregar event listeners a los chips
+    container.querySelectorAll('.assignee-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            // Si el contenedor está deshabilitado, no hacer nada
+            if (container.classList.contains('disabled')) return;
+            
+            // Quitar selección de todos
+            container.querySelectorAll('.assignee-chip').forEach(c => c.classList.remove('selected'));
+            // Seleccionar este
+            chip.classList.add('selected');
+            // Actualizar el valor hidden
+            hiddenInput.value = chip.dataset.userId;
+        });
+    });
 }
 
 function openTaskModal(taskId) {
@@ -1052,8 +1102,9 @@ function openTaskModal(taskId) {
     document.getElementById('task-progress').value = task.progress || 0;
     document.getElementById('progress-value').textContent = task.progress || 0;
     
-    updateAssigneeSelect();
+    // Establecer el valor del asignado ANTES de actualizar el select visual
     document.getElementById('task-assignee').value = task.assignee_id || '';
+    updateAssigneeSelect();
     
     updateStageSelect();
     document.getElementById('task-stage').value = task.stage_id || '';
@@ -1076,7 +1127,13 @@ function openTaskModal(taskId) {
     document.getElementById('task-priority').disabled = !isAdmin;
     document.getElementById('task-start').disabled = !isAdmin;
     document.getElementById('task-due').disabled = !isAdmin;
-    document.getElementById('task-assignee').disabled = !isAdmin;
+    // Para los chips de asignado, usamos clase disabled en el contenedor
+    const assigneeContainer = document.getElementById('assignee-chips-container');
+    if (isAdmin) {
+        assigneeContainer.classList.remove('disabled');
+    } else {
+        assigneeContainer.classList.add('disabled');
+    }
     
     // Campos que usuarios normales pueden editar (si es su tarea)
     const canEdit = isAdmin || (isMyTask && !isRestart);
@@ -1643,6 +1700,34 @@ function renderGantt() {
         return;
     }
     
+    // ORDENAR tareas por fecha de inicio
+    visibleTasks.sort((a, b) => {
+        const dateA = a.start_date ? new Date(a.start_date) : new Date(a.due_date);
+        const dateB = b.start_date ? new Date(b.start_date) : new Date(b.due_date);
+        return dateA - dateB;
+    });
+    
+    // AGRUPAR tareas por etapa
+    const tasksByStage = {};
+    const noStageKey = '__no_stage__';
+    
+    visibleTasks.forEach(task => {
+        const stageId = task.stage_id || noStageKey;
+        if (!tasksByStage[stageId]) {
+            tasksByStage[stageId] = [];
+        }
+        tasksByStage[stageId].push(task);
+    });
+    
+    // Ordenar las etapas por posición
+    const sortedStageIds = Object.keys(tasksByStage).sort((a, b) => {
+        if (a === noStageKey) return 1; // Sin etapa al final
+        if (b === noStageKey) return -1;
+        const stageA = stages.find(s => s.id == a);
+        const stageB = stages.find(s => s.id == b);
+        return (stageA?.position || 0) - (stageB?.position || 0);
+    });
+    
     // Render task bars
     const colors = {
         todo: '#64748b',
@@ -1654,7 +1739,8 @@ function renderGantt() {
     
     console.log('Total días:', totalDays, 'Scale:', ganttScale, 'Timeline width:', timelineWidth, 'Tareas visibles:', visibleTasks.length);
     
-    taskRows.innerHTML = visibleTasks.map(task => {
+    // Función helper para renderizar una tarea
+    function renderTaskRow(task) {
         const start = task.start_date ? new Date(task.start_date) : new Date(task.due_date);
         const end = task.due_date ? new Date(task.due_date) : new Date(task.start_date);
         
@@ -1681,40 +1767,30 @@ function renderGantt() {
         endDate.setHours(23, 59, 59, 999);
         
         if (today >= endDate) {
-            // Ya pasó la fecha de fin, debería estar al 100%
             scheduledProgress = 100;
         } else if (today >= startDate) {
-            // Estamos dentro del rango de la tarea
-            // Calcular días totales (incluye día inicio y fin)
             const totalDaysTask = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-            // Días transcurridos desde el inicio hasta hoy
             const elapsedDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
             scheduledProgress = Math.min(100, Math.round((elapsedDays / totalDaysTask) * 100));
         }
-        // Si today < startDate, scheduledProgress = 0 (aún no ha comenzado)
         
         // CALCULAR EFECTIVIDAD DE LA TAREA
         let taskEffectiveness = 100;
         if (scheduledProgress > 0) {
             taskEffectiveness = Math.round((task.progress / scheduledProgress) * 100);
         } else if (task.progress > 0) {
-            taskEffectiveness = 100; // Adelantado si tiene progreso antes de empezar
+            taskEffectiveness = 100;
         }
         
         // Determinar color de efectividad
-        let effectivenessColor = '#10b981'; // verde
         let effectivenessIcon = '🚀';
         if (taskEffectiveness < 100) {
-            effectivenessColor = '#ef4444'; // rojo
             effectivenessIcon = '⚠️';
         } else if (taskEffectiveness === 100) {
-            effectivenessColor = '#f59e0b'; // amarillo/naranja
             effectivenessIcon = '✅';
         }
         
-        console.log(`Tarea: ${task.title}, Start: ${start.toDateString()}, End: ${end.toDateString()}, Programado: ${scheduledProgress}%, Real: ${task.progress}%, Efectividad: ${taskEffectiveness}%`);
-        
-        // Indicadores de recorte (si la barra está recortada al inicio o al final)
+        // Indicadores de recorte
         const isClippedStart = startDayOffset < 0;
         const isClippedEnd = endDayOffset >= totalDays;
         const clipStartIndicator = isClippedStart ? '◀' : '';
@@ -1736,7 +1812,7 @@ function renderGantt() {
         // Color según estado
         const barColor = colors[task.status] || '#64748b';
         
-        // Si la tarea está completamente fuera del rango visible, mostrar indicador
+        // Si la tarea está completamente fuera del rango visible
         if (isOutOfRange) {
             return `
                 <div class="gantt-task-row">
@@ -1756,20 +1832,6 @@ function renderGantt() {
                     </div>
                 </div>
             `;
-
-            // Toggle collapse
-            const toggleBtn = document.getElementById('stages-toggle');
-            if (toggleBtn) {
-                const isCollapsed = localStorage.getItem('gantt-stages-collapsed') === 'true';
-                if (isCollapsed) {
-                    stagesContainer.classList.add('collapsed');
-                    toggleBtn.querySelector('i').classList.remove('fa-chevron-up');
-                    toggleBtn.querySelector('i').classList.add('fa-chevron-down');
-                    toggleBtn.setAttribute('aria-expanded', 'false');
-                } else {
-                    toggleBtn.setAttribute('aria-expanded', 'true');
-                }
-            }
         }
         
         return `
@@ -1788,11 +1850,8 @@ function renderGantt() {
                          class="gantt-task-bar"
                          data-id="${task.id}" 
                          title="📅 Prog: ${scheduledProgress}% | ✅ Real: ${task.progress}% | ${effectivenessIcon} Efect: ${taskEffectiveness}%">
-                        <!-- Barra de progreso programado (fondo gris más oscuro) -->
                         <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${scheduledProgress}%; background: rgba(0,0,0,0.3);"></div>
-                        <!-- Barra de progreso real (overlay brillante) -->
                         <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${task.progress}%; background: rgba(255,255,255,0.35);"></div>
-                        <!-- Indicadores de texto -->
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 8px; position: relative; z-index: 1; height: 100%;">
                             <span style="color: rgba(255,255,255,0.9); font-size: 0.65rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${clipStartIndicator} 📅${scheduledProgress}%</span>
                             <span style="color: white; font-size: 0.8rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${task.progress}% ${clipEndIndicator}</span>
@@ -1801,7 +1860,43 @@ function renderGantt() {
                 </div>
             </div>
         `;
-    }).join('');
+    }
+    
+    // Generar HTML agrupado por etapas
+    let ganttHtml = '';
+    
+    sortedStageIds.forEach(stageId => {
+        const stageTasks = tasksByStage[stageId];
+        const stage = stageId === noStageKey ? null : stages.find(s => s.id == stageId);
+        const stageName = stage ? stage.name : 'Sin Etapa';
+        const stageIcon = stage ? 'fa-layer-group' : 'fa-inbox';
+        const headerClass = stage ? '' : 'gantt-no-stage-header';
+        
+        ganttHtml += `
+            <div class="gantt-stage-group" data-stage-id="${stageId}">
+                <div class="gantt-stage-header ${headerClass}" onclick="toggleGanttStageGroup('${stageId}')">
+                    <i class="fas ${stageIcon}"></i>
+                    <span>${stageName}</span>
+                    <span class="stage-task-count">${stageTasks.length} tarea${stageTasks.length !== 1 ? 's' : ''}</span>
+                    <i class="fas fa-chevron-down stage-toggle"></i>
+                </div>
+                <div class="gantt-stage-tasks">
+                    ${stageTasks.map(task => renderTaskRow(task)).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    taskRows.innerHTML = ganttHtml;
+    
+    // Restaurar estados colapsados desde localStorage
+    const collapsedStages = JSON.parse(localStorage.getItem('gantt-collapsed-stages') || '{}');
+    Object.keys(collapsedStages).forEach(stageId => {
+        if (collapsedStages[stageId]) {
+            const group = document.querySelector(`.gantt-stage-group[data-stage-id="${stageId}"]`);
+            if (group) group.classList.add('collapsed');
+        }
+    });
     
     // Add click listeners
     taskRows.querySelectorAll('.gantt-task-bar').forEach(bar => {

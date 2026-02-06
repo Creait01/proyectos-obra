@@ -4128,3 +4128,152 @@ body.user-role #add-task-btn {
     cursor: not-allowed;
     opacity: 0.7;
 }
+
+/* ===================== ASSIGNEE CHIPS ===================== */
+.assignee-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    min-height: 60px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.assignee-chips-container.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.assignee-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid transparent;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.assignee-chip:hover {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
+}
+
+.assignee-chip.selected {
+    background: var(--primary);
+    border-color: var(--primary-light);
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+}
+
+.assignee-chip.selected:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary);
+}
+
+.assignee-chip-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+    flex-shrink: 0;
+}
+
+.assignee-chip-name {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.assignee-chip.selected .assignee-chip-name {
+    color: white;
+}
+
+.assignee-chip-unassigned {
+    background: rgba(100, 116, 139, 0.2);
+}
+
+.assignee-chip-unassigned .assignee-chip-avatar {
+    background: #64748b;
+}
+
+.assignee-chip-unassigned.selected {
+    background: #64748b;
+    border-color: #94a3b8;
+}
+
+/* ===================== GANTT STAGE GROUPS ===================== */
+.gantt-stage-group {
+    margin-bottom: 8px;
+}
+
+.gantt-stage-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: rgba(99, 102, 241, 0.15);
+    border-left: 3px solid var(--primary);
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.2s ease;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.gantt-stage-header:hover {
+    background: rgba(99, 102, 241, 0.25);
+}
+
+.gantt-stage-header i {
+    color: var(--primary-light);
+    font-size: 0.85rem;
+}
+
+.gantt-stage-header .stage-task-count {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.gantt-stage-header .stage-toggle {
+    margin-left: 8px;
+    transition: transform 0.2s ease;
+}
+
+.gantt-stage-group.collapsed .gantt-stage-header .stage-toggle {
+    transform: rotate(-90deg);
+}
+
+.gantt-stage-tasks {
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.gantt-stage-group.collapsed .gantt-stage-tasks {
+    max-height: 0 !important;
+}
+
+.gantt-no-stage-header {
+    background: rgba(100, 116, 139, 0.15);
+    border-left-color: #64748b;
+}
+
+.gantt-no-stage-header i {
+    color: #94a3b8;
+}
