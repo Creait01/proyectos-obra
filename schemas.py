@@ -124,7 +124,7 @@ class TaskBase(BaseModel):
     progress: Optional[float] = 0
 
 class TaskCreate(TaskBase):
-    assignee_id: Optional[int] = None
+    assignee_ids: Optional[List[int]] = None  # Lista de IDs de usuarios asignados
     stage_id: Optional[int] = None
 
 class TaskUpdate(BaseModel):
@@ -133,7 +133,7 @@ class TaskUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     position: Optional[int] = None
-    assignee_id: Optional[int] = None
+    assignee_ids: Optional[List[int]] = None  # Lista de IDs de usuarios asignados
     stage_id: Optional[int] = None
     start_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
@@ -143,7 +143,7 @@ class TaskResponse(TaskBase):
     id: int
     project_id: int
     stage_id: Optional[int]
-    assignee_id: Optional[int]
+    assignee_ids: List[int] = []  # Lista de IDs de usuarios asignados
     position: int
     created_at: datetime
     updated_at: datetime

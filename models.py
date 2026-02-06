@@ -1,7 +1,15 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean, Table
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
+
+# Tabla de asociación para múltiples asignados por tarea
+task_assignees = Table(
+    'task_assignees',
+    Base.metadata,
+    Column('task_id', Integer, ForeignKey('tasks.id'), primary_key=True),
+    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True)
+)
 
 class User(Base):
     __tablename__ = "users"
@@ -16,7 +24,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     projects = relationship("Project", back_populates="owner")
-    assigned_tasks = relationship("Task", back_populates="assignee")
+    assigned_tasks = relationship("Task", secondary=task_assignees, back_populates="assignees")
     activities = relationship("Activity", back_populates="user")
 
 class Project(Base):
@@ -80,7 +88,7 @@ class Task(Base):
     progress = Column(Float, default=0)  # 0-100 para Gantt
     project_id = Column(Integer, ForeignKey("projects.id"))
     stage_id = Column(Integer, ForeignKey("stages.id"), nullable=True)  # Etapa a la que pertenece
-    assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Mantener para compatibilidad
     start_date = Column(DateTime)
     due_date = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -88,7 +96,7 @@ class Task(Base):
     
     project = relationship("Project", back_populates="tasks")
     stage = relationship("Stage", back_populates="tasks")
-    assignee = relationship("User", back_populates="assigned_tasks")
+    assignees = relationship("User", secondary=task_assignees, back_populates="assigned_tasks")
     progress_history = relationship("TaskProgress", back_populates="task", cascade="all, delete-orphan")
     history = relationship("TaskHistory", back_populates="task", cascade="all, delete-orphan", order_by="TaskHistory.created_at.desc()")
 

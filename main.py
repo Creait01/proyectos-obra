@@ -1,7 +1,8 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect
 from typing import List, Optional
@@ -227,6 +228,43 @@ def init_database():
                 except Exception as mysql_err:
                     print(f"⚠️ Tabla admin_teams SQLite: {sqlite_err}")
                     print(f"⚠️ Tabla admin_teams MySQL: {mysql_err}")
+            
+            # Crear tabla task_assignees para relación muchos-a-muchos
+            try:
+                # Primero intentar sintaxis SQLite
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS task_assignees (
+                        task_id INT NOT NULL,
+                        user_id INT NOT NULL,
+                        PRIMARY KEY (task_id, user_id),
+                        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla task_assignees verificada")
+            except Exception as e:
+                print(f"⚠️ Tabla task_assignees: {e}")
+            
+            # Migrar datos existentes de assignee_id a task_assignees
+            try:
+                # Verificar si hay datos para migrar (tareas con assignee_id pero sin entrada en task_assignees)
+                result = conn.execute(text("""
+                    SELECT id, assignee_id FROM tasks 
+                    WHERE assignee_id IS NOT NULL 
+                    AND id NOT IN (SELECT task_id FROM task_assignees)
+                """))
+                tasks_to_migrate = result.fetchall()
+                
+                if tasks_to_migrate:
+                    for task_row in tasks_to_migrate:
+                        conn.execute(text("""
+                            INSERT INTO task_assignees (task_id, user_id) VALUES (:task_id, :user_id)
+                        """), {"task_id": task_row[0], "user_id": task_row[1]})
+                    conn.commit()
+                    print(f"✅ Migrados {len(tasks_to_migrate)} asignados a task_assignees")
+            except Exception as e:
+                print(f"⚠️ Migración task_assignees: {e}")
         
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
@@ -277,6 +315,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware para evitar caché en archivos estáticos
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/static"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+app.add_middleware(NoCacheMiddleware)
 
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -923,7 +973,25 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
 @app.get("/api/projects/{project_id}/tasks", response_model=List[TaskResponse])
 async def get_tasks(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     tasks = db.query(Task).filter(Task.project_id == project_id).order_by(Task.position).all()
-    return tasks
+    # Convertir a TaskResponse con assignee_ids
+    return [
+        TaskResponse(
+            id=t.id,
+            title=t.title,
+            description=t.description,
+            status=t.status,
+            priority=t.priority,
+            project_id=t.project_id,
+            stage_id=t.stage_id,
+            assignee_ids=[u.id for u in t.assignees],
+            position=t.position,
+            start_date=t.start_date,
+            due_date=t.due_date,
+            progress=t.progress,
+            created_at=t.created_at,
+            updated_at=t.updated_at
+        ) for t in tasks
+    ]
 
 @app.post("/api/projects/{project_id}/tasks", response_model=TaskResponse)
 async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -946,12 +1014,17 @@ async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(g
         priority=task.priority,
         project_id=project_id,
         stage_id=task.stage_id,
-        assignee_id=task.assignee_id,
         position=position,
         start_date=task.start_date,
         due_date=task.due_date,
         progress=task.progress or 0
     )
+    
+    # Agregar asignados
+    if task.assignee_ids:
+        assignees = db.query(User).filter(User.id.in_(task.assignee_ids)).all()
+        new_task.assignees = assignees
+    
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
@@ -967,13 +1040,31 @@ async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(g
     db.add(activity)
     db.commit()
     
+    # Preparar respuesta con assignee_ids
+    task_response = TaskResponse(
+        id=new_task.id,
+        title=new_task.title,
+        description=new_task.description,
+        status=new_task.status,
+        priority=new_task.priority,
+        project_id=new_task.project_id,
+        stage_id=new_task.stage_id,
+        assignee_ids=[u.id for u in new_task.assignees],
+        position=new_task.position,
+        start_date=new_task.start_date,
+        due_date=new_task.due_date,
+        progress=new_task.progress,
+        created_at=new_task.created_at,
+        updated_at=new_task.updated_at
+    )
+    
     # Broadcast a todos los conectados
     await manager.broadcast({
         "type": "task_created",
-        "task": TaskResponse.model_validate(new_task).model_dump(mode='json')
+        "task": task_response.model_dump(mode='json')
     }, str(project_id))
     
-    return new_task
+    return task_response
 
 @app.put("/api/tasks/{task_id}", response_model=TaskResponse)
 async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -983,7 +1074,9 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
     
     # Usuarios normales solo pueden actualizar tareas asignadas a ellos
     if not current_user.is_admin:
-        if db_task.assignee_id != current_user.id:
+        # Verificar si el usuario está en la lista de asignados
+        assignee_ids = [u.id for u in db_task.assignees]
+        if current_user.id not in assignee_ids:
             raise HTTPException(status_code=403, detail="Solo puedes actualizar tareas asignadas a ti")
         if db_task.status == "restart":
             raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")
@@ -996,6 +1089,7 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
             raise HTTPException(status_code=403, detail="Solo puedes actualizar estado, descripción, progreso y etapa de tus tareas")
     
     # Guardar valores anteriores para el historial
+    old_assignee_ids = [u.id for u in db_task.assignees]
     old_values = {
         'status': db_task.status,
         'progress': str(db_task.progress) if db_task.progress is not None else '0',
@@ -1004,15 +1098,21 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         'priority': db_task.priority,
         'start_date': db_task.start_date.isoformat() if db_task.start_date else None,
         'due_date': db_task.due_date.isoformat() if db_task.due_date else None,
-        'assignee_id': str(db_task.assignee_id) if db_task.assignee_id else None,
+        'assignee_ids': ','.join(map(str, old_assignee_ids)) if old_assignee_ids else None,
         'stage_id': str(db_task.stage_id) if db_task.stage_id else None
     }
     
     old_status = db_task.status
     
-    # Aplicar cambios
+    # Aplicar cambios (excepto assignee_ids que se maneja aparte)
     for key, value in task.model_dump(exclude_unset=True).items():
-        setattr(db_task, key, value)
+        if key != 'assignee_ids':
+            setattr(db_task, key, value)
+    
+    # Actualizar asignados si se proporcionaron
+    if task.assignee_ids is not None:
+        new_assignees = db.query(User).filter(User.id.in_(task.assignee_ids)).all()
+        db_task.assignees = new_assignees
     
     db.commit()
     db.refresh(db_task)
@@ -1032,12 +1132,13 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
             priority=db_task.priority,
             project_id=db_task.project_id,
             stage_id=db_task.stage_id,
-            assignee_id=db_task.assignee_id,
             position=new_position,
             start_date=db_task.start_date,
             due_date=db_task.due_date,
             progress=0
         )
+        # Copiar los asignados de la tarea original
+        new_task.assignees = list(db_task.assignees)
         db.add(new_task)
         db.commit()
         db.refresh(new_task)
@@ -1055,9 +1156,25 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         db.commit()
 
         # Broadcast de la nueva tarea
+        new_task_response = TaskResponse(
+            id=new_task.id,
+            title=new_task.title,
+            description=new_task.description,
+            status=new_task.status,
+            priority=new_task.priority,
+            project_id=new_task.project_id,
+            stage_id=new_task.stage_id,
+            assignee_ids=[u.id for u in new_task.assignees],
+            position=new_task.position,
+            start_date=new_task.start_date,
+            due_date=new_task.due_date,
+            progress=new_task.progress,
+            created_at=new_task.created_at,
+            updated_at=new_task.updated_at
+        )
         await manager.broadcast({
             "type": "task_created",
-            "task": TaskResponse.model_validate(new_task).model_dump(mode='json')
+            "task": new_task_response.model_dump(mode='json')
         }, str(db_task.project_id))
     
     # Registrar historial de cambios
@@ -1069,7 +1186,7 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         'priority': 'Prioridad',
         'start_date': 'Fecha Inicio',
         'due_date': 'Fecha Fin',
-        'assignee_id': 'Asignado',
+        'assignee_ids': 'Asignados',
         'stage_id': 'Etapa'
     }
     
@@ -1103,7 +1220,9 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         elif key == 'progress':
             new_val = str(int(value)) if value is not None else '0'
             old_val = str(int(float(old_val))) if old_val else '0'
-        elif key in ['assignee_id', 'stage_id']:
+        elif key == 'assignee_ids':
+            new_val = ','.join(map(str, value)) if value else None
+        elif key == 'stage_id':
             new_val = str(value) if value else None
         else:
             new_val = str(value) if value is not None else None
@@ -1143,16 +1262,17 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
                         display_new = new_val
                 else:
                     display_new = 'Sin fecha'
-            elif key == 'assignee_id':
-                # Obtener nombre del usuario
+            elif key == 'assignee_ids':
+                # Obtener nombres de los usuarios asignados
                 if old_val:
-                    old_user = db.query(User).filter(User.id == int(old_val)).first()
-                    display_old = old_user.name if old_user else old_val
+                    old_ids = [int(x) for x in old_val.split(',')]
+                    old_users = db.query(User).filter(User.id.in_(old_ids)).all()
+                    display_old = ', '.join([u.name for u in old_users]) if old_users else 'Sin asignar'
                 else:
                     display_old = 'Sin asignar'
                 if value:
-                    new_user = db.query(User).filter(User.id == int(value)).first()
-                    display_new = new_user.name if new_user else str(value)
+                    new_users = db.query(User).filter(User.id.in_(value)).all()
+                    display_new = ', '.join([u.name for u in new_users]) if new_users else 'Sin asignar'
                 else:
                     display_new = 'Sin asignar'
             elif key == 'stage_id':
@@ -1192,13 +1312,31 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         db.add(activity)
         db.commit()
     
+    # Preparar respuesta con assignee_ids
+    task_response = TaskResponse(
+        id=db_task.id,
+        title=db_task.title,
+        description=db_task.description,
+        status=db_task.status,
+        priority=db_task.priority,
+        project_id=db_task.project_id,
+        stage_id=db_task.stage_id,
+        assignee_ids=[u.id for u in db_task.assignees],
+        position=db_task.position,
+        start_date=db_task.start_date,
+        due_date=db_task.due_date,
+        progress=db_task.progress,
+        created_at=db_task.created_at,
+        updated_at=db_task.updated_at
+    )
+    
     # Broadcast
     await manager.broadcast({
         "type": "task_updated",
-        "task": TaskResponse.model_validate(db_task).model_dump(mode='json')
+        "task": task_response.model_dump(mode='json')
     }, str(db_task.project_id))
     
-    return db_task
+    return task_response
 
 @app.delete("/api/tasks/{task_id}")
 async def delete_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

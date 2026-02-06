@@ -903,9 +903,11 @@ function renderKanban() {
         document.getElementById(`count-${status}`).textContent = statusTasks.length;
         
         column.innerHTML = statusTasks.map(task => {
-            const assignee = users.find(u => u.id === task.assignee_id);
+            // Obtener los usuarios asignados (ahora es un array de IDs)
+            const assigneeIds = task.assignee_ids || [];
+            const assignees = assigneeIds.map(id => users.find(u => u.id === id)).filter(u => u);
             const overdue = task.status !== 'done' && task.status !== 'restart' && isOverdue(task.due_date);
-            const isMyTask = task.assignee_id === currentUser?.id;
+            const isMyTask = assigneeIds.includes(currentUser?.id);
             const canUpdateProgress = (isMyTask || isAdmin) && !(task.status === 'restart' && !isAdmin);
             const isRestart = task.status === 'restart';
             
@@ -936,11 +938,14 @@ function renderKanban() {
                                     <i class="fas fa-chart-line"></i>
                                 </button>
                             ` : ''}
-                            ${assignee ? `
-                                <div class="task-assignee" style="background: ${assignee.avatar_color}" title="${assignee.name}">
-                                    ${getInitials(assignee.name)}
-                                </div>
-                            ` : ''}
+                            <div class="task-assignees">
+                                ${assignees.slice(0, 3).map(assignee => `
+                                    <div class="task-assignee" style="background: ${assignee.avatar_color}" title="${assignee.name}">
+                                        ${getInitials(assignee.name)}
+                                    </div>
+                                `).join('')}
+                                ${assignees.length > 3 ? `<div class="task-assignee-more">+${assignees.length - 3}</div>` : ''}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -959,10 +964,11 @@ function renderKanban() {
                 
                 const taskId = parseInt(card.dataset.id);
                 const task = tasks.find(t => t.id === taskId);
+                const taskAssigneeIds = task.assignee_ids || [];
                 
                 if (isAdmin) {
                     openTaskModal(taskId);
-                } else if (task.assignee_id === currentUser?.id) {
+                } else if (taskAssigneeIds.includes(currentUser?.id)) {
                     if (task.status === 'restart') {
                         showToast('Tarea en reinicio: solo administradores pueden modificarla', 'info');
                         return;
@@ -1048,21 +1054,12 @@ document.getElementById('add-task-btn').addEventListener('click', () => {
 function updateAssigneeSelect() {
     const container = document.getElementById('assignee-chips-container');
     const hiddenInput = document.getElementById('task-assignee');
-    const currentValue = hiddenInput.value;
+    // Ahora es una lista de IDs separados por coma
+    const currentValues = hiddenInput.value ? hiddenInput.value.split(',').map(v => parseInt(v)) : [];
     
-    // Crear chip para "Sin asignar"
-    let chipsHtml = `
-        <div class="assignee-chip assignee-chip-unassigned ${!currentValue ? 'selected' : ''}" data-user-id="">
-            <div class="assignee-chip-avatar">
-                <i class="fas fa-user-slash"></i>
-            </div>
-            <span class="assignee-chip-name">Sin asignar</span>
-        </div>
-    `;
-    
-    // Crear chips para cada usuario
-    chipsHtml += users.map(u => `
-        <div class="assignee-chip ${currentValue == u.id ? 'selected' : ''}" data-user-id="${u.id}">
+    // Crear chips para cada usuario (sin opción "Sin asignar" ya que es multi-select)
+    let chipsHtml = users.map(u => `
+        <div class="assignee-chip ${currentValues.includes(u.id) ? 'selected' : ''}" data-user-id="${u.id}">
             <div class="assignee-chip-avatar" style="background: ${u.avatar_color}">
                 ${getInitials(u.name)}
             </div>
@@ -1072,18 +1069,23 @@ function updateAssigneeSelect() {
     
     container.innerHTML = chipsHtml;
     
-    // Agregar event listeners a los chips
+    // Agregar event listeners a los chips (toggle selection)
     container.querySelectorAll('.assignee-chip').forEach(chip => {
         chip.addEventListener('click', () => {
             // Si el contenedor está deshabilitado, no hacer nada
             if (container.classList.contains('disabled')) return;
             
-            // Quitar selección de todos
-            container.querySelectorAll('.assignee-chip').forEach(c => c.classList.remove('selected'));
-            // Seleccionar este
-            chip.classList.add('selected');
-            // Actualizar el valor hidden
-            hiddenInput.value = chip.dataset.userId;
+            // Toggle selección
+            chip.classList.toggle('selected');
+            
+            // Actualizar el valor hidden con todos los seleccionados
+            const selectedIds = [];
+            container.querySelectorAll('.assignee-chip.selected').forEach(c => {
+                if (c.dataset.userId) {
+                    selectedIds.push(c.dataset.userId);
+                }
+            });
+            hiddenInput.value = selectedIds.join(',');
         });
     });
 }
@@ -1103,7 +1105,9 @@ function openTaskModal(taskId) {
     document.getElementById('progress-value').textContent = task.progress || 0;
     
     // Establecer el valor del asignado ANTES de actualizar el select visual
-    document.getElementById('task-assignee').value = task.assignee_id || '';
+    // Ahora es array de IDs
+    const assigneeIds = task.assignee_ids || [];
+    document.getElementById('task-assignee').value = assigneeIds.join(',');
     updateAssigneeSelect();
     
     updateStageSelect();
@@ -1113,7 +1117,7 @@ function openTaskModal(taskId) {
     
     // Configurar visibilidad según rol
     const isAdmin = currentUser && currentUser.is_admin;
-    const isMyTask = task.assignee_id === currentUser?.id;
+    const isMyTask = assigneeIds.includes(currentUser?.id);
     const isRestart = task.status === 'restart';
     
     // Mostrar botón de historial (siempre visible para tareas existentes)
@@ -1170,12 +1174,15 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
         const startDateValue = document.getElementById('task-start').value;
         const dueDateValue = document.getElementById('task-due').value;
         
+        // Convertir string de IDs separados por coma a array de integers
+        const assigneeIds = assigneeValue ? assigneeValue.split(',').map(v => parseInt(v)).filter(v => !isNaN(v)) : [];
+        
         taskData = {
             title: document.getElementById('task-title').value,
             description: document.getElementById('task-description').value || null,
             status: document.getElementById('task-status').value,
             priority: document.getElementById('task-priority').value,
-            assignee_id: assigneeValue ? parseInt(assigneeValue) : null,
+            assignee_ids: assigneeIds,
             stage_id: stageValue ? parseInt(stageValue) : null,
             start_date: startDateValue ? new Date(startDateValue).toISOString() : null,
             due_date: dueDateValue ? new Date(dueDateValue).toISOString() : null,
@@ -1801,9 +1808,10 @@ function renderGantt() {
         const borderRadiusRight = isClippedEnd ? '0' : '6px';
         const borderRadius = `${borderRadiusLeft} ${borderRadiusRight} ${borderRadiusRight} ${borderRadiusLeft}`;
         
-        // Get assignee name
-        const assignee = task.assignee_id ? users.find(u => u.id === task.assignee_id) : null;
-        const assigneeName = assignee ? assignee.name : 'Sin asignar';
+        // Get assignee names (ahora puede haber múltiples)
+        const assigneeIds = task.assignee_ids || [];
+        const assignees = assigneeIds.map(id => users.find(u => u.id === id)).filter(u => u);
+        const assigneeName = assignees.length > 0 ? assignees.map(u => u.name).join(', ') : 'Sin asignar';
         
         // Formatear fechas para mostrar
         const startDateStr = task.start_date ? new Date(task.start_date).toLocaleDateString('es-ES', {day: '2-digit', month: 'short'}) : '';
@@ -1916,8 +1924,8 @@ async function loadMyTasks() {
             allTasks = allTasks.concat(projectTasks.map(t => ({ ...t, project })));
         }
         
-        // Filter by current user
-        const myTasks = allTasks.filter(t => t.assignee_id === currentUser.id);
+        // Filter by current user (ahora buscar si el usuario está en el array de assignee_ids)
+        const myTasks = allTasks.filter(t => (t.assignee_ids || []).includes(currentUser.id));
         renderMyTasks(myTasks);
     } catch (error) {
         showToast('Error cargando tareas', 'error');
@@ -2011,7 +2019,7 @@ async function loadTeam() {
     }
     
     grid.innerHTML = users.map(user => {
-        const userTasks = allTasks.filter(t => t.assignee_id === user.id);
+        const userTasks = allTasks.filter(t => (t.assignee_ids || []).includes(user.id));
         const completedTasks = userTasks.filter(t => t.status === 'done').length;
         const userProjects = projects.filter(p => (p.members || []).some(m => m.id === user.id));
         const projectsHtml = userProjects.length
