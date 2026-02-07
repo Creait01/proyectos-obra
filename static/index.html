@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3.6.5">
+    <link rel="stylesheet" href="/static/styles.css?v=3.6.6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -522,9 +522,10 @@
                     <div class="my-tasks-header">
                         <div class="filter-tabs">
                             <button class="filter-tab active" data-filter="all">Todas</button>
-                            <button class="filter-tab" data-filter="high">Alta</button>
-                            <button class="filter-tab" data-filter="medium">Media</button>
-                            <button class="filter-tab" data-filter="low">Baja</button>
+                            <button class="filter-tab" data-filter="todo">Por Hacer</button>
+                            <button class="filter-tab" data-filter="in_progress">En Progreso</button>
+                            <button class="filter-tab" data-filter="review">En Revision</button>
+                            <button class="filter-tab" data-filter="done">Completadas</button>
                         </div>
                         <div class="priority-filter">
                             <label for="my-tasks-priority-filter">Filtrar por prioridad</label>
@@ -1121,6 +1122,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=3.6.5"></script>
+    <script src="/static/app.js?v=3.6.6"></script>
 </body>
 </html>

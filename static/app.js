@@ -1966,16 +1966,16 @@ function renderMyTasks(taskList) {
     const prioritySelect = document.getElementById('my-tasks-priority-filter');
     const statusSelect = document.getElementById('my-tasks-status-filter');
     const activeTab = document.querySelector('.filter-tab.active');
-    const filter = (prioritySelect?.value && prioritySelect.value !== 'all')
+    const priorityFilter = (prioritySelect?.value && prioritySelect.value !== 'all')
         ? prioritySelect.value
-        : (activeTab?.dataset.filter || 'all');
+        : 'all';
     const statusFilter = (statusSelect?.value && statusSelect.value !== 'all')
         ? statusSelect.value
-        : 'all';
+        : (activeTab?.dataset.filter || 'all');
     
     let filtered = taskList;
-    if (filter !== 'all') {
-        filtered = taskList.filter(t => t.priority === filter);
+    if (priorityFilter !== 'all') {
+        filtered = taskList.filter(t => t.priority === priorityFilter);
     }
     if (statusFilter !== 'all') {
         filtered = filtered.filter(t => t.status === statusFilter);
@@ -2142,15 +2142,19 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        const prioritySelect = document.getElementById('my-tasks-priority-filter');
-        if (prioritySelect) {
-            prioritySelect.value = tab.dataset.filter;
+        const statusSelect = document.getElementById('my-tasks-status-filter');
+        if (statusSelect) {
+            statusSelect.value = tab.dataset.filter;
         }
         refreshMyTasksView();
     });
 });
 
 document.getElementById('my-tasks-priority-filter')?.addEventListener('change', (e) => {
+    refreshMyTasksView();
+});
+
+document.getElementById('my-tasks-status-filter')?.addEventListener('change', (e) => {
     const value = e.target.value;
     const tabs = document.querySelectorAll('.filter-tab');
     tabs.forEach(t => t.classList.remove('active'));
@@ -2160,10 +2164,6 @@ document.getElementById('my-tasks-priority-filter')?.addEventListener('change', 
     } else if (tabs[0]) {
         tabs[0].classList.add('active');
     }
-    refreshMyTasksView();
-});
-
-document.getElementById('my-tasks-status-filter')?.addEventListener('change', () => {
     refreshMyTasksView();
 });
 
