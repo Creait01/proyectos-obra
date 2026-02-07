@@ -7,6 +7,8 @@ let users = [];
 let stages = [];  // Etapas del proyecto actual
 let ws = null;
 let draggedTask = null;
+let myTasksCache = [];
+let myTasksLoadedAt = 0;
 
 const API_BASE = '';
 
@@ -1917,38 +1919,53 @@ async function loadMyTasks() {
     if (!currentUser) return;
     
     try {
-        // Load all tasks from all projects (including stage info)
+        // Load all tasks from all projects in parallel (including stage info)
+        const stagePromises = projects.map(project => loadProjectStages(project.id));
+        const tasksPromises = projects.map(project => apiRequest(`/api/projects/${project.id}/tasks`));
+        const stagesResults = await Promise.all(stagePromises);
+        const tasksResults = await Promise.all(tasksPromises);
+        
         let allTasks = [];
-        for (const project of projects) {
-            const projectStages = await loadProjectStages(project.id);
+        projects.forEach((project, index) => {
+            const projectStages = stagesResults[index] || [];
             const stageById = new Map(projectStages.map(s => [s.id, s]));
-            const projectTasks = await apiRequest(`/api/projects/${project.id}/tasks`);
+            const projectTasks = tasksResults[index] || [];
             allTasks = allTasks.concat(projectTasks.map(t => ({
                 ...t,
                 project,
                 stage: t.stage_id ? (stageById.get(t.stage_id) || null) : null
             })));
-        }
+        });
         
         // Filter by current user (ahora buscar si el usuario está en el array de assignee_ids)
         const myTasks = allTasks.filter(t => (t.assignee_ids || []).includes(currentUser.id));
-        renderMyTasks(myTasks);
+        myTasksCache = myTasks;
+        myTasksLoadedAt = Date.now();
+        renderMyTasks(myTasksCache);
     } catch (error) {
         showToast('Error cargando tareas', 'error');
     }
 }
 
+function refreshMyTasksView() {
+    if (myTasksCache.length > 0) {
+        renderMyTasks(myTasksCache);
+    } else {
+        loadMyTasks();
+    }
+}
+
 function renderMyTasks(taskList) {
     const list = document.getElementById('my-tasks-list');
-    const statusSelect = document.getElementById('my-tasks-status-filter');
+    const prioritySelect = document.getElementById('my-tasks-priority-filter');
     const activeTab = document.querySelector('.filter-tab.active');
-    const filter = (statusSelect?.value && statusSelect.value !== 'all')
-        ? statusSelect.value
+    const filter = (prioritySelect?.value && prioritySelect.value !== 'all')
+        ? prioritySelect.value
         : (activeTab?.dataset.filter || 'all');
     
     let filtered = taskList;
     if (filter !== 'all') {
-        filtered = taskList.filter(t => t.status === filter);
+        filtered = taskList.filter(t => t.priority === filter);
     }
     
     if (filtered.length === 0) {
@@ -2112,15 +2129,15 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        const statusSelect = document.getElementById('my-tasks-status-filter');
-        if (statusSelect) {
-            statusSelect.value = tab.dataset.filter;
+        const prioritySelect = document.getElementById('my-tasks-priority-filter');
+        if (prioritySelect) {
+            prioritySelect.value = tab.dataset.filter;
         }
-        loadMyTasks();
+        refreshMyTasksView();
     });
 });
 
-document.getElementById('my-tasks-status-filter')?.addEventListener('change', (e) => {
+document.getElementById('my-tasks-priority-filter')?.addEventListener('change', (e) => {
     const value = e.target.value;
     const tabs = document.querySelectorAll('.filter-tab');
     tabs.forEach(t => t.classList.remove('active'));
@@ -2130,7 +2147,7 @@ document.getElementById('my-tasks-status-filter')?.addEventListener('change', (e
     } else if (tabs[0]) {
         tabs[0].classList.add('active');
     }
-    loadMyTasks();
+    refreshMyTasksView();
 });
 
 // ===================== TEAM =====================
