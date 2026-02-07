@@ -17,6 +17,15 @@ const API_BASE = '';
 function getToken() {
     return localStorage.getItem('token');
 }
+
+function getStoredUser() {
+    try {
+        const raw = localStorage.getItem('currentUser');
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        return null;
+    }
+}
 function toggleGanttStages(event) {
     if (event) event.preventDefault();
     const stagesContainer = document.getElementById('gantt-stages-effectiveness');
@@ -52,8 +61,18 @@ function setToken(token) {
     localStorage.setItem('token', token);
 }
 
+function setStoredUser(user) {
+    try {
+        localStorage.setItem('currentUser', JSON.stringify(user));
+    } catch (e) {}
+}
+
 function clearToken() {
     localStorage.removeItem('token');
+}
+
+function clearStoredUser() {
+    localStorage.removeItem('currentUser');
 }
 
 async function apiRequest(endpoint, options = {}) {
@@ -74,6 +93,7 @@ async function apiRequest(endpoint, options = {}) {
     
     if (response.status === 401) {
         clearToken();
+        clearStoredUser();
         showAuthScreen();
         throw new Error('No autorizado');
     }
@@ -172,6 +192,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         
         setToken(data.access_token);
         currentUser = data.user;
+        setStoredUser(currentUser);
         showToast('¡Bienvenido!', 'success');
         initApp();
     } catch (error) {
@@ -208,6 +229,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
 
 document.getElementById('logout-btn').addEventListener('click', () => {
     clearToken();
+    clearStoredUser();
     currentUser = null;
     if (ws) ws.close();
     showAuthScreen();
@@ -3467,11 +3489,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const token = getToken();
     
     if (token) {
+        const storedUser = getStoredUser();
+        if (storedUser) {
+            currentUser = storedUser;
+            showMainApp();
+            updateUserInfo();
+            setupAdminUI();
+        }
         try {
             currentUser = await apiRequest('/api/auth/me');
+            setStoredUser(currentUser);
             initApp();
         } catch (error) {
-            showAuthScreen();
+            if (error.message === 'No autorizado') {
+                showAuthScreen();
+            } else {
+                showToast('No se pudo validar la sesión. Intenta de nuevo.', 'warning');
+            }
         }
     } else {
         showAuthScreen();
