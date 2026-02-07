@@ -2003,6 +2003,11 @@ body {
 /* ===================== MY TASKS ===================== */
 .my-tasks-header {
     margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
 }
 
 .filter-tabs {
@@ -2029,6 +2034,7 @@ body {
 .filter-tab.active {
     background: var(--primary);
     color: white;
+    box-shadow: 0 6px 14px rgba(99, 102, 241, 0.3);
 }
 
 .filter-tab:hover:not(.active) {
@@ -2036,10 +2042,83 @@ body {
     color: var(--text-primary);
 }
 
+.status-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+}
+
+.status-filter label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.status-filter select {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+}
+
 .tasks-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+.my-tasks-project {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+}
+
+.my-tasks-project-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.my-tasks-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.my-tasks-stage-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: var(--radius-md);
+}
+
+.my-tasks-stage-header .stage-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.my-tasks-stage-header .stage-count {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
 }
 
 .task-list-item {
@@ -2052,6 +2131,57 @@ body {
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: var(--transition-fast);
+}
+
+.task-list-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+}
+
+.task-list-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 220px;
+    padding-left: 12px;
+    border-left: 1px dashed var(--border-color);
+}
+
+.task-list-actions.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.task-action-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.task-action-row label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.task-status-select {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.task-progress-input {
+    width: 100%;
+}
+
+.progress-value {
+    color: var(--text-primary);
+    font-weight: 600;
 }
 
 .task-list-item:hover {

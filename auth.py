@@ -12,7 +12,8 @@ from models import User
 # Configuración
 SECRET_KEY = os.getenv("SECRET_KEY", "ef85017e3797dd4c61e94d190f3f0cc0")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 días
+# Mantener sesión por largo tiempo (hasta que el usuario cierre sesión)
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 365 * 5  # 5 años
 
 security = HTTPBearer()
 

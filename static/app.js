@@ -1917,11 +1917,17 @@ async function loadMyTasks() {
     if (!currentUser) return;
     
     try {
-        // Load all tasks from all projects
+        // Load all tasks from all projects (including stage info)
         let allTasks = [];
         for (const project of projects) {
+            const projectStages = await loadProjectStages(project.id);
+            const stageById = new Map(projectStages.map(s => [s.id, s]));
             const projectTasks = await apiRequest(`/api/projects/${project.id}/tasks`);
-            allTasks = allTasks.concat(projectTasks.map(t => ({ ...t, project })));
+            allTasks = allTasks.concat(projectTasks.map(t => ({
+                ...t,
+                project,
+                stage: t.stage_id ? (stageById.get(t.stage_id) || null) : null
+            })));
         }
         
         // Filter by current user (ahora buscar si el usuario está en el array de assignee_ids)
@@ -1934,36 +1940,124 @@ async function loadMyTasks() {
 
 function renderMyTasks(taskList) {
     const list = document.getElementById('my-tasks-list');
-    const filter = document.querySelector('.filter-tab.active').dataset.filter;
+    const statusSelect = document.getElementById('my-tasks-status-filter');
+    const activeTab = document.querySelector('.filter-tab.active');
+    const filter = (statusSelect?.value && statusSelect.value !== 'all')
+        ? statusSelect.value
+        : (activeTab?.dataset.filter || 'all');
     
     let filtered = taskList;
     if (filter !== 'all') {
         filtered = taskList.filter(t => t.status === filter);
     }
     
-    list.innerHTML = filtered.map(task => `
-        <div class="task-list-item" data-id="${task.id}">
-            <div class="task-checkbox ${task.status === 'done' ? 'checked' : ''} ${task.status === 'restart' ? 'disabled' : ''}" data-task-id="${task.id}">
-                <i class="fas fa-check"></i>
+    if (filtered.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-clipboard-check"></i>
+                <p>No hay tareas para este filtro</p>
             </div>
-            <div class="task-list-content">
-                <div class="task-list-title ${task.status === 'done' ? 'completed' : ''}">${task.title}</div>
-                <div class="task-list-meta">
-                    <span class="task-list-project">
-                        <span class="dot" style="background: ${task.project.color}"></span>
-                        ${task.project.name}
-                    </span>
-                    ${task.due_date ? `
-                        <span class="${isOverdue(task.due_date) && task.status !== 'done' && task.status !== 'restart' ? 'overdue' : ''}">
-                            <i class="fas fa-calendar"></i> ${formatDate(task.due_date)}
-                        </span>
-                    ` : ''}
-                    <span class="task-priority ${task.priority}">${task.priority}</span>
-                    ${task.status === 'restart' ? '<span class="task-status-badge restart">Reinicio</span>' : ''}
+        `;
+        return;
+    }
+    
+    // Agrupar por proyecto y etapa
+    const projectGroups = new Map();
+    filtered.forEach(task => {
+        const projectId = task.project.id;
+        if (!projectGroups.has(projectId)) {
+            projectGroups.set(projectId, {
+                project: task.project,
+                stages: new Map()
+            });
+        }
+        const stageKey = task.stage ? String(task.stage.id) : 'no-stage';
+        const stageName = task.stage ? task.stage.name : 'Sin etapa';
+        const group = projectGroups.get(projectId);
+        if (!group.stages.has(stageKey)) {
+            group.stages.set(stageKey, {
+                name: stageName,
+                tasks: []
+            });
+        }
+        group.stages.get(stageKey).tasks.push(task);
+    });
+    
+    const statusOptions = [
+        { value: 'todo', label: 'Por Hacer' },
+        { value: 'in_progress', label: 'En Progreso' },
+        { value: 'review', label: 'En Revision' },
+        { value: 'done', label: 'Completada' }
+    ];
+    
+    const projectsSorted = Array.from(projectGroups.values()).sort((a, b) =>
+        a.project.name.localeCompare(b.project.name)
+    );
+    
+    list.innerHTML = projectsSorted.map(projectGroup => {
+        const stagesSorted = Array.from(projectGroup.stages.values()).sort((a, b) =>
+            a.name.localeCompare(b.name)
+        );
+        
+        return `
+            <div class="my-tasks-project">
+                <div class="my-tasks-project-header">
+                    <span class="dot" style="background: ${projectGroup.project.color}"></span>
+                    <span>${projectGroup.project.name}</span>
                 </div>
+                ${stagesSorted.map(stageGroup => `
+                    <div class="my-tasks-stage">
+                        <div class="my-tasks-stage-header">
+                            <span class="stage-name">${stageGroup.name}</span>
+                            <span class="stage-count">${stageGroup.tasks.length}</span>
+                        </div>
+                        ${stageGroup.tasks.map(task => {
+                            const progressValue = task.progress || 0;
+                            const isRestart = task.status === 'restart';
+                            const statusOptionsForTask = isRestart
+                                ? [...statusOptions, { value: 'restart', label: 'Reinicio' }]
+                                : statusOptions;
+                            return `
+                                <div class="task-list-item" data-id="${task.id}">
+                                    <div class="task-list-left">
+                                        <div class="task-checkbox ${task.status === 'done' ? 'checked' : ''} ${isRestart ? 'disabled' : ''}" data-task-id="${task.id}">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div class="task-list-content">
+                                            <div class="task-list-title ${task.status === 'done' ? 'completed' : ''}">${task.title}</div>
+                                            <div class="task-list-meta">
+                                                ${task.due_date ? `
+                                                    <span class="${isOverdue(task.due_date) && task.status !== 'done' && !isRestart ? 'overdue' : ''}">
+                                                        <i class="fas fa-calendar"></i> ${formatDate(task.due_date)}
+                                                    </span>
+                                                ` : ''}
+                                                <span class="task-priority ${task.priority}">${task.priority}</span>
+                                                ${isRestart ? '<span class="task-status-badge restart">Reinicio</span>' : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="task-list-actions ${isRestart ? 'disabled' : ''}">
+                                        <div class="task-action-row">
+                                            <label>Estado</label>
+                                            <select class="task-status-select" data-task-id="${task.id}" ${isRestart ? 'disabled' : ''}>
+                                                ${statusOptionsForTask.map(opt => `
+                                                    <option value="${opt.value}" ${task.status === opt.value ? 'selected' : ''}>${opt.label}</option>
+                                                `).join('')}
+                                            </select>
+                                        </div>
+                                        <div class="task-action-row">
+                                            <label>Avance <span class="progress-value" data-task-id="${task.id}">${progressValue}%</span></label>
+                                            <input type="range" class="task-progress-input" min="0" max="100" value="${progressValue}" data-task-id="${task.id}" ${isRestart ? 'disabled' : ''}>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `).join('')}
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
     
     list.querySelectorAll('.task-checkbox').forEach(checkbox => {
         checkbox.addEventListener('click', async (e) => {
@@ -1974,27 +2068,69 @@ function renderMyTasks(taskList) {
             }
             const taskId = parseInt(checkbox.dataset.taskId);
             const newStatus = checkbox.classList.contains('checked') ? 'todo' : 'done';
-            
-            try {
-                await apiRequest(`/api/tasks/${taskId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ status: newStatus })
-                });
-                loadMyTasks();
-                loadDashboard();
-            } catch (error) {
-                showToast(error.message, 'error');
-            }
+            await updateMyTaskInline(taskId, { status: newStatus });
         });
     });
+    
+    list.querySelectorAll('.task-status-select').forEach(select => {
+        select.addEventListener('change', async (e) => {
+            const taskId = parseInt(e.target.dataset.taskId);
+            const newStatus = e.target.value;
+            await updateMyTaskInline(taskId, { status: newStatus });
+        });
+    });
+    
+    list.querySelectorAll('.task-progress-input').forEach(range => {
+        range.addEventListener('input', (e) => {
+            const taskId = e.target.dataset.taskId;
+            const value = e.target.value;
+            const label = list.querySelector(`.progress-value[data-task-id="${taskId}"]`);
+            if (label) label.textContent = `${value}%`;
+        });
+        range.addEventListener('change', async (e) => {
+            const taskId = parseInt(e.target.dataset.taskId);
+            const value = parseInt(e.target.value) || 0;
+            await updateMyTaskInline(taskId, { progress: value });
+        });
+    });
+}
+
+async function updateMyTaskInline(taskId, payload) {
+    try {
+        await apiRequest(`/api/tasks/${taskId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        });
+        await loadMyTasks();
+        loadDashboard();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
 }
 
 document.querySelectorAll('.filter-tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
+        const statusSelect = document.getElementById('my-tasks-status-filter');
+        if (statusSelect) {
+            statusSelect.value = tab.dataset.filter;
+        }
         loadMyTasks();
     });
+});
+
+document.getElementById('my-tasks-status-filter')?.addEventListener('change', (e) => {
+    const value = e.target.value;
+    const tabs = document.querySelectorAll('.filter-tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    const tabToActivate = document.querySelector(`.filter-tab[data-filter="${value}"]`);
+    if (tabToActivate) {
+        tabToActivate.classList.add('active');
+    } else if (tabs[0]) {
+        tabs[0].classList.add('active');
+    }
+    loadMyTasks();
 });
 
 // ===================== TEAM =====================
