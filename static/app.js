@@ -9,6 +9,7 @@ let ws = null;
 let draggedTask = null;
 let myTasksCache = [];
 let myTasksLoadedAt = 0;
+const MY_TASKS_CACHE_TTL_MS = 60000;
 
 const API_BASE = '';
 
@@ -1915,8 +1916,13 @@ function renderGantt() {
 }
 
 // ===================== MY TASKS =====================
-async function loadMyTasks() {
+async function loadMyTasks(force = false) {
     if (!currentUser) return;
+    
+    if (!force && myTasksLoadedAt && (Date.now() - myTasksLoadedAt) < MY_TASKS_CACHE_TTL_MS) {
+        renderMyTasks(myTasksCache);
+        return;
+    }
     
     try {
         // Load all tasks from all projects in parallel (including stage info)
@@ -1958,14 +1964,21 @@ function refreshMyTasksView() {
 function renderMyTasks(taskList) {
     const list = document.getElementById('my-tasks-list');
     const prioritySelect = document.getElementById('my-tasks-priority-filter');
+    const statusSelect = document.getElementById('my-tasks-status-filter');
     const activeTab = document.querySelector('.filter-tab.active');
     const filter = (prioritySelect?.value && prioritySelect.value !== 'all')
         ? prioritySelect.value
         : (activeTab?.dataset.filter || 'all');
+    const statusFilter = (statusSelect?.value && statusSelect.value !== 'all')
+        ? statusSelect.value
+        : 'all';
     
     let filtered = taskList;
     if (filter !== 'all') {
         filtered = taskList.filter(t => t.priority === filter);
+    }
+    if (statusFilter !== 'all') {
+        filtered = filtered.filter(t => t.status === statusFilter);
     }
     
     if (filtered.length === 0) {
@@ -2118,7 +2131,7 @@ async function updateMyTaskInline(taskId, payload) {
             method: 'PUT',
             body: JSON.stringify(payload)
         });
-        await loadMyTasks();
+        await loadMyTasks(true);
         loadDashboard();
     } catch (error) {
         showToast(error.message, 'error');
@@ -2147,6 +2160,10 @@ document.getElementById('my-tasks-priority-filter')?.addEventListener('change', 
     } else if (tabs[0]) {
         tabs[0].classList.add('active');
     }
+    refreshMyTasksView();
+});
+
+document.getElementById('my-tasks-status-filter')?.addEventListener('change', () => {
     refreshMyTasksView();
 });
 

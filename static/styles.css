@@ -2078,6 +2078,42 @@ body {
     color: white;
 }
 
+.status-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+}
+
+.status-filter label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.status-filter select {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+}
+
+.status-filter select option {
+    background: #1e1e2e;
+    color: #e2e8f0;
+}
+
+.status-filter select option:hover,
+.status-filter select option:checked {
+    background: #3b3b5a;
+    color: white;
+}
+
 .tasks-list {
     display: flex;
     flex-direction: column;

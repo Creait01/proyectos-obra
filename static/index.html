@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3.6.4">
+    <link rel="stylesheet" href="/static/styles.css?v=3.6.5">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -533,6 +533,16 @@
                                 <option value="high">Alta</option>
                                 <option value="medium">Media</option>
                                 <option value="low">Baja</option>
+                            </select>
+                        </div>
+                        <div class="status-filter">
+                            <label for="my-tasks-status-filter">Filtrar por estado</label>
+                            <select id="my-tasks-status-filter">
+                                <option value="all">Todos</option>
+                                <option value="todo">Por Hacer</option>
+                                <option value="in_progress">En Progreso</option>
+                                <option value="review">En Revision</option>
+                                <option value="done">Completadas</option>
                             </select>
                         </div>
                     </div>
@@ -1111,6 +1121,6 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=3.6.4"></script>
+    <script src="/static/app.js?v=3.6.5"></script>
 </body>
 </html>
