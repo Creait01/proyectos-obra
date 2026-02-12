@@ -2226,8 +2226,7 @@ async function loadTeam() {
         const userProjects = projects.filter(p => (p.members || []).some(m => m.id === user.id));
         const projectCount = userProjects.length;
         const projectsHtml = projectCount
-            ? `<div class="team-projects-count">${projectCount} obra${projectCount > 1 ? 's' : ''}</div>` +
-              userProjects.map(p => `
+            ? userProjects.map(p => `
                 <span class="team-project-chip" style="--chip-color: ${p.color}">
                     <span class="dot"></span>${p.name}
                 </span>
@@ -2248,6 +2247,10 @@ async function loadTeam() {
                     </div>
                 </div>
                 <div class="team-stats">
+                    <div class="team-stat">
+                        <div class="team-stat-value">${projectCount}</div>
+                        <div class="team-stat-label">Obras</div>
+                    </div>
                     <div class="team-stat">
                         <div class="team-stat-value">${userTasks.length}</div>
                         <div class="team-stat-label">Tareas</div>
