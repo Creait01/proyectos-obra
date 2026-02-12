@@ -623,9 +623,19 @@ function initStageDragAndDrop() {
 }
 
 // ===================== PLANTILLAS DE ETAPAS EN PROYECTO =====================
-function loadStageTemplatesSelector() {
+async function loadStageTemplatesSelector() {
     const select = document.getElementById('stage-template-select');
     if (!select) return;
+    
+    // Si no hay plantillas cargadas, cargarlas primero
+    if (!stageTemplates || stageTemplates.length === 0) {
+        try {
+            stageTemplates = await apiRequest('/api/templates/stages');
+        } catch (error) {
+            console.error('Error cargando plantillas de etapas:', error);
+            stageTemplates = [];
+        }
+    }
     
     select.innerHTML = '<option value="">-- Cargar desde plantilla (opcional) --</option>';
     
@@ -743,7 +753,7 @@ document.getElementById('add-stage-btn')?.addEventListener('click', addTempStage
 // Event listener para aplicar plantilla de etapas
 document.getElementById('apply-stage-template-btn')?.addEventListener('click', applyStageTemplateToProject);
 
-document.getElementById('add-project-btn').addEventListener('click', () => {
+document.getElementById('add-project-btn').addEventListener('click', async () => {
     document.getElementById('project-id').value = '';
     document.getElementById('project-form').reset();
     document.getElementById('project-modal-title').textContent = 'Nuevo Proyecto';
@@ -760,7 +770,7 @@ document.getElementById('add-project-btn').addEventListener('click', () => {
     renderStagesEditor([]);
     
     // Cargar plantillas en el selector
-    loadStageTemplatesSelector();
+    await loadStageTemplatesSelector();
     
     openModal('project-modal');
 });
@@ -793,7 +803,7 @@ async function editProject(projectId) {
     renderStagesEditor(existingStages);
     
     // Cargar plantillas en el selector
-    loadStageTemplatesSelector();
+    await loadStageTemplatesSelector();
     
     openModal('project-modal');
 }
@@ -2214,8 +2224,10 @@ async function loadTeam() {
         const userTasks = allTasks.filter(t => (t.assignee_ids || []).includes(user.id));
         const completedTasks = userTasks.filter(t => t.status === 'done').length;
         const userProjects = projects.filter(p => (p.members || []).some(m => m.id === user.id));
-        const projectsHtml = userProjects.length
-            ? userProjects.map(p => `
+        const projectCount = userProjects.length;
+        const projectsHtml = projectCount
+            ? `<div class="team-projects-count">${projectCount} obra${projectCount > 1 ? 's' : ''}</div>` +
+              userProjects.map(p => `
                 <span class="team-project-chip" style="--chip-color: ${p.color}">
                     <span class="dot"></span>${p.name}
                 </span>
@@ -2672,11 +2684,20 @@ function getRandomColor(name) {
     return colors[index];
 }
 
+// Solo cerrar modal si mousedown Y mouseup ocurren en el overlay
+// Esto evita cerrar cuando el usuario selecciona texto y suelta el mouse fuera
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
+    let mouseDownOnOverlay = false;
+    
+    overlay.addEventListener('mousedown', (e) => {
+        mouseDownOnOverlay = (e.target === overlay);
+    });
+    
+    overlay.addEventListener('mouseup', (e) => {
+        if (mouseDownOnOverlay && e.target === overlay) {
             overlay.classList.remove('active');
         }
+        mouseDownOnOverlay = false;
     });
 });
 
