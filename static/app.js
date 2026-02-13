@@ -388,12 +388,14 @@ function switchView(view) {
         'kanban': 'Tablero Kanban',
         'gantt': 'Diagrama Gantt',
         'my-tasks': 'Mis Tareas',
+        'projects': 'Proyectos',
         'team': 'Equipo',
         'admin': 'Administración'
     };
     document.getElementById('page-title').textContent = titles[view] || view;
     
     if (view === 'my-tasks') loadMyTasks();
+    if (view === 'projects') loadProjectsView();
     if (view === 'team') loadTeam();
     if (view === 'gantt') renderGantt();
     if (view === 'admin') loadPendingUsers();
@@ -753,6 +755,113 @@ document.getElementById('add-stage-btn')?.addEventListener('click', addTempStage
 // Event listener para aplicar plantilla de etapas
 document.getElementById('apply-stage-template-btn')?.addEventListener('click', applyStageTemplateToProject);
 
+// Función para poblar selectores de coordinador y líder
+function populateRoleSelectors(coordinatorId = '', leaderId = '') {
+    const coordinatorSelect = document.getElementById('project-coordinator');
+    const leaderSelect = document.getElementById('project-leader');
+    
+    const optionsHtml = '<option value="">Sin asignar</option>' +
+        users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+    
+    if (coordinatorSelect) {
+        coordinatorSelect.innerHTML = optionsHtml;
+        if (coordinatorId) coordinatorSelect.value = coordinatorId;
+    }
+    if (leaderSelect) {
+        leaderSelect.innerHTML = optionsHtml;
+        if (leaderId) leaderSelect.value = leaderId;
+    }
+}
+
+// Función para mostrar preview de imagen
+function showImagePreview(imageUrl) {
+    const preview = document.getElementById('project-image-preview');
+    const removeBtn = document.getElementById('project-image-remove');
+    
+    if (imageUrl) {
+        preview.innerHTML = `<img src="${imageUrl}" alt="Preview">`;
+        preview.classList.add('has-image');
+        removeBtn.style.display = 'inline-flex';
+    } else {
+        preview.innerHTML = `<i class="fas fa-building"></i><span>Sin imagen</span>`;
+        preview.classList.remove('has-image');
+        removeBtn.style.display = 'none';
+    }
+}
+
+// Manejar cambio de imagen
+document.getElementById('project-image-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const projectId = document.getElementById('project-id').value;
+    
+    // Si es un proyecto existente, subir directamente
+    if (projectId) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            const response = await fetch(`/api/projects/${projectId}/upload-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`
+                },
+                body: formData
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                showImagePreview(data.image_url);
+                // Actualizar proyecto en memoria
+                const project = projects.find(p => p.id == projectId);
+                if (project) project.image_url = data.image_url;
+                showToast('Imagen subida exitosamente', 'success');
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Error al subir imagen', 'error');
+            }
+        } catch (error) {
+            showToast('Error al subir imagen', 'error');
+        }
+    } else {
+        // Si es proyecto nuevo, mostrar preview local
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            showImagePreview(e.target.result);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Manejar eliminar imagen
+document.getElementById('project-image-remove')?.addEventListener('click', async () => {
+    const projectId = document.getElementById('project-id').value;
+    
+    if (projectId) {
+        try {
+            const response = await fetch(`/api/projects/${projectId}/image`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`
+                }
+            });
+            
+            if (response.ok) {
+                showImagePreview(null);
+                const project = projects.find(p => p.id == projectId);
+                if (project) project.image_url = null;
+                showToast('Imagen eliminada', 'success');
+            }
+        } catch (error) {
+            showToast('Error al eliminar imagen', 'error');
+        }
+    } else {
+        showImagePreview(null);
+        document.getElementById('project-image-input').value = '';
+    }
+});
+
 document.getElementById('add-project-btn').addEventListener('click', async () => {
     document.getElementById('project-id').value = '';
     document.getElementById('project-form').reset();
@@ -765,6 +874,16 @@ document.getElementById('add-project-btn').addEventListener('click', async () =>
     
     // Seleccionar al usuario actual por defecto
     renderMembersSelector([currentUser.id]);
+    
+    // Poblar selectores de coordinador y líder
+    populateRoleSelectors();
+    
+    // Limpiar metros cuadrados
+    document.getElementById('project-square-meters').value = '';
+    
+    // Limpiar imagen
+    showImagePreview(null);
+    document.getElementById('project-image-input').value = '';
     
     // Inicializar etapas vacías
     renderStagesEditor([]);
@@ -785,6 +904,7 @@ async function editProject(projectId) {
     document.getElementById('project-description').value = project.description || '';
     document.getElementById('project-start').value = project.start_date ? project.start_date.split('T')[0] : '';
     document.getElementById('project-end').value = project.end_date ? project.end_date.split('T')[0] : '';
+    document.getElementById('project-square-meters').value = project.square_meters || '';
     document.getElementById('project-color').value = project.color;
     document.getElementById('project-active').checked = project.is_active !== false;
     document.getElementById('project-active').disabled = !(currentUser && currentUser.is_admin);
@@ -793,6 +913,13 @@ async function editProject(projectId) {
     document.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
     const colorBtn = document.querySelector(`.color-option[data-color="${project.color}"]`);
     if (colorBtn) colorBtn.classList.add('selected');
+    
+    // Mostrar imagen existente
+    showImagePreview(project.image_url);
+    document.getElementById('project-image-input').value = '';
+    
+    // Poblar selectores de coordinador y líder
+    populateRoleSelectors(project.coordinator_id || '', project.leader_id || '');
     
     // Cargar miembros actuales
     const memberIds = project.members ? project.members.map(m => m.id) : [];
@@ -824,6 +951,9 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     const endDate = document.getElementById('project-end').value;
     const memberIds = getSelectedMemberIds();
     const stagesToSave = getValidStages();
+    const squareMeters = document.getElementById('project-square-meters').value;
+    const coordinatorId = document.getElementById('project-coordinator').value;
+    const leaderId = document.getElementById('project-leader').value;
     
     // Validar que las etapas sumen 100% si hay etapas
     if (stagesToSave.length > 0) {
@@ -841,6 +971,9 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
         start_date: startDate ? new Date(startDate).toISOString() : null,
         end_date: endDate ? new Date(endDate).toISOString() : null,
         is_active: document.getElementById('project-active').checked,
+        square_meters: squareMeters ? parseFloat(squareMeters) : null,
+        coordinator_id: coordinatorId ? parseInt(coordinatorId) : null,
+        leader_id: leaderId ? parseInt(leaderId) : null,
         member_ids: memberIds
     };
     
@@ -859,6 +992,26 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
                 body: JSON.stringify(projectData)
             });
             savedProjectId = newProject.id;
+            
+            // Subir imagen si se seleccionó una para proyecto nuevo
+            const imageInput = document.getElementById('project-image-input');
+            if (imageInput && imageInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('file', imageInput.files[0]);
+                
+                try {
+                    await fetch(`/api/projects/${savedProjectId}/upload-image`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${getToken()}`
+                        },
+                        body: formData
+                    });
+                } catch (e) {
+                    console.error('Error subiendo imagen:', e);
+                }
+            }
+            
             showToast('Proyecto creado', 'success');
         }
         
@@ -2258,6 +2411,124 @@ async function loadTeam() {
                     <div class="team-stat">
                         <div class="team-stat-value">${completedTasks}</div>
                         <div class="team-stat-label">Completadas</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ===================== PROJECTS VIEW =====================
+async function loadProjectsView() {
+    const grid = document.getElementById('projects-grid');
+    if (!grid) return;
+    
+    // Obtener tareas de todos los proyectos para estadísticas
+    let allTasks = [];
+    for (const project of projects) {
+        try {
+            const projectTasks = await apiRequest(`/api/projects/${project.id}/tasks`);
+            allTasks = allTasks.concat(projectTasks.map(t => ({...t, project_id: project.id})));
+        } catch (e) {}
+    }
+    
+    grid.innerHTML = projects.map(project => {
+        const projectTasks = allTasks.filter(t => t.project_id === project.id);
+        const completedTasks = projectTasks.filter(t => t.status === 'done').length;
+        const totalTasks = projectTasks.length;
+        const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+        
+        const startDate = project.start_date ? formatDate(project.start_date) : 'Sin definir';
+        const endDate = project.end_date ? formatDate(project.end_date) : 'Sin definir';
+        
+        const membersHtml = project.members && project.members.length > 0
+            ? project.members.slice(0, 5).map(m => `
+                <div class="project-card-member" style="background: ${m.avatar_color}" title="${m.name}">
+                    ${getInitials(m.name)}
+                </div>
+            `).join('') + (project.members.length > 5 ? `<div class="project-card-member more">+${project.members.length - 5}</div>` : '')
+            : '<span class="no-members">Sin asignar</span>';
+        
+        const coordinatorHtml = project.coordinator
+            ? `<div class="project-role-person">
+                <div class="project-role-avatar" style="background: ${project.coordinator.avatar_color}">${getInitials(project.coordinator.name)}</div>
+                <span>${project.coordinator.name}</span>
+               </div>`
+            : '<span class="no-assigned">Sin asignar</span>';
+        
+        const leaderHtml = project.leader
+            ? `<div class="project-role-person">
+                <div class="project-role-avatar" style="background: ${project.leader.avatar_color}">${getInitials(project.leader.name)}</div>
+                <span>${project.leader.name}</span>
+               </div>`
+            : '<span class="no-assigned">Sin asignar</span>';
+        
+        const imageHtml = project.image_url
+            ? `<div class="project-card-image">
+                <img src="${project.image_url}" alt="${project.name}">
+               </div>`
+            : '';
+        
+        return `
+            <div class="project-card glass-card" data-project-id="${project.id}">
+                ${imageHtml}
+                <div class="project-card-header" style="border-left-color: ${project.color}">
+                    <div class="project-card-title">
+                        <h3>${project.name}</h3>
+                        <span class="project-status-badge ${project.is_active ? 'active' : 'inactive'}">
+                            ${project.is_active ? 'Activo' : 'Inactivo'}
+                        </span>
+                    </div>
+                    ${project.description ? `<p class="project-card-desc">${project.description}</p>` : ''}
+                </div>
+                
+                <div class="project-card-info">
+                    <div class="project-info-item">
+                        <i class="fas fa-ruler-combined"></i>
+                        <span>${project.square_meters ? project.square_meters.toLocaleString() + ' m²' : 'No especificado'}</span>
+                    </div>
+                    <div class="project-info-item">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>${startDate} - ${endDate}</span>
+                    </div>
+                </div>
+                
+                <div class="project-card-roles">
+                    <div class="project-role">
+                        <div class="project-role-label"><i class="fas fa-user-tie"></i> Coordinador</div>
+                        ${coordinatorHtml}
+                    </div>
+                    <div class="project-role">
+                        <div class="project-role-label"><i class="fas fa-user-cog"></i> Líder</div>
+                        ${leaderHtml}
+                    </div>
+                </div>
+                
+                <div class="project-card-team">
+                    <div class="project-team-label">Equipo asignado</div>
+                    <div class="project-team-avatars">
+                        ${membersHtml}
+                    </div>
+                </div>
+                
+                <div class="project-card-stats">
+                    <div class="project-stat">
+                        <div class="project-stat-value">${totalTasks}</div>
+                        <div class="project-stat-label">Tareas</div>
+                    </div>
+                    <div class="project-stat">
+                        <div class="project-stat-value">${completedTasks}</div>
+                        <div class="project-stat-label">Completadas</div>
+                    </div>
+                    <div class="project-stat">
+                        <div class="project-stat-value">${progressPercent}%</div>
+                        <div class="project-stat-label">Progreso</div>
+                    </div>
+                </div>
+                
+                <div class="project-card-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${progressPercent}%; background: ${project.color}"></div>
                     </div>
                 </div>
             </div>

@@ -23,7 +23,7 @@ class User(Base):
     is_approved = Column(Boolean, default=False)  # Aprobado por admin
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    projects = relationship("Project", back_populates="owner")
+    projects = relationship("Project", back_populates="owner", foreign_keys="[Project.owner_id]")
     assigned_tasks = relationship("Task", secondary=task_assignees, back_populates="assignees")
     activities = relationship("Activity", back_populates="user")
 
@@ -34,14 +34,20 @@ class Project(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text)
     color = Column(String(20), default="#6366f1")
+    image_url = Column(String(500), nullable=True)  # URL de la imagen del proyecto
     owner_id = Column(Integer, ForeignKey("users.id"))
     start_date = Column(DateTime)
     end_date = Column(DateTime)
     is_active = Column(Boolean, default=True)
+    square_meters = Column(Float, nullable=True)  # Metros cuadrados
+    coordinator_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Coordinador (informativo)
+    leader_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Líder (informativo)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    owner = relationship("User", back_populates="projects")
+    owner = relationship("User", back_populates="projects", foreign_keys=[owner_id])
+    coordinator = relationship("User", foreign_keys=[coordinator_id])
+    leader = relationship("User", foreign_keys=[leader_id])
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
     stages = relationship("Stage", back_populates="project", cascade="all, delete-orphan", order_by="Stage.position")

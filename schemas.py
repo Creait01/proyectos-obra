@@ -49,9 +49,13 @@ class ProjectBase(BaseModel):
     name: str
     description: Optional[str] = None
     color: Optional[str] = "#6366f1"
+    image_url: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     is_active: Optional[bool] = True
+    square_meters: Optional[float] = None
+    coordinator_id: Optional[int] = None
+    leader_id: Optional[int] = None
 
 class ProjectCreate(ProjectBase):
     pass
@@ -60,9 +64,13 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
+    image_url: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     is_active: Optional[bool] = None
+    square_meters: Optional[float] = None
+    coordinator_id: Optional[int] = None
+    leader_id: Optional[int] = None
     member_ids: Optional[List[int]] = None  # Lista de IDs de usuarios miembros
 
 class ProjectMemberResponse(BaseModel):

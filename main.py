@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +8,8 @@ from sqlalchemy import inspect
 from typing import List, Optional
 import json
 import os
+import uuid
+import shutil
 from datetime import datetime, timedelta
 
 from database import engine, get_db, Base, SessionLocal
@@ -328,8 +330,13 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(NoCacheMiddleware)
 
+# Crear carpeta uploads si no existe
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # ===================== WEBSOCKET MANAGER =====================
 class ConnectionManager:
@@ -554,10 +561,16 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
                 "name": project.name,
                 "description": project.description,
                 "color": project.color,
+                "image_url": project.image_url,
                 "owner_id": project.owner_id,
                 "start_date": project.start_date,
                 "end_date": project.end_date,
                 "is_active": project.is_active,
+                "square_meters": project.square_meters,
+                "coordinator_id": project.coordinator_id,
+                "leader_id": project.leader_id,
+                "coordinator": {"id": project.coordinator.id, "name": project.coordinator.name, "avatar_color": project.coordinator.avatar_color} if project.coordinator else None,
+                "leader": {"id": project.leader.id, "name": project.leader.name, "avatar_color": project.leader.avatar_color} if project.leader else None,
                 "created_at": project.created_at,
                 "updated_at": project.updated_at,
                 "members": members
@@ -572,10 +585,16 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
             "name": p.name,
             "description": p.description,
             "color": p.color,
+            "image_url": p.image_url,
             "owner_id": p.owner_id,
             "start_date": p.start_date,
             "end_date": p.end_date,
             "is_active": p.is_active,
+            "square_meters": p.square_meters,
+            "coordinator_id": p.coordinator_id,
+            "leader_id": p.leader_id,
+            "coordinator": None,
+            "leader": None,
             "created_at": p.created_at,
             "updated_at": p.updated_at,
             "members": []
@@ -594,7 +613,10 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         owner_id=current_user.id,
         start_date=project.start_date,
         end_date=project.end_date,
-        is_active=project.is_active if project.is_active is not None else True
+        is_active=project.is_active if project.is_active is not None else True,
+        square_meters=project.square_meters,
+        coordinator_id=project.coordinator_id,
+        leader_id=project.leader_id
     )
     db.add(new_project)
     db.commit()
@@ -624,10 +646,16 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         "name": new_project.name,
         "description": new_project.description,
         "color": new_project.color,
+        "image_url": new_project.image_url,
         "owner_id": new_project.owner_id,
         "start_date": new_project.start_date,
         "end_date": new_project.end_date,
         "is_active": new_project.is_active,
+        "square_meters": new_project.square_meters,
+        "coordinator_id": new_project.coordinator_id,
+        "leader_id": new_project.leader_id,
+        "coordinator": None,
+        "leader": None,
         "created_at": new_project.created_at,
         "updated_at": new_project.updated_at,
         "members": [{"id": current_user.id, "name": current_user.name, "email": current_user.email, "avatar_color": current_user.avatar_color}]
@@ -672,10 +700,16 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
         "name": db_project.name,
         "description": db_project.description,
         "color": db_project.color,
+        "image_url": db_project.image_url,
         "owner_id": db_project.owner_id,
         "start_date": db_project.start_date,
         "end_date": db_project.end_date,
         "is_active": db_project.is_active,
+        "square_meters": db_project.square_meters,
+        "coordinator_id": db_project.coordinator_id,
+        "leader_id": db_project.leader_id,
+        "coordinator": {"id": db_project.coordinator.id, "name": db_project.coordinator.name, "avatar_color": db_project.coordinator.avatar_color} if db_project.coordinator else None,
+        "leader": {"id": db_project.leader.id, "name": db_project.leader.name, "avatar_color": db_project.leader.avatar_color} if db_project.leader else None,
         "created_at": db_project.created_at,
         "updated_at": db_project.updated_at,
         "members": members
@@ -694,6 +728,76 @@ async def delete_project(project_id: int, db: Session = Depends(get_db), current
     db.delete(db_project)
     db.commit()
     return {"message": "Proyecto eliminado"}
+
+@app.post("/api/projects/{project_id}/upload-image")
+async def upload_project_image(
+    project_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Subir imagen para un proyecto"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden subir imágenes")
+    
+    db_project = db.query(Project).filter(Project.id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    # Validar tipo de archivo
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Tipo de archivo no permitido. Use JPG, PNG, GIF o WEBP")
+    
+    # Generar nombre único para el archivo
+    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    unique_filename = f"project_{project_id}_{uuid.uuid4().hex}.{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    
+    # Eliminar imagen anterior si existe
+    if db_project.image_url:
+        old_path = db_project.image_url.replace("/uploads/", "uploads/")
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except:
+                pass
+    
+    # Guardar el archivo
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Actualizar URL en la base de datos
+    db_project.image_url = f"/uploads/{unique_filename}"
+    db.commit()
+    
+    return {"image_url": db_project.image_url, "message": "Imagen subida exitosamente"}
+
+@app.delete("/api/projects/{project_id}/image")
+async def delete_project_image(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Eliminar imagen de un proyecto"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar imágenes")
+    
+    db_project = db.query(Project).filter(Project.id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    if db_project.image_url:
+        old_path = db_project.image_url.replace("/uploads/", "uploads/")
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except:
+                pass
+        db_project.image_url = None
+        db.commit()
+    
+    return {"message": "Imagen eliminada"}
 
 # ===================== ETAPAS =====================
 @app.get("/api/projects/{project_id}/stages", response_model=List[StageResponse])
