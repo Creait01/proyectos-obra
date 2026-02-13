@@ -3767,7 +3767,6 @@ window.openProgressModal = openProgressModal;
 window.openProgressHistory = openProgressHistory;
 window.approveUser = approveUser;
 window.rejectUser = rejectUser;
-window.toggleUserAdmin = toggleUserAdmin;
 window.deleteUser = deleteUser;
 window.openEditUserModal = openEditUserModal;
 window.editProject = editProject;

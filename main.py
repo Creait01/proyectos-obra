@@ -561,16 +561,16 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
                 "name": project.name,
                 "description": project.description,
                 "color": project.color,
-                "image_url": project.image_url,
+                "image_url": getattr(project, 'image_url', None),
                 "owner_id": project.owner_id,
                 "start_date": project.start_date,
                 "end_date": project.end_date,
                 "is_active": project.is_active,
-                "square_meters": project.square_meters,
-                "coordinator_id": project.coordinator_id,
-                "leader_id": project.leader_id,
-                "coordinator": {"id": project.coordinator.id, "name": project.coordinator.name, "avatar_color": project.coordinator.avatar_color} if project.coordinator else None,
-                "leader": {"id": project.leader.id, "name": project.leader.name, "avatar_color": project.leader.avatar_color} if project.leader else None,
+                "square_meters": getattr(project, 'square_meters', None),
+                "coordinator_id": getattr(project, 'coordinator_id', None),
+                "leader_id": getattr(project, 'leader_id', None),
+                "coordinator": {"id": project.coordinator.id, "name": project.coordinator.name, "avatar_color": project.coordinator.avatar_color} if getattr(project, 'coordinator', None) else None,
+                "leader": {"id": project.leader.id, "name": project.leader.name, "avatar_color": project.leader.avatar_color} if getattr(project, 'leader', None) else None,
                 "created_at": project.created_at,
                 "updated_at": project.updated_at,
                 "members": members
@@ -585,14 +585,14 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
             "name": p.name,
             "description": p.description,
             "color": p.color,
-            "image_url": p.image_url,
+            "image_url": getattr(p, 'image_url', None),
             "owner_id": p.owner_id,
             "start_date": p.start_date,
             "end_date": p.end_date,
             "is_active": p.is_active,
-            "square_meters": p.square_meters,
-            "coordinator_id": p.coordinator_id,
-            "leader_id": p.leader_id,
+            "square_meters": getattr(p, 'square_meters', None),
+            "coordinator_id": getattr(p, 'coordinator_id', None),
+            "leader_id": getattr(p, 'leader_id', None),
             "coordinator": None,
             "leader": None,
             "created_at": p.created_at,
@@ -606,6 +606,7 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Solo administradores pueden crear proyectos")
     
+    # Crear proyecto con campos básicos
     new_project = Project(
         name=project.name,
         description=project.description,
@@ -613,11 +614,20 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         owner_id=current_user.id,
         start_date=project.start_date,
         end_date=project.end_date,
-        is_active=project.is_active if project.is_active is not None else True,
-        square_meters=project.square_meters,
-        coordinator_id=project.coordinator_id,
-        leader_id=project.leader_id
+        is_active=project.is_active if project.is_active is not None else True
     )
+    
+    # Intentar agregar campos nuevos si existen en el modelo
+    try:
+        if hasattr(Project, 'square_meters'):
+            new_project.square_meters = project.square_meters
+        if hasattr(Project, 'coordinator_id'):
+            new_project.coordinator_id = project.coordinator_id
+        if hasattr(Project, 'leader_id'):
+            new_project.leader_id = project.leader_id
+    except Exception as e:
+        print(f"No se pudieron agregar campos nuevos: {e}")
+    
     db.add(new_project)
     db.commit()
     db.refresh(new_project)
@@ -646,14 +656,14 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         "name": new_project.name,
         "description": new_project.description,
         "color": new_project.color,
-        "image_url": new_project.image_url,
+        "image_url": getattr(new_project, 'image_url', None),
         "owner_id": new_project.owner_id,
         "start_date": new_project.start_date,
         "end_date": new_project.end_date,
         "is_active": new_project.is_active,
-        "square_meters": new_project.square_meters,
-        "coordinator_id": new_project.coordinator_id,
-        "leader_id": new_project.leader_id,
+        "square_meters": getattr(new_project, 'square_meters', None),
+        "coordinator_id": getattr(new_project, 'coordinator_id', None),
+        "leader_id": getattr(new_project, 'leader_id', None),
         "coordinator": None,
         "leader": None,
         "created_at": new_project.created_at,
@@ -700,16 +710,16 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
         "name": db_project.name,
         "description": db_project.description,
         "color": db_project.color,
-        "image_url": db_project.image_url,
+        "image_url": getattr(db_project, 'image_url', None),
         "owner_id": db_project.owner_id,
         "start_date": db_project.start_date,
         "end_date": db_project.end_date,
         "is_active": db_project.is_active,
-        "square_meters": db_project.square_meters,
-        "coordinator_id": db_project.coordinator_id,
-        "leader_id": db_project.leader_id,
-        "coordinator": {"id": db_project.coordinator.id, "name": db_project.coordinator.name, "avatar_color": db_project.coordinator.avatar_color} if db_project.coordinator else None,
-        "leader": {"id": db_project.leader.id, "name": db_project.leader.name, "avatar_color": db_project.leader.avatar_color} if db_project.leader else None,
+        "square_meters": getattr(db_project, 'square_meters', None),
+        "coordinator_id": getattr(db_project, 'coordinator_id', None),
+        "leader_id": getattr(db_project, 'leader_id', None),
+        "coordinator": {"id": db_project.coordinator.id, "name": db_project.coordinator.name, "avatar_color": db_project.coordinator.avatar_color} if getattr(db_project, 'coordinator', None) else None,
+        "leader": {"id": db_project.leader.id, "name": db_project.leader.name, "avatar_color": db_project.leader.avatar_color} if getattr(db_project, 'leader', None) else None,
         "created_at": db_project.created_at,
         "updated_at": db_project.updated_at,
         "members": members
