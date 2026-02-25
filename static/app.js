@@ -458,6 +458,13 @@ function updateProjectSelects() {
 async function selectProject(projectId) {
     currentProject = projects.find(p => p.id === projectId);
     
+    // Toggle leader class para mostrar/ocultar botones de crear tareas
+    if (currentProject && currentUser && currentProject.leader_id === currentUser.id) {
+        document.body.classList.add('is-project-leader');
+    } else {
+        document.body.classList.remove('is-project-leader');
+    }
+    
     document.querySelectorAll('.project-item').forEach(item => {
         item.classList.toggle('active', parseInt(item.dataset.id) === projectId);
     });
@@ -755,10 +762,16 @@ document.getElementById('add-stage-btn')?.addEventListener('click', addTempStage
 // Event listener para aplicar plantilla de etapas
 document.getElementById('apply-stage-template-btn')?.addEventListener('click', applyStageTemplateToProject);
 
+// Toggle para mostrar proyectos inactivos
+document.getElementById('show-inactive-projects')?.addEventListener('change', () => {
+    loadProjectsView();
+});
+
 // Función para poblar selectores de coordinador y líder
-function populateRoleSelectors(coordinatorId = '', leaderId = '') {
+function populateRoleSelectors(coordinatorId = '', leaderId = '', supervisorId = '') {
     const coordinatorSelect = document.getElementById('project-coordinator');
     const leaderSelect = document.getElementById('project-leader');
+    const supervisorSelect = document.getElementById('project-supervisor');
     
     const optionsHtml = '<option value="">Sin asignar</option>' +
         users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
@@ -770,6 +783,10 @@ function populateRoleSelectors(coordinatorId = '', leaderId = '') {
     if (leaderSelect) {
         leaderSelect.innerHTML = optionsHtml;
         if (leaderId) leaderSelect.value = leaderId;
+    }
+    if (supervisorSelect) {
+        supervisorSelect.innerHTML = optionsHtml;
+        if (supervisorId) supervisorSelect.value = supervisorId;
     }
 }
 
@@ -919,7 +936,7 @@ async function editProject(projectId) {
     document.getElementById('project-image-input').value = '';
     
     // Poblar selectores de coordinador y líder
-    populateRoleSelectors(project.coordinator_id || '', project.leader_id || '');
+    populateRoleSelectors(project.coordinator_id || '', project.leader_id || '', project.supervisor_id || '');
     
     // Cargar miembros actuales
     const memberIds = project.members ? project.members.map(m => m.id) : [];
@@ -954,6 +971,7 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     const squareMeters = document.getElementById('project-square-meters').value;
     const coordinatorId = document.getElementById('project-coordinator').value;
     const leaderId = document.getElementById('project-leader').value;
+    const supervisorId = document.getElementById('project-supervisor').value;
     
     // Validar que las etapas sumen 100% si hay etapas
     if (stagesToSave.length > 0) {
@@ -974,6 +992,7 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
         square_meters: squareMeters ? parseFloat(squareMeters) : null,
         coordinator_id: coordinatorId ? parseInt(coordinatorId) : null,
         leader_id: leaderId ? parseInt(leaderId) : null,
+        supervisor_id: supervisorId ? parseInt(supervisorId) : null,
         member_ids: memberIds
     };
     
@@ -1096,7 +1115,8 @@ function renderKanban() {
             const assignees = assigneeIds.map(id => users.find(u => u.id === id)).filter(u => u);
             const overdue = task.status !== 'done' && task.status !== 'restart' && isOverdue(task.due_date);
             const isMyTask = assigneeIds.includes(currentUser?.id);
-            const canUpdateProgress = (isMyTask || isAdmin) && !(task.status === 'restart' && !isAdmin);
+            const isProjectLeader = currentProject && currentProject.leader_id === currentUser?.id;
+            const canUpdateProgress = (isMyTask || isAdmin || isProjectLeader) && !(task.status === 'restart' && !isAdmin);
             const isRestart = task.status === 'restart';
             
             return `
@@ -1156,7 +1176,7 @@ function renderKanban() {
                 
                 if (isAdmin) {
                     openTaskModal(taskId);
-                } else if (taskAssigneeIds.includes(currentUser?.id)) {
+                } else if (taskAssigneeIds.includes(currentUser?.id) || (currentProject && currentProject.leader_id === currentUser?.id)) {
                     if (task.status === 'restart') {
                         showToast('Tarea en reinicio: solo administradores pueden modificarla', 'info');
                         return;
@@ -2423,16 +2443,33 @@ async function loadProjectsView() {
     const grid = document.getElementById('projects-grid');
     if (!grid) return;
     
+    // Filtrar por activos/inactivos
+    const showInactive = document.getElementById('show-inactive-projects')?.checked || false;
+    const filteredProjects = projects.filter(p => showInactive ? !p.is_active : p.is_active !== false);
+    
+    // Ordenar por código/nombre
+    filteredProjects.sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
+    
     // Obtener tareas de todos los proyectos para estadísticas
     let allTasks = [];
-    for (const project of projects) {
+    for (const project of filteredProjects) {
         try {
             const projectTasks = await apiRequest(`/api/projects/${project.id}/tasks`);
             allTasks = allTasks.concat(projectTasks.map(t => ({...t, project_id: project.id})));
         } catch (e) {}
     }
     
-    grid.innerHTML = projects.map(project => {
+    if (filteredProjects.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+                <i class="fas fa-folder-open"></i>
+                <p>${showInactive ? 'No hay proyectos inactivos' : 'No hay proyectos activos'}</p>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = filteredProjects.map(project => {
         const projectTasks = allTasks.filter(t => t.project_id === project.id);
         const completedTasks = projectTasks.filter(t => t.status === 'done').length;
         const totalTasks = projectTasks.length;
@@ -2460,6 +2497,13 @@ async function loadProjectsView() {
             ? `<div class="project-role-person">
                 <div class="project-role-avatar" style="background: ${project.leader.avatar_color}">${getInitials(project.leader.name)}</div>
                 <span>${project.leader.name}</span>
+               </div>`
+            : '<span class="no-assigned">Sin asignar</span>';
+        
+        const supervisorHtml = project.supervisor
+            ? `<div class="project-role-person">
+                <div class="project-role-avatar" style="background: ${project.supervisor.avatar_color}">${getInitials(project.supervisor.name)}</div>
+                <span>${project.supervisor.name}</span>
                </div>`
             : '<span class="no-assigned">Sin asignar</span>';
         
@@ -2501,6 +2545,10 @@ async function loadProjectsView() {
                     <div class="project-role">
                         <div class="project-role-label"><i class="fas fa-user-cog"></i> Líder</div>
                         ${leaderHtml}
+                    </div>
+                    <div class="project-role">
+                        <div class="project-role-label"><i class="fas fa-hard-hat"></i> Supervisor</div>
+                        ${supervisorHtml}
                     </div>
                 </div>
                 

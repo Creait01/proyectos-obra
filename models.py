@@ -42,12 +42,14 @@ class Project(Base):
     square_meters = Column(Float, nullable=True)  # Metros cuadrados
     coordinator_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Coordinador (informativo)
     leader_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Líder (informativo)
+    supervisor_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Supervisor de proyecto
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     owner = relationship("User", back_populates="projects", foreign_keys=[owner_id])
     coordinator = relationship("User", foreign_keys=[coordinator_id])
     leader = relationship("User", foreign_keys=[leader_id])
+    supervisor = relationship("User", foreign_keys=[supervisor_id])
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
     stages = relationship("Stage", back_populates="project", cascade="all, delete-orphan", order_by="Stage.position")

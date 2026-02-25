@@ -569,8 +569,10 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
                 "square_meters": getattr(project, 'square_meters', None),
                 "coordinator_id": getattr(project, 'coordinator_id', None),
                 "leader_id": getattr(project, 'leader_id', None),
+                "supervisor_id": getattr(project, 'supervisor_id', None),
                 "coordinator": {"id": project.coordinator.id, "name": project.coordinator.name, "avatar_color": project.coordinator.avatar_color} if getattr(project, 'coordinator', None) else None,
                 "leader": {"id": project.leader.id, "name": project.leader.name, "avatar_color": project.leader.avatar_color} if getattr(project, 'leader', None) else None,
+                "supervisor": {"id": project.supervisor.id, "name": project.supervisor.name, "avatar_color": project.supervisor.avatar_color} if getattr(project, 'supervisor', None) else None,
                 "created_at": project.created_at,
                 "updated_at": project.updated_at,
                 "members": members
@@ -593,8 +595,10 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
             "square_meters": getattr(p, 'square_meters', None),
             "coordinator_id": getattr(p, 'coordinator_id', None),
             "leader_id": getattr(p, 'leader_id', None),
+            "supervisor_id": getattr(p, 'supervisor_id', None),
             "coordinator": None,
             "leader": None,
+            "supervisor": None,
             "created_at": p.created_at,
             "updated_at": p.updated_at,
             "members": []
@@ -625,6 +629,8 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
             new_project.coordinator_id = project.coordinator_id
         if hasattr(Project, 'leader_id'):
             new_project.leader_id = project.leader_id
+        if hasattr(Project, 'supervisor_id'):
+            new_project.supervisor_id = project.supervisor_id
     except Exception as e:
         print(f"No se pudieron agregar campos nuevos: {e}")
     
@@ -664,8 +670,10 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         "square_meters": getattr(new_project, 'square_meters', None),
         "coordinator_id": getattr(new_project, 'coordinator_id', None),
         "leader_id": getattr(new_project, 'leader_id', None),
+        "supervisor_id": getattr(new_project, 'supervisor_id', None),
         "coordinator": None,
         "leader": None,
+        "supervisor": None,
         "created_at": new_project.created_at,
         "updated_at": new_project.updated_at,
         "members": [{"id": current_user.id, "name": current_user.name, "email": current_user.email, "avatar_color": current_user.avatar_color}]
@@ -718,8 +726,10 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
         "square_meters": getattr(db_project, 'square_meters', None),
         "coordinator_id": getattr(db_project, 'coordinator_id', None),
         "leader_id": getattr(db_project, 'leader_id', None),
+        "supervisor_id": getattr(db_project, 'supervisor_id', None),
         "coordinator": {"id": db_project.coordinator.id, "name": db_project.coordinator.name, "avatar_color": db_project.coordinator.avatar_color} if getattr(db_project, 'coordinator', None) else None,
         "leader": {"id": db_project.leader.id, "name": db_project.leader.name, "avatar_color": db_project.leader.avatar_color} if getattr(db_project, 'leader', None) else None,
+        "supervisor": {"id": db_project.supervisor.id, "name": db_project.supervisor.name, "avatar_color": db_project.supervisor.avatar_color} if getattr(db_project, 'supervisor', None) else None,
         "created_at": db_project.created_at,
         "updated_at": db_project.updated_at,
         "members": members
@@ -1109,9 +1119,14 @@ async def get_tasks(project_id: int, db: Session = Depends(get_db), current_user
 
 @app.post("/api/projects/{project_id}/tasks", response_model=TaskResponse)
 async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Solo admins pueden crear tareas
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden crear tareas")
+    # Verificar si es admin o líder del proyecto
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    is_leader = getattr(project, 'leader_id', None) == current_user.id
+    if not current_user.is_admin and not is_leader:
+        raise HTTPException(status_code=403, detail="Solo administradores o líderes de proyecto pueden crear tareas")
     
     # Obtener la última posición
     last_task = db.query(Task).filter(
@@ -1186,11 +1201,15 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
     if not db_task:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
     
-    # Usuarios normales solo pueden actualizar tareas asignadas a ellos
+    # Usuarios normales solo pueden actualizar tareas asignadas a ellos (o líderes del proyecto)
     if not current_user.is_admin:
         # Verificar si el usuario está en la lista de asignados
         assignee_ids = [u.id for u in db_task.assignees]
-        if current_user.id not in assignee_ids:
+        # Verificar si es líder del proyecto
+        project = db.query(Project).filter(Project.id == db_task.project_id).first()
+        is_leader = project and getattr(project, 'leader_id', None) == current_user.id
+        
+        if current_user.id not in assignee_ids and not is_leader:
             raise HTTPException(status_code=403, detail="Solo puedes actualizar tareas asignadas a ti")
         if db_task.status == "restart":
             raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")
@@ -1509,8 +1528,14 @@ async def register_progress(task_id: int, progress_data: TaskProgressCreate, db:
     if not db_task:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
     
-    # Solo el asignado o admin pueden registrar avance
-    if not current_user.is_admin and db_task.assignee_id != current_user.id:
+    # Solo el asignado, admin o líder del proyecto pueden registrar avance
+    is_assignee = current_user.id in [u.id for u in db_task.assignees]
+    
+    # Verificar si es líder del proyecto
+    project = db.query(Project).filter(Project.id == db_task.project_id).first()
+    is_leader = project and getattr(project, 'leader_id', None) == current_user.id
+    
+    if not current_user.is_admin and not is_assignee and not is_leader:
         raise HTTPException(status_code=403, detail="Solo puedes registrar avance en tareas asignadas a ti")
     if not current_user.is_admin and db_task.status == "restart":
         raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")

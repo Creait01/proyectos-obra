@@ -56,6 +56,7 @@ class ProjectBase(BaseModel):
     square_meters: Optional[float] = None
     coordinator_id: Optional[int] = None
     leader_id: Optional[int] = None
+    supervisor_id: Optional[int] = None
 
 class ProjectCreate(ProjectBase):
     pass
@@ -71,6 +72,7 @@ class ProjectUpdate(BaseModel):
     square_meters: Optional[float] = None
     coordinator_id: Optional[int] = None
     leader_id: Optional[int] = None
+    supervisor_id: Optional[int] = None
     member_ids: Optional[List[int]] = None  # Lista de IDs de usuarios miembros
 
 class ProjectMemberResponse(BaseModel):
