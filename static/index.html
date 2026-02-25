@@ -903,6 +903,11 @@
                     <i class="fas fa-spinner fa-spin"></i> Cargando historial...
                 </div>
             </div>
+            <div class="modal-footer" style="padding: 16px; border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" id="history-back-btn">
+                    <i class="fas fa-arrow-left"></i> Volver a Tarea
+                </button>
+            </div>
         </div>
     </div>
 
@@ -922,8 +927,14 @@
                     <p id="progress-current">Progreso actual: <span>0%</span></p>
                 </div>
                 <div class="form-group">
-                    <label>Nuevo Progreso: <span id="new-progress-value">0</span>%</label>
-                    <input type="range" id="new-progress" min="0" max="100" value="0">
+                    <label>Nuevo Progreso</label>
+                    <div class="progress-input-group">
+                        <input type="range" id="new-progress" min="0" max="100" step="1" value="0" class="progress-slider-styled">
+                        <div class="progress-number-input">
+                            <input type="number" id="new-progress-number" min="0" max="100" step="1" value="0" class="progress-number">
+                            <span>%</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Comentario (opcional)</label>
@@ -943,7 +954,7 @@
     </div>
 
     <!-- Progress History Modal -->
-    <div class="modal-overlay" id="history-modal">
+    <div class="modal-overlay" id="progress-history-modal">
         <div class="modal glass-card modal-large">
             <div class="modal-header">
                 <h2><i class="fas fa-history"></i> Historial de Avances</h2>
@@ -951,11 +962,16 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="history-content" id="history-content">
+            <div class="progress-history-list" id="progress-history-content">
                 <div class="empty-state">
                     <i class="fas fa-clipboard-list"></i>
                     <p>No hay registros de avance</p>
                 </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px; border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('progress-history-modal'); openModal('progress-modal')">
+                    <i class="fas fa-arrow-left"></i> Volver
+                </button>
             </div>
         </div>
     </div>

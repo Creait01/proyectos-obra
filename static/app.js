@@ -1172,7 +1172,13 @@ function renderKanban() {
                 
                 const taskId = parseInt(card.dataset.id);
                 const task = tasks.find(t => t.id === taskId);
+                if (!task) {
+                    console.error('Tarea no encontrada en array local:', taskId);
+                    return;
+                }
                 const taskAssigneeIds = task.assignee_ids || [];
+                
+                console.log('Click en tarea:', taskId, 'isAdmin:', isAdmin, 'assigneeIds:', taskAssigneeIds, 'currentUserId:', currentUser?.id, 'isLeader:', currentProject?.leader_id === currentUser?.id);
                 
                 if (isAdmin) {
                     openTaskModal(taskId);
@@ -1182,6 +1188,9 @@ function renderKanban() {
                         return;
                     }
                     openProgressModal(task);
+                } else {
+                    console.log('Usuario no tiene permiso para esta tarea. Asignados:', taskAssigneeIds, 'User:', currentUser?.id);
+                    showToast('No estás asignado a esta tarea', 'info');
                 }
             });
         });
@@ -1469,6 +1478,9 @@ document.getElementById('view-history-btn').addEventListener('click', async () =
     // Guardar referencia a la tarea actual
     currentTaskForHistory = tasks.find(t => t.id === parseInt(taskId));
     
+    // Cerrar task-modal antes de abrir historial
+    closeModal('task-modal');
+    
     // Mostrar modal de historial
     openHistoryModal(taskId);
 });
@@ -1553,6 +1565,14 @@ async function openHistoryModal(taskId) {
         console.error('Error loading history:', error);
     }
 }
+
+// Botón "Volver a Tarea" del historial de cambios
+document.getElementById('history-back-btn')?.addEventListener('click', () => {
+    closeModal('history-modal');
+    if (currentTaskForHistory) {
+        openTaskModal(currentTaskForHistory.id);
+    }
+});
 
 // ===================== DASHBOARD =====================
 async function loadDashboard() {
@@ -2325,7 +2345,18 @@ function renderMyTasks(taskList) {
         range.addEventListener('change', async (e) => {
             const taskId = parseInt(e.target.dataset.taskId);
             const value = parseInt(e.target.value) || 0;
-            await updateMyTaskInline(taskId, { progress: value });
+            try {
+                await apiRequest(`/api/tasks/${taskId}/progress`, {
+                    method: 'POST',
+                    body: JSON.stringify({ progress: value, comment: 'Actualizado desde Mis Tareas' })
+                });
+                showToast(`Avance actualizado a ${value}%`, 'success');
+                await loadMyTasks(true);
+                loadDashboard();
+            } catch (error) {
+                showToast(error.message || 'Error al actualizar avance', 'error');
+                await loadMyTasks(true);
+            }
         });
     });
 }
@@ -2897,11 +2928,28 @@ async function deleteUser(userId) {
 // ===================== PROGRESS FUNCTIONS =====================
 let currentProgressTaskId = null;
 
+let progressFormInitialized = false;
+
 function setupProgressForm() {
+    if (progressFormInitialized) return;
+    progressFormInitialized = true;
+    
     const progressSlider = document.getElementById('new-progress');
-    if (progressSlider) {
+    const progressNumber = document.getElementById('new-progress-number');
+    
+    if (progressSlider && progressNumber) {
+        // Sincronizar slider → número
         progressSlider.addEventListener('input', (e) => {
-            document.getElementById('new-progress-value').textContent = e.target.value;
+            progressNumber.value = e.target.value;
+        });
+        
+        // Sincronizar número → slider
+        progressNumber.addEventListener('input', (e) => {
+            let val = parseInt(e.target.value) || 0;
+            if (val < 0) val = 0;
+            if (val > 100) val = 100;
+            progressSlider.value = val;
+            e.target.value = val;
         });
     }
     
@@ -2920,12 +2968,24 @@ function setupProgressForm() {
 }
 
 function openProgressModal(task) {
+    console.log('Abriendo modal de progreso para tarea:', task.id, task.title);
     currentProgressTaskId = task.id;
     document.getElementById('progress-task-id').value = task.id;
     document.getElementById('progress-task-title').textContent = task.title;
     document.getElementById('progress-current').querySelector('span').textContent = `${task.progress || 0}%`;
-    document.getElementById('new-progress').value = task.progress || 0;
-    document.getElementById('new-progress-value').textContent = task.progress || 0;
+    
+    const progressValue = task.progress || 0;
+    const slider = document.getElementById('new-progress');
+    const numberInput = document.getElementById('new-progress-number');
+    
+    slider.value = progressValue;
+    slider.min = 0;
+    slider.max = 100;
+    
+    if (numberInput) {
+        numberInput.value = progressValue;
+    }
+    
     document.getElementById('progress-comment').value = '';
     
     openModal('progress-modal');
@@ -2933,39 +2993,63 @@ function openProgressModal(task) {
 
 async function submitProgress() {
     const taskId = document.getElementById('progress-task-id').value;
-    const progress = parseFloat(document.getElementById('new-progress').value);
+    const progress = parseInt(document.getElementById('new-progress').value) || 0;
     const comment = document.getElementById('progress-comment').value;
     
+    if (progress < 0 || progress > 100) {
+        showToast('El progreso debe estar entre 0 y 100', 'warning');
+        return;
+    }
+    
+    const submitBtn = document.querySelector('#progress-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+    }
+    
     try {
+        console.log('Enviando progreso:', { taskId, progress, comment });
         await apiRequest(`/api/tasks/${taskId}/progress`, {
             method: 'POST',
             body: JSON.stringify({ progress, comment })
         });
         
-        showToast('Avance registrado correctamente', 'success');
+        showToast(`Avance actualizado a ${progress}%`, 'success');
         closeModal('progress-modal');
         loadTasks();
         loadDashboard();
     } catch (error) {
-        showToast(error.message, 'error');
+        console.error('Error al registrar avance:', error);
+        showToast(error.message || 'Error al registrar el avance', 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-save"></i> Guardar Avance';
+        }
     }
 }
 
 async function openProgressHistory() {
-    if (!currentProgressTaskId) return;
+    if (!currentProgressTaskId) {
+        showToast('No se pudo identificar la tarea', 'warning');
+        return;
+    }
     
     try {
+        console.log('Cargando historial de progreso para tarea:', currentProgressTaskId);
         const history = await apiRequest(`/api/tasks/${currentProgressTaskId}/progress`);
+        console.log('Historial recibido:', history.length, 'registros');
         renderProgressHistory(history);
         closeModal('progress-modal');
-        openModal('history-modal');
+        openModal('progress-history-modal');
     } catch (error) {
-        showToast('Error cargando historial', 'error');
+        console.error('Error cargando historial de progreso:', error);
+        showToast('Error cargando historial: ' + (error.message || 'Error desconocido'), 'error');
     }
 }
 
 function renderProgressHistory(history) {
-    const container = document.getElementById('history-content');
+    const container = document.getElementById('progress-history-content');
     
     if (history.length === 0) {
         container.innerHTML = `
