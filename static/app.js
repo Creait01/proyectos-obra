@@ -461,10 +461,6 @@ async function selectProject(projectId) {
     // Toggle leader class para mostrar/ocultar botones de crear tareas
     if (currentProject && currentUser && currentProject.leader_id === currentUser.id) {
         document.body.classList.add('is-project-leader');
-        // Cargar plantillas para líderes (si aún no se cargaron)
-        if (taskTemplates.length === 0) {
-            loadTemplates();
-        }
     } else {
         document.body.classList.remove('is-project-leader');
     }
@@ -1123,7 +1119,7 @@ function renderKanban() {
             const canUpdateProgress = (isMyTask || isAdmin || isProjectLeader) && !(task.status === 'restart' && !isAdmin);
             const isRestart = task.status === 'restart';
             
-            const canDrag = isAdmin || ((isMyTask || isProjectLeader) && !isRestart);
+            const canDrag = isAdmin || ((isMyTask || isProjectLeader) && !isRestart && task.status !== 'done');
             
             return `
                 <div class="task-card ${isRestart ? 'restart' : ''}" data-id="${task.id}" draggable="${canDrag}">
@@ -1254,8 +1250,14 @@ async function handleDrop(e) {
         return;
     }
     
-    // Verificar que el usuario puede mover esta tarea
+    // Solo admin puede mover tareas que ya están en 'done'
     const task = tasks.find(t => t.id === taskId);
+    if (!isAdmin && task && task.status === 'done') {
+        showToast('Solo los administradores pueden modificar tareas completadas', 'warning');
+        return;
+    }
+    
+    // Verificar que el usuario puede mover esta tarea
     if (!isAdmin && task) {
         const taskAssigneeIds = task.assignee_ids || [];
         const isMyTask = taskAssigneeIds.includes(currentUser?.id);
@@ -1434,9 +1436,10 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
     const isAdmin = currentUser && currentUser.is_admin;
     
     let taskData;
+    const isLeader = currentProject && currentUser && currentProject.leader_id === currentUser.id;
     
-    if (isAdmin) {
-        // Admin puede enviar todos los campos
+    if (isAdmin || (isLeader && !taskId)) {
+        // Admin puede enviar todos los campos, y líder al crear tarea nueva
         const assigneeValue = document.getElementById('task-assignee').value;
         const stageValue = document.getElementById('task-stage').value;
         const startDateValue = document.getElementById('task-start').value;
@@ -1476,9 +1479,9 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
             });
             showToast('Tarea actualizada', 'success');
         } else {
-            // Solo admin puede crear tareas
-            if (!isAdmin) {
-                showToast('Solo administradores pueden crear tareas', 'error');
+            // Admin o líder del proyecto pueden crear tareas
+            if (!isAdmin && !isLeader) {
+                showToast('Solo administradores o líderes pueden crear tareas', 'error');
                 return;
             }
             await apiRequest(`/api/projects/${currentProject.id}/tasks`, {
@@ -2364,7 +2367,7 @@ function renderMyTasks(taskList) {
                                         </div>
                                         <div class="task-action-row">
                                             <label>Avance <span class="progress-value" data-task-id="${task.id}">${progressValue}%</span></label>
-                                            <input type="range" class="task-progress-input" min="0" max="100" value="${progressValue}" data-task-id="${task.id}" ${isRestart ? 'disabled' : ''}>
+                                            <input type="range" class="task-progress-input" min="0" max="${isAdmin ? 100 : 99}" value="${progressValue}" data-task-id="${task.id}" ${isRestart ? 'disabled' : ''}>
                                         </div>
                                     </div>
                                 </div>
@@ -2385,8 +2388,13 @@ function renderMyTasks(taskList) {
             }
             const isAdmin = currentUser && currentUser.is_admin;
             const isChecked = checkbox.classList.contains('checked');
-            if (!isChecked && !isAdmin) {
-                showToast('Solo los administradores pueden marcar tareas como completadas', 'warning');
+            // Solo admin puede marcar como completada o desmarcar completada
+            if (!isAdmin) {
+                if (isChecked) {
+                    showToast('Solo los administradores pueden modificar tareas completadas', 'warning');
+                } else {
+                    showToast('Solo los administradores pueden marcar tareas como completadas', 'warning');
+                }
                 return;
             }
             const taskId = parseInt(checkbox.dataset.taskId);
@@ -2401,7 +2409,14 @@ function renderMyTasks(taskList) {
             const newStatus = e.target.value;
             const isAdmin = currentUser && currentUser.is_admin;
             if (!isAdmin && (newStatus === 'done' || newStatus === 'restart')) {
-                showToast('Solo los administradores pueden marcar tareas como completadas', 'warning');
+                showToast('Solo los administradores pueden marcar tareas como completadas o en reinicio', 'warning');
+                await loadMyTasks(true);
+                return;
+            }
+            // Si la tarea estaba en 'done', solo admin puede cambiarla
+            const taskObj = myTasksCache.find(t => t.id === taskId);
+            if (!isAdmin && taskObj && taskObj.status === 'done') {
+                showToast('Solo los administradores pueden modificar tareas completadas', 'warning');
                 await loadMyTasks(true);
                 return;
             }
@@ -3051,13 +3066,16 @@ function openProgressModal(task) {
     const progressValue = task.progress || 0;
     const slider = document.getElementById('new-progress');
     const numberInput = document.getElementById('new-progress-number');
+    const isAdmin = currentUser && currentUser.is_admin;
+    const maxProgress = isAdmin ? 100 : 99;
     
     slider.value = progressValue;
     slider.min = 0;
-    slider.max = 100;
+    slider.max = maxProgress;
     
     if (numberInput) {
         numberInput.value = progressValue;
+        numberInput.max = maxProgress;
     }
     
     document.getElementById('progress-comment').value = '';
@@ -3075,6 +3093,10 @@ async function submitProgress() {
         return;
     }
     
+    // Non-admin no puede poner 100%
+    const isAdmin = currentUser && currentUser.is_admin;
+    const cappedProgress = (!isAdmin && progress >= 100) ? 99 : progress;
+    
     const submitBtn = document.querySelector('#progress-form button[type="submit"]');
     if (submitBtn) {
         submitBtn.disabled = true;
@@ -3082,13 +3104,13 @@ async function submitProgress() {
     }
     
     try {
-        console.log('Enviando progreso:', { taskId, progress, comment });
+        console.log('Enviando progreso:', { taskId, progress: cappedProgress, comment });
         await apiRequest(`/api/tasks/${taskId}/progress`, {
             method: 'POST',
-            body: JSON.stringify({ progress, comment })
+            body: JSON.stringify({ progress: cappedProgress, comment })
         });
         
-        showToast(`Avance actualizado a ${progress}%`, 'success');
+        showToast(`Avance actualizado a ${cappedProgress}%`, 'success');
         closeModal('progress-modal');
         loadTasks();
         loadDashboard();
@@ -3736,10 +3758,19 @@ async function deleteTaskTemplate(templateId) {
 }
 
 // ===================== QUICK TASK TEMPLATE (desde Kanban) =====================
-function openQuickTaskTemplateModal() {
+async function openQuickTaskTemplateModal() {
     if (!currentProject) {
         showToast('Primero selecciona un proyecto', 'warning');
         return;
+    }
+    
+    // Cargar plantillas si aún no se han cargado
+    if (taskTemplates.length === 0) {
+        try {
+            taskTemplates = await apiRequest('/api/templates/tasks');
+        } catch (error) {
+            console.error('Error cargando plantillas:', error);
+        }
     }
     
     if (taskTemplates.length === 0) {

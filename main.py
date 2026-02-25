@@ -1277,6 +1277,8 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
             raise HTTPException(status_code=403, detail="Solo puedes actualizar tareas asignadas a ti")
         if db_task.status == "restart":
             raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")
+        if db_task.status == "done":
+            raise HTTPException(status_code=403, detail="Esta tarea está completada y solo un administrador puede modificarla")
         if task.status == "restart":
             raise HTTPException(status_code=403, detail="Solo un administrador puede marcar una tarea como reinicio")
         if task.status == "done":
@@ -1605,6 +1607,8 @@ async def register_progress(task_id: int, progress_data: TaskProgressCreate, db:
         raise HTTPException(status_code=403, detail="Solo puedes registrar avance en tareas asignadas a ti")
     if not current_user.is_admin and db_task.status == "restart":
         raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")
+    if not current_user.is_admin and db_task.status == "done":
+        raise HTTPException(status_code=403, detail="Esta tarea está completada y solo un administrador puede modificarla")
     
     # Validar progreso
     if progress_data.progress < 0 or progress_data.progress > 100:
@@ -1626,11 +1630,16 @@ async def register_progress(task_id: int, progress_data: TaskProgressCreate, db:
     # Actualizar el progreso de la tarea
     db_task.progress = progress_data.progress
     
-    # Si llega a 100%, marcar como completada
+    # Solo admin puede poner 100% (auto-marca como done)
+    if not current_user.is_admin and progress_data.progress == 100:
+        db_task.progress = 99
+        progress_record.new_progress = 99
+    
+    # Si llega a 100%, marcar como completada (solo admin llega aquí con 100)
     if db_task.status != "restart":
-        if progress_data.progress == 100:
+        if db_task.progress == 100:
             db_task.status = "done"
-        elif progress_data.progress > 0 and db_task.status == "todo":
+        elif db_task.progress > 0 and db_task.status == "todo":
             db_task.status = "in_progress"
     
     # Registrar actividad
