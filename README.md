@@ -139,3 +139,5 @@ Documentación automática disponible en:
 - La aplicación está diseñada para uso en red local/intranet
 - Para uso en internet, considera agregar HTTPS y medidas de seguridad adicionales
 - El WebSocket se reconecta automáticamente si se pierde la conexión
+
+
