@@ -1119,8 +1119,10 @@ function renderKanban() {
             const canUpdateProgress = (isMyTask || isAdmin || isProjectLeader) && !(task.status === 'restart' && !isAdmin);
             const isRestart = task.status === 'restart';
             
+            const canDrag = isAdmin || ((isMyTask || isProjectLeader) && !isRestart);
+            
             return `
-                <div class="task-card ${isRestart ? 'restart' : ''}" data-id="${task.id}" draggable="${isAdmin}">
+                <div class="task-card ${isRestart ? 'restart' : ''}" data-id="${task.id}" draggable="${canDrag}">
                     <div class="task-card-header">
                         <span class="task-priority ${task.priority}">${task.priority}</span>
                         ${isRestart ? `<span class="task-status-badge restart">Reinicio</span>` : ''}
@@ -1160,9 +1162,17 @@ function renderKanban() {
             `;
         }).join('');
         
-        // Add drag and drop listeners (solo para admin)
+        // Add drag and drop listeners
         column.querySelectorAll('.task-card').forEach(card => {
-            if (isAdmin) {
+            const taskId = parseInt(card.dataset.id);
+            const task = tasks.find(t => t.id === taskId);
+            const taskAssigneeIds = task ? (task.assignee_ids || []) : [];
+            const isMyCard = taskAssigneeIds.includes(currentUser?.id);
+            const isLeaderCard = currentProject && currentProject.leader_id === currentUser?.id;
+            const isRestartCard = task && task.status === 'restart';
+            const canDragCard = isAdmin || ((isMyCard || isLeaderCard) && !isRestartCard);
+            
+            if (canDragCard) {
                 card.addEventListener('dragstart', handleDragStart);
                 card.addEventListener('dragend', handleDragEnd);
             }
@@ -1196,14 +1206,12 @@ function renderKanban() {
         });
     });
     
-    // Column drop listeners (solo para admin)
-    if (isAdmin) {
-        document.querySelectorAll('.column-content').forEach(column => {
-            column.addEventListener('dragover', handleDragOver);
-            column.addEventListener('drop', handleDrop);
-            column.addEventListener('dragleave', handleDragLeave);
-        });
-    }
+    // Column drop listeners (para admin y usuarios con tareas asignadas)
+    document.querySelectorAll('.column-content').forEach(column => {
+        column.addEventListener('dragover', handleDragOver);
+        column.addEventListener('drop', handleDrop);
+        column.addEventListener('dragleave', handleDragLeave);
+    });
 }
 
 function handleDragStart(e) {
@@ -1234,6 +1242,25 @@ async function handleDrop(e) {
     
     const taskId = parseInt(draggedTask.dataset.id);
     const newStatus = e.currentTarget.id.replace('column-', '');
+    const isAdmin = currentUser && currentUser.is_admin;
+    
+    // Solo admin puede mover a 'done' o 'restart'
+    if (!isAdmin && (newStatus === 'done' || newStatus === 'restart')) {
+        showToast('Solo los administradores pueden marcar tareas como completadas o en reinicio', 'warning');
+        return;
+    }
+    
+    // Verificar que el usuario puede mover esta tarea
+    const task = tasks.find(t => t.id === taskId);
+    if (!isAdmin && task) {
+        const taskAssigneeIds = task.assignee_ids || [];
+        const isMyTask = taskAssigneeIds.includes(currentUser?.id);
+        const isProjectLeader = currentProject && currentProject.leader_id === currentUser?.id;
+        if (!isMyTask && !isProjectLeader) {
+            showToast('Solo puedes mover tareas asignadas a ti', 'warning');
+            return;
+        }
+    }
     
     try {
         await apiRequest(`/api/tasks/${taskId}`, {
@@ -2238,11 +2265,17 @@ function renderMyTasks(taskList) {
         group.stages.get(stageKey).tasks.push(task);
     });
     
-    const statusOptions = [
+    const isAdmin = currentUser && currentUser.is_admin;
+    
+    const statusOptions = isAdmin ? [
         { value: 'todo', label: 'Por Hacer' },
         { value: 'in_progress', label: 'En Progreso' },
-        { value: 'review', label: 'En Revision' },
+        { value: 'review', label: 'En Revisión' },
         { value: 'done', label: 'Completada' }
+    ] : [
+        { value: 'todo', label: 'Por Hacer' },
+        { value: 'in_progress', label: 'En Progreso' },
+        { value: 'review', label: 'En Revisión' }
     ];
     
     const projectsSorted = Array.from(projectGroups.values()).sort((a, b) =>
@@ -2269,9 +2302,14 @@ function renderMyTasks(taskList) {
                         ${stageGroup.tasks.map(task => {
                             const progressValue = task.progress || 0;
                             const isRestart = task.status === 'restart';
-                            const statusOptionsForTask = isRestart
+                            const isDone = task.status === 'done';
+                            let statusOptionsForTask = isRestart
                                 ? [...statusOptions, { value: 'restart', label: 'Reinicio' }]
                                 : statusOptions;
+                            // Si la tarea está en 'done' y no es admin, agregar opción done como solo lectura
+                            if (isDone && !isAdmin && !statusOptionsForTask.find(o => o.value === 'done')) {
+                                statusOptionsForTask = [...statusOptionsForTask, { value: 'done', label: 'Completada' }];
+                            }
                             return `
                                 <div class="task-list-item" data-id="${task.id}">
                                     <div class="task-list-left">
@@ -2321,8 +2359,14 @@ function renderMyTasks(taskList) {
                 showToast('Tarea en reinicio: solo administradores pueden modificarla', 'info');
                 return;
             }
+            const isAdmin = currentUser && currentUser.is_admin;
+            const isChecked = checkbox.classList.contains('checked');
+            if (!isChecked && !isAdmin) {
+                showToast('Solo los administradores pueden marcar tareas como completadas', 'warning');
+                return;
+            }
             const taskId = parseInt(checkbox.dataset.taskId);
-            const newStatus = checkbox.classList.contains('checked') ? 'todo' : 'done';
+            const newStatus = isChecked ? 'todo' : 'done';
             await updateMyTaskInline(taskId, { status: newStatus });
         });
     });
@@ -2331,6 +2375,12 @@ function renderMyTasks(taskList) {
         select.addEventListener('change', async (e) => {
             const taskId = parseInt(e.target.dataset.taskId);
             const newStatus = e.target.value;
+            const isAdmin = currentUser && currentUser.is_admin;
+            if (!isAdmin && (newStatus === 'done' || newStatus === 'restart')) {
+                showToast('Solo los administradores pueden marcar tareas como completadas', 'warning');
+                await loadMyTasks(true);
+                return;
+            }
             await updateMyTaskInline(taskId, { status: newStatus });
         });
     });

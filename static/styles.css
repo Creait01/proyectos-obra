@@ -1475,7 +1475,7 @@ body {
     transition: var(--transition-fast);
 }
 
-body.admin-role .task-card {
+.task-card[draggable="true"] {
     cursor: grab;
 }
 

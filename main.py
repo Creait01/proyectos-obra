@@ -1279,6 +1279,8 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
             raise HTTPException(status_code=403, detail="Esta tarea está en reinicio y solo un administrador puede modificarla")
         if task.status == "restart":
             raise HTTPException(status_code=403, detail="Solo un administrador puede marcar una tarea como reinicio")
+        if task.status == "done":
+            raise HTTPException(status_code=403, detail="Solo un administrador puede marcar una tarea como completada")
         # Usuarios normales pueden cambiar: estado, descripción, progreso y etapa
         allowed_fields = {'status', 'description', 'progress', 'stage_id'}
         update_fields = set(task.model_dump(exclude_unset=True).keys())
