@@ -461,6 +461,10 @@ async function selectProject(projectId) {
     // Toggle leader class para mostrar/ocultar botones de crear tareas
     if (currentProject && currentUser && currentProject.leader_id === currentUser.id) {
         document.body.classList.add('is-project-leader');
+        // Cargar plantillas para líderes (si aún no se cargaron)
+        if (taskTemplates.length === 0) {
+            loadTemplates();
+        }
     } else {
         document.body.classList.remove('is-project-leader');
     }
@@ -1290,6 +1294,25 @@ document.getElementById('add-task-btn').addEventListener('click', () => {
     document.getElementById('progress-value').textContent = '0';
     document.getElementById('task-assignee').value = ''; // Resetear asignado
     document.getElementById('assignee-chips-container').classList.remove('disabled'); // Habilitar chips para nueva tarea
+    
+    // Mostrar botón guardar para admin y líderes
+    const saveBtn = document.getElementById('save-task-btn');
+    if (saveBtn) {
+        const isAdmin = currentUser && currentUser.is_admin;
+        const isLeader = currentProject && currentUser && currentProject.leader_id === currentUser.id;
+        saveBtn.style.display = (isAdmin || isLeader) ? 'block' : 'none';
+    }
+    
+    // Habilitar todos los campos para nueva tarea (admin y líder)
+    document.getElementById('task-title').disabled = false;
+    document.getElementById('task-priority').disabled = false;
+    document.getElementById('task-start').disabled = false;
+    document.getElementById('task-due').disabled = false;
+    document.getElementById('task-status').disabled = false;
+    document.getElementById('task-description').disabled = false;
+    document.getElementById('task-progress').disabled = false;
+    document.getElementById('task-stage').disabled = false;
+    
     updateAssigneeSelect();
     updateStageSelect();
     openModal('task-modal');
@@ -1390,10 +1413,11 @@ function openTaskModal(taskId) {
     document.getElementById('task-progress').disabled = !canEdit;
     document.getElementById('task-stage').disabled = !canEdit;
     
-    // Mostrar botón guardar solo si puede editar algo
-    const submitBtn = document.querySelector('#task-form button[type="submit"]');
+    // Mostrar botón guardar para admin, líder del proyecto, o usuario asignado
+    const isLeader = currentProject && currentUser && currentProject.leader_id === currentUser.id;
+    const submitBtn = document.getElementById('save-task-btn');
     if (submitBtn) {
-        submitBtn.style.display = canEdit ? 'block' : 'none';
+        submitBtn.style.display = (isAdmin || isLeader || canEdit) ? 'block' : 'none';
     }
     
     openModal('task-modal');

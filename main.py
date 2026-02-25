@@ -2197,8 +2197,10 @@ async def delete_task_template(template_id: int, db: Session = Depends(get_db), 
 @app.post("/api/projects/{project_id}/apply-task-template/{template_id}")
 async def apply_task_template(project_id: int, template_id: int, stage_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Aplicar plantilla de tareas a un proyecto"""
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden aplicar plantillas")
+    # Permitir admin y líderes del proyecto
+    project_check = db.query(Project).filter(Project.id == project_id).first()
+    if not current_user.is_admin and (not project_check or project_check.leader_id != current_user.id):
+        raise HTTPException(status_code=403, detail="Solo administradores o líderes del proyecto pueden aplicar plantillas")
     
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:

@@ -3726,6 +3726,14 @@ body.user-role.is-project-leader #add-task-btn {
     display: inline-flex !important;
 }
 
+body.user-role #apply-task-template-btn {
+    display: none !important;
+}
+
+body.user-role.is-project-leader #apply-task-template-btn {
+    display: inline-flex !important;
+}
+
 body.user-role.is-project-leader #gantt-add-task {
     display: inline-flex !important;
 }
