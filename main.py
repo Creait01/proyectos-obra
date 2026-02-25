@@ -10,7 +10,10 @@ import json
 import os
 import uuid
 import shutil
+import io
 from datetime import datetime, timedelta
+import cloudinary
+import cloudinary.uploader
 
 from database import engine, get_db, Base, SessionLocal
 from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam
@@ -330,9 +333,26 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(NoCacheMiddleware)
 
-# Crear carpeta uploads si no existe
+# Crear carpeta uploads si no existe (fallback local)
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Configurar Cloudinary
+CLOUDINARY_CLOUD = os.environ.get("CLOUDINARY_CLOUD_NAME")
+CLOUDINARY_KEY = os.environ.get("CLOUDINARY_API_KEY")
+CLOUDINARY_SECRET = os.environ.get("CLOUDINARY_API_SECRET")
+
+if CLOUDINARY_CLOUD and CLOUDINARY_KEY and CLOUDINARY_SECRET:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD,
+        api_key=CLOUDINARY_KEY,
+        api_secret=CLOUDINARY_SECRET
+    )
+    CLOUDINARY_CONFIGURED = True
+    print("✅ Cloudinary configurado")
+else:
+    CLOUDINARY_CONFIGURED = False
+    print("⚠️ Cloudinary no configurado, usando almacenamiento local")
 
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -769,26 +789,56 @@ async def upload_project_image(
     if file.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Tipo de archivo no permitido. Use JPG, PNG, GIF o WEBP")
     
-    # Generar nombre único para el archivo
-    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    unique_filename = f"project_{project_id}_{uuid.uuid4().hex}.{file_extension}"
-    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    # Eliminar imagen anterior de Cloudinary si existe
+    if db_project.image_url and "cloudinary" in (db_project.image_url or ""):
+        try:
+            # Extraer public_id de la URL de Cloudinary
+            parts = db_project.image_url.split("/upload/")
+            if len(parts) > 1:
+                public_id = parts[1].rsplit(".", 1)[0]  # Quitar extensión
+                # Quitar versión si existe (v1234567890/)
+                if "/" in public_id:
+                    public_id = "/".join(public_id.split("/")[1:]) if public_id.split("/")[0].startswith("v") else public_id
+                cloudinary.uploader.destroy(public_id)
+        except Exception as e:
+            print(f"Error eliminando imagen anterior de Cloudinary: {e}")
     
-    # Eliminar imagen anterior si existe
-    if db_project.image_url:
-        old_path = db_project.image_url.replace("/uploads/", "uploads/")
-        if os.path.exists(old_path):
-            try:
-                os.remove(old_path)
-            except:
-                pass
+    if CLOUDINARY_CONFIGURED:
+        # Subir a Cloudinary
+        try:
+            file_content = await file.read()
+            result = cloudinary.uploader.upload(
+                io.BytesIO(file_content),
+                folder=f"projects/{project_id}",
+                public_id=f"project_{project_id}_{uuid.uuid4().hex[:8]}",
+                overwrite=True,
+                resource_type="image",
+                transformation=[
+                    {"width": 800, "height": 600, "crop": "limit", "quality": "auto"}
+                ]
+            )
+            db_project.image_url = result["secure_url"]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error subiendo imagen: {str(e)}")
+    else:
+        # Fallback: guardar localmente
+        file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+        unique_filename = f"project_{project_id}_{uuid.uuid4().hex}.{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        
+        if db_project.image_url and "/uploads/" in (db_project.image_url or ""):
+            old_path = db_project.image_url.replace("/uploads/", "uploads/")
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except:
+                    pass
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        db_project.image_url = f"/uploads/{unique_filename}"
     
-    # Guardar el archivo
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Actualizar URL en la base de datos
-    db_project.image_url = f"/uploads/{unique_filename}"
     db.commit()
     
     return {"image_url": db_project.image_url, "message": "Imagen subida exitosamente"}
@@ -808,12 +858,26 @@ async def delete_project_image(
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     
     if db_project.image_url:
-        old_path = db_project.image_url.replace("/uploads/", "uploads/")
-        if os.path.exists(old_path):
+        if "cloudinary" in (db_project.image_url or ""):
+            # Eliminar de Cloudinary
             try:
-                os.remove(old_path)
-            except:
-                pass
+                parts = db_project.image_url.split("/upload/")
+                if len(parts) > 1:
+                    public_id = parts[1].rsplit(".", 1)[0]
+                    if "/" in public_id:
+                        public_id = "/".join(public_id.split("/")[1:]) if public_id.split("/")[0].startswith("v") else public_id
+                    cloudinary.uploader.destroy(public_id)
+            except Exception as e:
+                print(f"Error eliminando de Cloudinary: {e}")
+        else:
+            # Eliminar archivo local
+            old_path = db_project.image_url.replace("/uploads/", "uploads/")
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except:
+                    pass
+        
         db_project.image_url = None
         db.commit()
     
