@@ -3853,8 +3853,9 @@ document.getElementById('apply-quick-template-btn')?.addEventListener('click', a
         showToast(result.message, 'success');
         closeModal('quick-task-template-modal');
         
-        // Recargar datos del proyecto
-        await loadProjectData(currentProject.id);
+        // Recargar tareas y dashboard
+        await loadTasks();
+        loadDashboard();
     } catch (error) {
         showToast(error.message, 'error');
     }
