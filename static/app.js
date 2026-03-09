@@ -767,6 +767,11 @@ document.getElementById('show-inactive-projects')?.addEventListener('change', ()
     loadProjectsView();
 });
 
+// Toggle para mostrar proyectos inactivos en vista de equipo
+document.getElementById('show-inactive-team-projects')?.addEventListener('change', () => {
+    loadTeam();
+});
+
 // Función para poblar selectores de coordinador y líder
 function populateRoleSelectors(coordinatorId = '', leaderId = '', supervisorId = '') {
     const coordinatorSelect = document.getElementById('project-coordinator');
@@ -2503,10 +2508,14 @@ async function loadUsers() {
 
 async function loadTeam() {
     const grid = document.getElementById('team-grid');
+    const showInactiveTeam = document.getElementById('show-inactive-team-projects')?.checked || false;
+    
+    // Filtrar proyectos activos/todos según toggle
+    const visibleProjects = showInactiveTeam ? projects : projects.filter(p => p.is_active !== false);
     
     // Count tasks per user
     let allTasks = [];
-    for (const project of projects) {
+    for (const project of visibleProjects) {
         try {
             const projectTasks = await apiRequest(`/api/projects/${project.id}/tasks`);
             allTasks = allTasks.concat(projectTasks);
@@ -2516,7 +2525,7 @@ async function loadTeam() {
     grid.innerHTML = users.map(user => {
         const userTasks = allTasks.filter(t => (t.assignee_ids || []).includes(user.id));
         const completedTasks = userTasks.filter(t => t.status === 'done').length;
-        const userProjects = projects.filter(p => (p.members || []).some(m => m.id === user.id));
+        const userProjects = visibleProjects.filter(p => (p.members || []).some(m => m.id === user.id));
         const projectCount = userProjects.length;
         const projectsHtml = projectCount
             ? userProjects.map(p => `

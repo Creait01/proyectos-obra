@@ -2316,6 +2316,14 @@ body {
 }
 
 /* ===================== TEAM VIEW ===================== */
+.team-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 0 16px;
+    gap: 16px;
+}
+
 .team-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
