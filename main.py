@@ -16,7 +16,7 @@ import cloudinary
 import cloudinary.uploader
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam
+from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam, task_assignees
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
@@ -1751,6 +1751,62 @@ async def get_activities(limit: int = 20, db: Session = Depends(get_db), current
 async def get_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     users = db.query(User).all()
     return users
+
+@app.get("/api/team-summary")
+async def get_team_summary(include_inactive: bool = False, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Devuelve resumen de equipo en una sola consulta: usuarios con sus proyectos y conteo de tareas."""
+    from sqlalchemy import func, case
+    
+    all_users = db.query(User).all()
+    
+    # Obtener proyectos filtrados
+    proj_query = db.query(Project)
+    if not include_inactive:
+        proj_query = proj_query.filter(Project.is_active == True)
+    active_projects = proj_query.all()
+    active_project_ids = [p.id for p in active_projects]
+    
+    # Mapa de proyectos
+    project_map = {p.id: {"id": p.id, "name": p.name, "color": p.color, "is_active": p.is_active} for p in active_projects}
+    
+    # Miembros de proyectos
+    members = db.query(ProjectMember).filter(ProjectMember.project_id.in_(active_project_ids)).all() if active_project_ids else []
+    user_projects = {}
+    for m in members:
+        user_projects.setdefault(m.user_id, []).append(project_map.get(m.project_id))
+    
+    # Conteo de tareas por usuario (total y completadas) solo de proyectos visibles
+    task_stats = {}
+    if active_project_ids:
+        stats = (
+            db.query(
+                task_assignees.c.user_id,
+                func.count(Task.id).label('total'),
+                func.sum(case((Task.status == 'done', 1), else_=0)).label('completed')
+            )
+            .join(Task, Task.id == task_assignees.c.task_id)
+            .filter(Task.project_id.in_(active_project_ids))
+            .group_by(task_assignees.c.user_id)
+            .all()
+        )
+        for row in stats:
+            task_stats[row[0]] = {"total": row[1], "completed": int(row[2] or 0)}
+    
+    result = []
+    for u in all_users:
+        up = user_projects.get(u.id, [])
+        ts = task_stats.get(u.id, {"total": 0, "completed": 0})
+        result.append({
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "avatar_color": u.avatar_color,
+            "projects": up,
+            "task_count": ts["total"],
+            "completed_count": ts["completed"]
+        })
+    
+    return result
 
 # ===================== REPORTES PDF =====================
 try:

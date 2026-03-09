@@ -2510,25 +2510,20 @@ async function loadTeam() {
     const grid = document.getElementById('team-grid');
     const showInactiveTeam = document.getElementById('show-inactive-team-projects')?.checked || false;
     
-    // Filtrar proyectos activos/todos según toggle
-    const visibleProjects = showInactiveTeam ? projects : projects.filter(p => p.is_active !== false);
-    
-    // Count tasks per user
-    let allTasks = [];
-    for (const project of visibleProjects) {
-        try {
-            const projectTasks = await apiRequest(`/api/projects/${project.id}/tasks`);
-            allTasks = allTasks.concat(projectTasks);
-        } catch (e) {}
+    // Una sola petición al backend con todo el resumen
+    let teamData;
+    try {
+        teamData = await apiRequest(`/api/team-summary?include_inactive=${showInactiveTeam}`);
+    } catch (e) {
+        console.error('Error loading team summary:', e);
+        grid.innerHTML = '<p style="color:var(--text-muted);text-align:center">Error al cargar equipo</p>';
+        return;
     }
     
-    grid.innerHTML = users.map(user => {
-        const userTasks = allTasks.filter(t => (t.assignee_ids || []).includes(user.id));
-        const completedTasks = userTasks.filter(t => t.status === 'done').length;
-        const userProjects = visibleProjects.filter(p => (p.members || []).some(m => m.id === user.id));
-        const projectCount = userProjects.length;
+    grid.innerHTML = teamData.map(member => {
+        const projectCount = (member.projects || []).length;
         const projectsHtml = projectCount
-            ? userProjects.map(p => `
+            ? member.projects.map(p => `
                 <span class="team-project-chip" style="--chip-color: ${p.color}">
                     <span class="dot"></span>${p.name}
                 </span>
@@ -2537,11 +2532,11 @@ async function loadTeam() {
         
         return `
             <div class="team-card">
-                <div class="team-avatar" style="background: ${user.avatar_color}">
-                    ${getInitials(user.name)}
+                <div class="team-avatar" style="background: ${member.avatar_color}">
+                    ${getInitials(member.name)}
                 </div>
-                <div class="team-name">${user.name}</div>
-                <div class="team-email">${user.email}</div>
+                <div class="team-name">${member.name}</div>
+                <div class="team-email">${member.email}</div>
                 <div class="team-projects">
                     <div class="team-projects-title">Proyectos asignados</div>
                     <div class="team-projects-list">
@@ -2554,11 +2549,11 @@ async function loadTeam() {
                         <div class="team-stat-label">Obras</div>
                     </div>
                     <div class="team-stat">
-                        <div class="team-stat-value">${userTasks.length}</div>
+                        <div class="team-stat-value">${member.task_count}</div>
                         <div class="team-stat-label">Tareas</div>
                     </div>
                     <div class="team-stat">
-                        <div class="team-stat-value">${completedTasks}</div>
+                        <div class="team-stat-value">${member.completed_count}</div>
                         <div class="team-stat-label">Completadas</div>
                     </div>
                 </div>
