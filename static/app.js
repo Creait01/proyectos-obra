@@ -429,14 +429,9 @@ function renderProjectList() {
                 <span class="project-name">${p.name}</span>
             </div>
             ${isAdmin ? `
-                <div class="project-item-actions">
-                    <button class="btn-edit-project" onclick="event.stopPropagation(); editProject(${p.id})" title="Editar proyecto">
-                        <i class="fas fa-pen"></i>
-                    </button>
-                    <button class="btn-delete-project" onclick="event.stopPropagation(); deleteProject(${p.id}, '${p.name.replace(/'/g, "\\'")}')" title="Eliminar proyecto">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
+                <button class="btn-edit-project" onclick="event.stopPropagation(); editProject(${p.id})" title="Editar proyecto">
+                    <i class="fas fa-pen"></i>
+                </button>
             ` : ''}
         </div>
     `).join('');
@@ -2676,7 +2671,7 @@ async function loadProjectsView() {
                             <span class="project-status-badge ${project.is_active ? 'active' : 'inactive'}">
                                 ${project.is_active ? 'Activo' : 'Inactivo'}
                             </span>
-                            ${currentUser && currentUser.is_admin ? `
+                            ${currentUser && (currentUser.is_admin || (project.coordinator && project.coordinator.id === currentUser.id)) ? `
                                 <button class="btn-delete-project-card" onclick="deleteProject(${project.id}, '${project.name.replace(/'/g, "\\'")}')" title="Eliminar proyecto">
                                     <i class="fas fa-trash"></i>
                                 </button>

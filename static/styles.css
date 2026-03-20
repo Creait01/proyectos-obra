@@ -736,9 +736,7 @@ body {
     display: none;
 }
 
-.sidebar.collapsed .btn-edit-project,
-.sidebar.collapsed .btn-delete-project,
-.sidebar.collapsed .project-item-actions {
+.sidebar.collapsed .btn-edit-project {
     display: none;
 }
 
@@ -782,12 +780,6 @@ body {
     text-overflow: ellipsis;
 }
 
-.project-item-actions {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-}
-
 .btn-edit-project {
     padding: 2px 6px;
     background: transparent;
@@ -799,29 +791,12 @@ body {
     transition: var(--transition-fast);
 }
 
-.btn-delete-project {
-    padding: 2px 6px;
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    opacity: 0;
-    transition: var(--transition-fast);
-}
-
-.project-item:hover .btn-edit-project,
-.project-item:hover .btn-delete-project {
+.project-item:hover .btn-edit-project {
     opacity: 1;
 }
 
 .btn-edit-project:hover {
     background: var(--primary);
-    color: white;
-}
-
-.btn-delete-project:hover {
-    background: var(--danger);
     color: white;
 }
 

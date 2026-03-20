@@ -757,14 +757,15 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
 
 @app.delete("/api/projects/{project_id}")
 async def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Solo admins pueden eliminar proyectos
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar proyectos")
-    
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if not db_project:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-    
+
+    # Solo admins o coordinadores del proyecto pueden eliminar
+    is_coordinator = getattr(db_project, 'coordinator_id', None) == current_user.id
+    if not current_user.is_admin and not is_coordinator:
+        raise HTTPException(status_code=403, detail="Solo administradores o coordinadores pueden eliminar proyectos")
+
     db.delete(db_project)
     db.commit()
     return {"message": "Proyecto eliminado"}
