@@ -407,6 +407,7 @@ async function loadProjects() {
         projects = await apiRequest('/api/projects');
         renderProjectList();
         updateProjectSelects();
+        renderEffectivenessProjectSelect();
     } catch (error) {
         showToast('Error cargando proyectos', 'error');
     }
@@ -428,9 +429,14 @@ function renderProjectList() {
                 <span class="project-name">${p.name}</span>
             </div>
             ${isAdmin ? `
-                <button class="btn-edit-project" onclick="event.stopPropagation(); editProject(${p.id})" title="Editar proyecto">
-                    <i class="fas fa-pen"></i>
-                </button>
+                <div class="project-item-actions">
+                    <button class="btn-edit-project" onclick="event.stopPropagation(); editProject(${p.id})" title="Editar proyecto">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="btn-delete-project" onclick="event.stopPropagation(); deleteProject(${p.id}, '${p.name.replace(/'/g, "\\'")}')" title="Eliminar proyecto">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             ` : ''}
         </div>
     `).join('');
@@ -439,6 +445,29 @@ function renderProjectList() {
         item.addEventListener('click', () => selectProject(parseInt(item.dataset.id)));
     });
 
+}
+
+async function deleteProject(projectId, projectName) {
+    if (!confirm(`¿Estás seguro de que deseas eliminar el proyecto "${projectName}"?\n\nEsta acción eliminará todas las etapas, tareas e historial asociados y no se puede deshacer.`)) {
+        return;
+    }
+
+    try {
+        await apiRequest(`/api/projects/${projectId}`, { method: 'DELETE' });
+        showToast('Proyecto eliminado correctamente', 'success');
+
+        // Si el proyecto eliminado era el seleccionado, limpiar selección
+        if (currentProject && currentProject.id === projectId) {
+            currentProject = null;
+            stages = [];
+            tasks = [];
+        }
+
+        await loadProjects();
+        loadDashboard();
+    } catch (error) {
+        showToast(error.message || 'Error al eliminar el proyecto', 'error');
+    }
 }
 
 function updateProjectSelects() {
@@ -2643,9 +2672,16 @@ async function loadProjectsView() {
                 <div class="project-card-header" style="border-left-color: ${project.color}">
                     <div class="project-card-title">
                         <h3>${project.name}</h3>
-                        <span class="project-status-badge ${project.is_active ? 'active' : 'inactive'}">
-                            ${project.is_active ? 'Activo' : 'Inactivo'}
-                        </span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="project-status-badge ${project.is_active ? 'active' : 'inactive'}">
+                                ${project.is_active ? 'Activo' : 'Inactivo'}
+                            </span>
+                            ${currentUser && currentUser.is_admin ? `
+                                <button class="btn-delete-project-card" onclick="deleteProject(${project.id}, '${project.name.replace(/'/g, "\\'")}')" title="Eliminar proyecto">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                     ${project.description ? `<p class="project-card-desc">${project.description}</p>` : ''}
                 </div>
