@@ -1178,10 +1178,13 @@ async function loadTasks() {
     try {
         const [tasksData, milestonesData] = await Promise.all([
             apiRequest(`/api/projects/${currentProject.id}/tasks`),
-            apiRequest(`/api/projects/${currentProject.id}/milestones`)
+            apiRequest(`/api/projects/${currentProject.id}/milestones`).catch(e => {
+                console.warn('Error cargando hitos:', e);
+                return [];
+            })
         ]);
         tasks = tasksData;
-        milestones = milestonesData;
+        milestones = milestonesData || [];
         console.log('Tareas cargadas:', tasks.length, '- Hitos cargados:', milestones.length);
         renderKanban();
         renderGantt();
@@ -2258,8 +2261,14 @@ function renderGantt() {
     const MILESTONE_TYPE_ICONS = { meeting: '🤝', change: '🔄', blueprint: '📐', other: '📌' };
     const MILESTONE_TYPE_LABELS = { meeting: 'Reunión', change: 'Cambio', blueprint: 'Plano', other: 'Otro' };
 
+    console.log('Milestones para renderizar:', milestones, 'minDate:', minDate, 'maxDate:', maxDate);
+
     const visibleMilestones = (milestones || []).filter(m => {
         const mDate = new Date(m.date);
+        mDate.setHours(0, 0, 0, 0);
+        console.log('Milestone:', m.title, 'date:', m.date, 'parsed:', mDate, 'visible:', mDate >= minDate && mDate <= maxDate);
+        return mDate >= minDate && mDate <= maxDate;
+    });
         return mDate >= minDate && mDate <= maxDate;
     });
 
@@ -4320,10 +4329,16 @@ async function saveMilestone() {
 
     try {
         if (id) {
-            await apiRequest(`/api/milestones/${id}`, 'PUT', data);
+            await apiRequest(`/api/milestones/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
             showToast('Hito actualizado', 'success');
         } else {
-            await apiRequest(`/api/projects/${currentProject.id}/milestones`, 'POST', data);
+            await apiRequest(`/api/projects/${currentProject.id}/milestones`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
             showToast('Hito creado', 'success');
         }
         document.getElementById('milestone-modal').classList.remove('active');
@@ -4340,7 +4355,7 @@ async function deleteMilestone() {
     if (!confirm('¿Estás seguro de eliminar este hito?')) return;
 
     try {
-        await apiRequest(`/api/milestones/${id}`, 'DELETE');
+        await apiRequest(`/api/milestones/${id}`, { method: 'DELETE' });
         showToast('Hito eliminado', 'success');
         document.getElementById('milestone-modal').classList.remove('active');
         await loadTasks();
@@ -4406,7 +4421,7 @@ async function deleteMilestoneAttachment(milestoneId, attachmentId) {
     if (!confirm('¿Eliminar este archivo adjunto?')) return;
 
     try {
-        await apiRequest(`/api/milestones/${milestoneId}/attachments/${attachmentId}`, 'DELETE');
+        await apiRequest(`/api/milestones/${milestoneId}/attachments/${attachmentId}`, { method: 'DELETE' });
         showToast('Adjunto eliminado', 'success');
         // Reload milestones to get updated attachments
         const updatedMilestones = await apiRequest(`/api/projects/${currentProject.id}/milestones`);
