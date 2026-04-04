@@ -2483,6 +2483,37 @@ body {
 .typology-badge.typology-hospitalario { background: rgba(239, 68, 68, 0.15); color: #f87171; }
 .typology-badge.typology-otros { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
 
+.project-card-typology {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+}
+
+.modality-badge {
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary-light);
+}
+
+.modality-badge i, .typology-badge i {
+    margin-right: 4px;
+    font-size: 0.7rem;
+}
+
+.modality-badge.modality-anteproyecto { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.modality-badge.modality-proyecto { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.modality-badge.modality-probono { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.modality-badge.modality-personal { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+.modality-badge.modality-solo_obra { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.modality-badge.modality-outsourcing { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
+
 .toggle-switch {
     display: flex;
     align-items: center;

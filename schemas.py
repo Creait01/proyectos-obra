@@ -58,6 +58,7 @@ class ProjectBase(BaseModel):
     leader_id: Optional[int] = None
     supervisor_id: Optional[int] = None
     typology: Optional[str] = None
+    work_modality: Optional[str] = None
 
 class ProjectCreate(ProjectBase):
     pass
@@ -75,6 +76,7 @@ class ProjectUpdate(BaseModel):
     leader_id: Optional[int] = None
     supervisor_id: Optional[int] = None
     typology: Optional[str] = None
+    work_modality: Optional[str] = None
     member_ids: Optional[List[int]] = None  # Lista de IDs de usuarios miembros
 
 class ProjectMemberResponse(BaseModel):

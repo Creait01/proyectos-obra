@@ -579,6 +579,15 @@
                                 <option value="hospitalario">Hospitalario</option>
                                 <option value="otros">Otros</option>
                             </select>
+                            <select id="filter-modality" class="select-styled" style="min-width: 180px;">
+                                <option value="">Todas las modalidades</option>
+                                <option value="anteproyecto">Ante-proyecto</option>
+                                <option value="proyecto">Proyecto</option>
+                                <option value="probono">Favores/Probono</option>
+                                <option value="personal">Personal</option>
+                                <option value="solo_obra">Solo Obra</option>
+                                <option value="outsourcing">Outsourcing</option>
+                            </select>
                             <label class="toggle-switch" title="Mostrar proyectos inactivos">
                                 <input type="checkbox" id="show-inactive-projects">
                                 <span class="toggle-slider"></span>
@@ -721,17 +730,31 @@
                     <label><i class="fas fa-ruler-combined"></i> Metros Cuadrados</label>
                     <input type="number" id="project-square-meters" step="0.01" min="0" placeholder="Ej: 1500.50">
                 </div>
-                <div class="form-group">
-                    <label><i class="fas fa-building"></i> Tipología</label>
-                    <select id="project-typology" class="select-styled">
-                        <option value="">Sin especificar</option>
-                        <option value="residencial">Residencial</option>
-                        <option value="comercial_corporativo">Comercial Corporativo</option>
-                        <option value="comercial_residencial">Comercial Residencial</option>
-                        <option value="deportivo">Deportivo</option>
-                        <option value="hospitalario">Hospitalario</option>
-                        <option value="otros">Otros</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-building"></i> Tipología</label>
+                        <select id="project-typology" class="select-styled">
+                            <option value="">Sin especificar</option>
+                            <option value="residencial">Residencial</option>
+                            <option value="comercial_corporativo">Comercial Corporativo</option>
+                            <option value="comercial_residencial">Comercial Residencial</option>
+                            <option value="deportivo">Deportivo</option>
+                            <option value="hospitalario">Hospitalario</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-briefcase"></i> Modalidad de Trabajo</label>
+                        <select id="project-work-modality" class="select-styled">
+                            <option value="">Sin especificar</option>
+                            <option value="anteproyecto">Ante-proyecto</option>
+                            <option value="proyecto">Proyecto</option>
+                            <option value="probono">Favores/Probono</option>
+                            <option value="personal">Personal</option>
+                            <option value="solo_obra">Solo Obra</option>
+                            <option value="outsourcing">Outsourcing</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-image"></i> Imagen del Proyecto</label>

@@ -44,6 +44,7 @@ class Project(Base):
     leader_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Líder (informativo)
     supervisor_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Supervisor de proyecto
     typology = Column(String(50), nullable=True)  # Tipología: residencial, comercial_corporativo, etc.
+    work_modality = Column(String(50), nullable=True)  # Modalidad: anteproyecto, proyecto, probono, etc.
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

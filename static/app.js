@@ -796,6 +796,11 @@ document.getElementById('filter-typology')?.addEventListener('change', () => {
     loadProjectsView();
 });
 
+// Filtro por modalidad de trabajo
+document.getElementById('filter-modality')?.addEventListener('change', () => {
+    loadProjectsView();
+});
+
 // Toggle para mostrar proyectos inactivos en vista de equipo
 document.getElementById('show-inactive-team-projects')?.addEventListener('change', () => {
     loadTeam();
@@ -932,6 +937,7 @@ document.getElementById('add-project-btn').addEventListener('click', async () =>
     // Limpiar metros cuadrados y tipología
     document.getElementById('project-square-meters').value = '';
     document.getElementById('project-typology').value = '';
+    document.getElementById('project-work-modality').value = '';
     
     // Limpiar imagen
     showImagePreview(null);
@@ -958,6 +964,7 @@ async function editProject(projectId) {
     document.getElementById('project-end').value = project.end_date ? project.end_date.split('T')[0] : '';
     document.getElementById('project-square-meters').value = project.square_meters || '';
     document.getElementById('project-typology').value = project.typology || '';
+    document.getElementById('project-work-modality').value = project.work_modality || '';
     document.getElementById('project-color').value = project.color;
     document.getElementById('project-active').checked = project.is_active !== false;
     document.getElementById('project-active').disabled = !(currentUser && currentUser.is_admin);
@@ -1009,6 +1016,7 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     const leaderId = document.getElementById('project-leader').value;
     const supervisorId = document.getElementById('project-supervisor').value;
     const typology = document.getElementById('project-typology').value;
+    const workModality = document.getElementById('project-work-modality').value;
     
     // Validar que las etapas sumen 100% si hay etapas
     if (stagesToSave.length > 0) {
@@ -1031,6 +1039,7 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
         leader_id: leaderId ? parseInt(leaderId) : null,
         supervisor_id: supervisorId ? parseInt(supervisorId) : null,
         typology: typology || null,
+        work_modality: workModality || null,
         member_ids: memberIds
     };
     
@@ -2609,6 +2618,19 @@ function getTypologyLabel(typology) {
     return TYPOLOGY_LABELS[typology] || typology || 'Sin especificar';
 }
 
+const MODALITY_LABELS = {
+    anteproyecto: 'Ante-proyecto',
+    proyecto: 'Proyecto',
+    probono: 'Favores/Probono',
+    personal: 'Personal',
+    solo_obra: 'Solo Obra',
+    outsourcing: 'Outsourcing'
+};
+
+function getModalityLabel(modality) {
+    return MODALITY_LABELS[modality] || modality || 'Sin especificar';
+}
+
 async function loadProjectsView() {
     const grid = document.getElementById('projects-grid');
     if (!grid) return;
@@ -2616,11 +2638,17 @@ async function loadProjectsView() {
     // Filtrar por activos/inactivos
     const showInactive = document.getElementById('show-inactive-projects')?.checked || false;
     const typologyFilter = document.getElementById('filter-typology')?.value || '';
+    const modalityFilter = document.getElementById('filter-modality')?.value || '';
     let filteredProjects = projects.filter(p => showInactive ? !p.is_active : p.is_active !== false);
 
     // Filtrar por tipología
     if (typologyFilter) {
         filteredProjects = filteredProjects.filter(p => p.typology === typologyFilter);
+    }
+
+    // Filtrar por modalidad
+    if (modalityFilter) {
+        filteredProjects = filteredProjects.filter(p => p.work_modality === modalityFilter);
     }
     
     // Ordenar por código/nombre
@@ -2714,18 +2742,18 @@ async function loadProjectsView() {
                         <i class="fas fa-ruler-combined"></i>
                         <span>${project.square_meters ? project.square_meters.toLocaleString() + ' m²' : 'No especificado'}</span>
                     </div>
-                    ${project.typology ? `
-                    <div class="project-info-item">
-                        <i class="fas fa-building"></i>
-                        <span class="typology-badge typology-${project.typology}">${getTypologyLabel(project.typology)}</span>
-                    </div>
-                    ` : ''}
                     <div class="project-info-item">
                         <i class="fas fa-calendar-alt"></i>
                         <span>${startDate} - ${endDate}</span>
                     </div>
                 </div>
-                
+                ${project.typology || project.work_modality ? `
+                <div class="project-card-typology">
+                    ${project.typology ? `<span class="typology-badge typology-${project.typology}"><i class="fas fa-building"></i> ${getTypologyLabel(project.typology)}</span>` : ''}
+                    ${project.work_modality ? `<span class="modality-badge modality-${project.work_modality}"><i class="fas fa-briefcase"></i> ${getModalityLabel(project.work_modality)}</span>` : ''}
+                </div>
+                ` : ''}
+
                 <div class="project-card-roles">
                     <div class="project-role">
                         <div class="project-role-label"><i class="fas fa-user-tie"></i> Coordinador</div>
