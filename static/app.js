@@ -788,18 +788,56 @@ document.getElementById('apply-stage-template-btn')?.addEventListener('click', a
 
 // Toggle para mostrar proyectos inactivos
 document.getElementById('show-inactive-projects')?.addEventListener('change', () => {
+    updateFilterCount();
     loadProjectsView();
 });
 
 // Filtro por tipología
 document.getElementById('filter-typology')?.addEventListener('change', () => {
+    updateFilterCount();
     loadProjectsView();
 });
 
 // Filtro por modalidad de trabajo
 document.getElementById('filter-modality')?.addEventListener('change', () => {
+    updateFilterCount();
     loadProjectsView();
 });
+
+// Toggle panel de filtros
+document.getElementById('projects-filter-btn')?.addEventListener('click', () => {
+    const panel = document.getElementById('projects-filter-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+});
+
+// Cerrar panel al hacer clic fuera
+document.addEventListener('click', (e) => {
+    const wrapper = document.querySelector('.projects-filter-wrapper');
+    const panel = document.getElementById('projects-filter-panel');
+    if (wrapper && panel && !wrapper.contains(e.target)) {
+        panel.style.display = 'none';
+    }
+});
+
+// Limpiar todos los filtros
+document.getElementById('clear-all-filters')?.addEventListener('click', () => {
+    document.getElementById('filter-typology').value = '';
+    document.getElementById('filter-modality').value = '';
+    document.getElementById('show-inactive-projects').checked = false;
+    updateFilterCount();
+    loadProjectsView();
+});
+
+function updateFilterCount() {
+    const count = (document.getElementById('filter-typology')?.value ? 1 : 0)
+        + (document.getElementById('filter-modality')?.value ? 1 : 0)
+        + (document.getElementById('show-inactive-projects')?.checked ? 1 : 0);
+    const badge = document.getElementById('filter-active-count');
+    if (badge) {
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+}
 
 // Toggle para mostrar proyectos inactivos en vista de equipo
 document.getElementById('show-inactive-team-projects')?.addEventListener('change', () => {
@@ -2654,14 +2692,15 @@ async function loadProjectsView() {
     // Ordenar por código/nombre
     filteredProjects.sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
     
-    // Obtener tareas de todos los proyectos para estadísticas
-    let allTasks = [];
-    for (const project of filteredProjects) {
-        try {
-            const projectTasks = await apiRequest(`/api/projects/${project.id}/tasks`);
-            allTasks = allTasks.concat(projectTasks.map(t => ({...t, project_id: project.id})));
-        } catch (e) {}
-    }
+    // Obtener tareas de todos los proyectos en paralelo
+    const taskResults = await Promise.all(
+        filteredProjects.map(project =>
+            apiRequest(`/api/projects/${project.id}/tasks`)
+                .then(tasks => tasks.map(t => ({ ...t, project_id: project.id })))
+                .catch(() => [])
+        )
+    );
+    const allTasks = taskResults.flat();
     
     if (filteredProjects.length === 0) {
         grid.innerHTML = `
@@ -2747,12 +2786,10 @@ async function loadProjectsView() {
                         <span>${startDate} - ${endDate}</span>
                     </div>
                 </div>
-                ${project.typology || project.work_modality ? `
                 <div class="project-card-typology">
-                    ${project.typology ? `<span class="typology-badge typology-${project.typology}"><i class="fas fa-building"></i> ${getTypologyLabel(project.typology)}</span>` : ''}
-                    ${project.work_modality ? `<span class="modality-badge modality-${project.work_modality}"><i class="fas fa-briefcase"></i> ${getModalityLabel(project.work_modality)}</span>` : ''}
+                    <span class="typology-badge typology-${project.typology || 'none'}"><i class="fas fa-building"></i> ${getTypologyLabel(project.typology)}</span>
+                    <span class="modality-badge modality-${project.work_modality || 'none'}"><i class="fas fa-briefcase"></i> ${getModalityLabel(project.work_modality)}</span>
                 </div>
-                ` : ''}
 
                 <div class="project-card-roles">
                     <div class="project-role">

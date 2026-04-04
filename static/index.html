@@ -569,30 +569,50 @@
                 <!-- Projects View -->
                 <section id="projects-view" class="view">
                     <div class="projects-toolbar">
-                        <div class="projects-filters">
-                            <select id="filter-typology" class="select-styled" style="min-width: 180px;">
-                                <option value="">Todas las tipologías</option>
-                                <option value="residencial">Residencial</option>
-                                <option value="comercial_corporativo">Comercial Corporativo</option>
-                                <option value="comercial_residencial">Comercial Residencial</option>
-                                <option value="deportivo">Deportivo</option>
-                                <option value="hospitalario">Hospitalario</option>
-                                <option value="otros">Otros</option>
-                            </select>
-                            <select id="filter-modality" class="select-styled" style="min-width: 180px;">
-                                <option value="">Todas las modalidades</option>
-                                <option value="anteproyecto">Ante-proyecto</option>
-                                <option value="proyecto">Proyecto</option>
-                                <option value="probono">Favores/Probono</option>
-                                <option value="personal">Personal</option>
-                                <option value="solo_obra">Solo Obra</option>
-                                <option value="outsourcing">Outsourcing</option>
-                            </select>
-                            <label class="toggle-switch" title="Mostrar proyectos inactivos">
-                                <input type="checkbox" id="show-inactive-projects">
-                                <span class="toggle-slider"></span>
-                                <span class="toggle-label">Ver inactivos</span>
-                            </label>
+                        <div class="projects-filter-wrapper">
+                            <button type="button" class="btn btn-secondary btn-filter-toggle" id="projects-filter-btn">
+                                <i class="fas fa-filter"></i> Filtros
+                                <span class="filter-count" id="filter-active-count" style="display: none;">0</span>
+                            </button>
+                            <div class="projects-filter-panel" id="projects-filter-panel" style="display: none;">
+                                <div class="filter-panel-header">
+                                    <span><i class="fas fa-filter"></i> Filtros</span>
+                                    <button type="button" class="btn-clear-filters" id="clear-all-filters">Limpiar todo</button>
+                                </div>
+                                <div class="filter-panel-body">
+                                    <div class="filter-group">
+                                        <label>Tipología</label>
+                                        <select id="filter-typology" class="select-styled">
+                                            <option value="">Todas</option>
+                                            <option value="residencial">Residencial</option>
+                                            <option value="comercial_corporativo">Comercial Corporativo</option>
+                                            <option value="comercial_residencial">Comercial Residencial</option>
+                                            <option value="deportivo">Deportivo</option>
+                                            <option value="hospitalario">Hospitalario</option>
+                                            <option value="otros">Otros</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Modalidad</label>
+                                        <select id="filter-modality" class="select-styled">
+                                            <option value="">Todas</option>
+                                            <option value="anteproyecto">Ante-proyecto</option>
+                                            <option value="proyecto">Proyecto</option>
+                                            <option value="probono">Favores/Probono</option>
+                                            <option value="personal">Personal</option>
+                                            <option value="solo_obra">Solo Obra</option>
+                                            <option value="outsourcing">Outsourcing</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label class="toggle-switch" title="Mostrar proyectos inactivos">
+                                            <input type="checkbox" id="show-inactive-projects">
+                                            <span class="toggle-slider"></span>
+                                            <span class="toggle-label">Ver inactivos</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="projects-grid" id="projects-grid"></div>
