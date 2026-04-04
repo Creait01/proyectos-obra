@@ -240,6 +240,47 @@ class TaskHistoryResponse(BaseModel):
     old_value: Optional[str] = None
     new_value: Optional[str] = None
     created_at: datetime
-    
+
+    class Config:
+        from_attributes = True
+
+# ===================== MILESTONE SCHEMAS =====================
+class MilestoneAttachmentResponse(BaseModel):
+    id: int
+    milestone_id: int
+    file_url: str
+    file_name: str
+    file_type: Optional[str] = None
+    uploaded_by: int
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class MilestoneCreate(BaseModel):
+    title: str
+    date: datetime
+    milestone_type: str
+    description: Optional[str] = None
+
+class MilestoneUpdate(BaseModel):
+    title: Optional[str] = None
+    date: Optional[datetime] = None
+    milestone_type: Optional[str] = None
+    description: Optional[str] = None
+
+class MilestoneResponse(BaseModel):
+    id: int
+    project_id: int
+    title: str
+    date: datetime
+    milestone_type: str
+    description: Optional[str] = None
+    created_by: int
+    created_by_name: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    attachments: List[MilestoneAttachmentResponse] = []
+
     class Config:
         from_attributes = True

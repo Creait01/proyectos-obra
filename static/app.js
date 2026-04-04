@@ -5,6 +5,7 @@ let projects = [];
 let tasks = [];
 let users = [];
 let stages = [];  // Etapas del proyecto actual
+let milestones = [];  // Hitos del proyecto actual
 let ws = null;
 let draggedTask = null;
 let myTasksCache = [];
@@ -1168,14 +1169,20 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
 async function loadTasks() {
     if (!currentProject) {
         tasks = [];
+        milestones = [];
         renderKanban();
         renderGantt();
         return;
     }
-    
+
     try {
-        tasks = await apiRequest(`/api/projects/${currentProject.id}/tasks`);
-        console.log('Tareas cargadas:', tasks.length, tasks);
+        const [tasksData, milestonesData] = await Promise.all([
+            apiRequest(`/api/projects/${currentProject.id}/tasks`),
+            apiRequest(`/api/projects/${currentProject.id}/milestones`)
+        ]);
+        tasks = tasksData;
+        milestones = milestonesData;
+        console.log('Tareas cargadas:', tasks.length, '- Hitos cargados:', milestones.length);
         renderKanban();
         renderGantt();
     } catch (error) {
@@ -2239,7 +2246,54 @@ function renderGantt() {
     
     // Generar HTML agrupado por etapas
     let ganttHtml = '';
-    
+
+    // ===== RENDERIZAR GRUPO DE HITOS =====
+    const MILESTONE_TYPE_ICONS = { meeting: '🤝', change: '🔄', blueprint: '📐', other: '📌' };
+    const MILESTONE_TYPE_LABELS = { meeting: 'Reunión', change: 'Cambio', blueprint: 'Plano', other: 'Otro' };
+
+    const visibleMilestones = (milestones || []).filter(m => {
+        const mDate = new Date(m.date);
+        return mDate >= minDate && mDate <= maxDate;
+    });
+
+    if (visibleMilestones.length > 0) {
+        ganttHtml += `
+            <div class="gantt-stage-group gantt-milestone-group" data-stage-id="__milestones__">
+                <div class="gantt-stage-header gantt-milestone-header" onclick="toggleGanttStageGroup('__milestones__')">
+                    <i class="fas fa-diamond"></i>
+                    <span>Hitos</span>
+                    <span class="stage-task-count">${visibleMilestones.length} hito${visibleMilestones.length !== 1 ? 's' : ''}</span>
+                    <i class="fas fa-chevron-down stage-toggle"></i>
+                </div>
+                <div class="gantt-stage-tasks">
+                    ${visibleMilestones.map(m => {
+                        const mDate = new Date(m.date);
+                        const dayOffset = Math.floor((mDate - minDate) / (1000 * 60 * 60 * 24));
+                        const leftPos = dayOffset * ganttScale + (ganttScale / 2) - 10; // center diamond
+                        const icon = MILESTONE_TYPE_ICONS[m.milestone_type] || '📌';
+                        const typeLabel = MILESTONE_TYPE_LABELS[m.milestone_type] || 'Otro';
+                        const dateStr = mDate.toLocaleDateString('es-ES', {day: '2-digit', month: 'short'});
+                        return `
+                            <div class="gantt-task-row gantt-milestone-row">
+                                <div class="gantt-task-info">
+                                    <span class="milestone-type-icon">${icon}</span>
+                                    <div class="gantt-task-details">
+                                        <span class="gantt-task-name">${m.title}</span>
+                                        <span class="gantt-task-assignee">${typeLabel} · ${dateStr}</span>
+                                    </div>
+                                </div>
+                                <div class="gantt-task-bar-container" style="width: ${timelineWidth}px; max-width: ${timelineWidth}px; overflow: hidden;">
+                                    ${todayIndex >= 0 ? `<div class="gantt-today-line" style="left: ${(todayIndex * ganttScale) + (ganttScale / 2)}px;"></div>` : ''}
+                                    <div class="gantt-milestone-diamond" style="left: ${leftPos}px;" data-milestone-id="${m.id}" title="${icon} ${m.title}\n${dateStr}"></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     sortedStageIds.forEach(stageId => {
         const stageTasks = tasksByStage[stageId];
         const stage = stageId === noStageKey ? null : stages.find(s => s.id == stageId);
@@ -2276,6 +2330,11 @@ function renderGantt() {
     // Add click listeners
     taskRows.querySelectorAll('.gantt-task-bar').forEach(bar => {
         bar.addEventListener('click', () => openTaskModal(parseInt(bar.dataset.id)));
+    });
+
+    // Add click listeners for milestone diamonds
+    taskRows.querySelectorAll('.gantt-milestone-diamond').forEach(diamond => {
+        diamond.addEventListener('click', () => openMilestoneModal(parseInt(diamond.dataset.milestoneId)));
     });
 }
 
@@ -4175,6 +4234,200 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } else {
         showAuthScreen();
+    }
+});
+
+// ===================== HITOS (MILESTONES) =====================
+
+function openMilestoneModal(milestoneId = null) {
+    if (!currentProject) {
+        showToast('Selecciona un proyecto primero', 'warning');
+        return;
+    }
+
+    const modal = document.getElementById('milestone-modal');
+    const titleEl = document.getElementById('milestone-modal-title');
+    const deleteBtn = document.getElementById('milestone-delete-btn');
+    const attachmentsSection = document.getElementById('milestone-attachments-section');
+
+    // Reset form
+    document.getElementById('milestone-id').value = '';
+    document.getElementById('milestone-title').value = '';
+    document.getElementById('milestone-date').value = '';
+    document.getElementById('milestone-type').value = 'meeting';
+    document.getElementById('milestone-description').value = '';
+
+    if (milestoneId) {
+        // Edit mode
+        const milestone = milestones.find(m => m.id === milestoneId);
+        if (!milestone) {
+            showToast('Hito no encontrado', 'error');
+            return;
+        }
+        titleEl.innerHTML = '<i class="fas fa-diamond"></i> Editar Hito';
+        document.getElementById('milestone-id').value = milestone.id;
+        document.getElementById('milestone-title').value = milestone.title;
+        document.getElementById('milestone-date').value = milestone.date ? milestone.date.split('T')[0] : '';
+        document.getElementById('milestone-type').value = milestone.milestone_type;
+        document.getElementById('milestone-description').value = milestone.description || '';
+
+        // Show delete button and attachments for admin
+        if (currentUser && currentUser.is_admin) {
+            deleteBtn.style.display = 'inline-flex';
+        } else {
+            deleteBtn.style.display = 'none';
+        }
+        attachmentsSection.style.display = 'block';
+        renderMilestoneAttachments(milestone.attachments || []);
+    } else {
+        // Create mode
+        titleEl.innerHTML = '<i class="fas fa-diamond"></i> Nuevo Hito';
+        deleteBtn.style.display = 'none';
+        attachmentsSection.style.display = 'none';
+        // Default date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('milestone-date').value = today;
+    }
+
+    modal.classList.add('active');
+}
+
+async function saveMilestone() {
+    const id = document.getElementById('milestone-id').value;
+    const title = document.getElementById('milestone-title').value.trim();
+    const date = document.getElementById('milestone-date').value;
+    const milestoneType = document.getElementById('milestone-type').value;
+    const description = document.getElementById('milestone-description').value.trim();
+
+    if (!title || !date) {
+        showToast('Título y fecha son requeridos', 'warning');
+        return;
+    }
+
+    const data = {
+        title,
+        date: new Date(date + 'T12:00:00').toISOString(),
+        milestone_type: milestoneType,
+        description: description || null
+    };
+
+    try {
+        if (id) {
+            await apiRequest(`/api/milestones/${id}`, 'PUT', data);
+            showToast('Hito actualizado', 'success');
+        } else {
+            await apiRequest(`/api/projects/${currentProject.id}/milestones`, 'POST', data);
+            showToast('Hito creado', 'success');
+        }
+        document.getElementById('milestone-modal').classList.remove('active');
+        await loadTasks();
+    } catch (error) {
+        showToast('Error guardando hito: ' + error.message, 'error');
+    }
+}
+
+async function deleteMilestone() {
+    const id = document.getElementById('milestone-id').value;
+    if (!id) return;
+
+    if (!confirm('¿Estás seguro de eliminar este hito?')) return;
+
+    try {
+        await apiRequest(`/api/milestones/${id}`, 'DELETE');
+        showToast('Hito eliminado', 'success');
+        document.getElementById('milestone-modal').classList.remove('active');
+        await loadTasks();
+    } catch (error) {
+        showToast('Error eliminando hito: ' + error.message, 'error');
+    }
+}
+
+function renderMilestoneAttachments(attachments) {
+    const list = document.getElementById('milestone-attachments-list');
+    if (!attachments || attachments.length === 0) {
+        list.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 8px 0;">Sin archivos adjuntos</div>';
+        return;
+    }
+
+    list.innerHTML = attachments.map(att => {
+        const isImage = att.file_type && att.file_type.startsWith('image/');
+        const icon = isImage ? 'fa-image' : att.file_type && att.file_type.includes('pdf') ? 'fa-file-pdf' : 'fa-file';
+        const isAdmin = currentUser && currentUser.is_admin;
+        return `
+            <div class="milestone-attachment-item">
+                <i class="fas ${icon} attachment-icon"></i>
+                <a href="${att.file_url}" target="_blank" class="attachment-name" title="${att.file_name}">${att.file_name}</a>
+                ${isAdmin ? `<button class="btn-icon btn-delete-attachment" onclick="deleteMilestoneAttachment(${att.milestone_id}, ${att.id})" title="Eliminar">
+                    <i class="fas fa-times"></i>
+                </button>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+async function uploadMilestoneAttachment(milestoneId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/milestones/${milestoneId}/attachments`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Error subiendo archivo');
+        }
+
+        showToast('Archivo adjuntado', 'success');
+        // Reload milestones to get updated attachments
+        const updatedMilestones = await apiRequest(`/api/projects/${currentProject.id}/milestones`);
+        milestones = updatedMilestones;
+        const milestone = milestones.find(m => m.id === milestoneId);
+        if (milestone) {
+            renderMilestoneAttachments(milestone.attachments || []);
+        }
+    } catch (error) {
+        showToast('Error subiendo archivo: ' + error.message, 'error');
+    }
+}
+
+async function deleteMilestoneAttachment(milestoneId, attachmentId) {
+    if (!confirm('¿Eliminar este archivo adjunto?')) return;
+
+    try {
+        await apiRequest(`/api/milestones/${milestoneId}/attachments/${attachmentId}`, 'DELETE');
+        showToast('Adjunto eliminado', 'success');
+        // Reload milestones to get updated attachments
+        const updatedMilestones = await apiRequest(`/api/projects/${currentProject.id}/milestones`);
+        milestones = updatedMilestones;
+        const milestone = milestones.find(m => m.id === milestoneId);
+        if (milestone) {
+            renderMilestoneAttachments(milestone.attachments || []);
+        }
+    } catch (error) {
+        showToast('Error eliminando adjunto: ' + error.message, 'error');
+    }
+}
+
+// File input change listener for milestone attachments
+document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('milestone-file-input');
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const milestoneId = document.getElementById('milestone-id').value;
+            if (!milestoneId) {
+                showToast('Guarda el hito primero para adjuntar archivos', 'warning');
+                return;
+            }
+            uploadMilestoneAttachment(parseInt(milestoneId), file);
+            fileInput.value = ''; // Reset input
+        });
     }
 });
 

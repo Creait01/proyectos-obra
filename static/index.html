@@ -464,6 +464,9 @@
                             <button class="btn btn-success admin-only" id="gantt-add-task" title="Nueva actividad">
                                 <i class="fas fa-plus"></i> Nueva Actividad
                             </button>
+                            <button class="btn btn-warning admin-only" id="gantt-add-milestone" title="Nuevo Hito" onclick="openMilestoneModal()">
+                                <i class="fas fa-diamond"></i> Nuevo Hito
+                            </button>
                         </div>
                     </div>
                     
@@ -1270,9 +1273,69 @@
         </div>
     </div>
 
+    <!-- Milestone Modal -->
+    <div class="modal-overlay" id="milestone-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2 id="milestone-modal-title"><i class="fas fa-diamond"></i> Nuevo Hito</h2>
+                <button class="btn-icon modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="milestone-id">
+                <div class="form-group">
+                    <label>Título *</label>
+                    <input type="text" id="milestone-title" placeholder="Ej: Reunión con cliente" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha *</label>
+                        <input type="date" id="milestone-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo *</label>
+                        <select id="milestone-type" class="select-styled">
+                            <option value="meeting">🤝 Reunión</option>
+                            <option value="change">🔄 Cambio</option>
+                            <option value="blueprint">📐 Plano</option>
+                            <option value="other">📌 Otro</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Minuta / Notas</label>
+                    <textarea id="milestone-description" rows="5" placeholder="Descripción del hito, acuerdos, notas..."></textarea>
+                </div>
+                <!-- Sección de adjuntos (solo al editar) -->
+                <div class="form-group" id="milestone-attachments-section" style="display:none;">
+                    <label>Archivos Adjuntos</label>
+                    <div id="milestone-attachments-list" class="milestone-attachments-list">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                    <div class="milestone-upload-area">
+                        <input type="file" id="milestone-file-input" style="display:none" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('milestone-file-input').click()">
+                            <i class="fas fa-paperclip"></i> Adjuntar archivo
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="milestone-delete-btn" style="display:none; margin-right:auto;" onclick="deleteMilestone()">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+                <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveMilestone()">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=3.6.7"></script>
+    <script src="/static/app.js?v=3.7.0"></script>
 </body>
 </html>

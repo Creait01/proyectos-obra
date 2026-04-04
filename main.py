@@ -16,14 +16,15 @@ import cloudinary
 import cloudinary.uploader
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam, task_assignees
+from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam, task_assignees, Milestone, MilestoneAttachment
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
     UserCreate, UserResponse, UserLogin, UserApproval, PendingUserResponse, UserUpdate,
     ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse,
     ProjectMemberResponse, StageCreate, StageResponse, StageUpdate,
-    EffectivenessMetric, ProjectEffectiveness, TaskHistoryResponse
+    EffectivenessMetric, ProjectEffectiveness, TaskHistoryResponse,
+    MilestoneCreate, MilestoneUpdate, MilestoneResponse, MilestoneAttachmentResponse
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
 
@@ -291,6 +292,84 @@ def init_database():
             except Exception as e:
                 pass  # Ya existe
 
+            # Crear tabla milestones
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS milestones (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        project_id INT NOT NULL,
+                        title VARCHAR(300) NOT NULL,
+                        date DATETIME NOT NULL,
+                        milestone_type VARCHAR(50) NOT NULL,
+                        description TEXT,
+                        created_by INT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                        FOREIGN KEY (created_by) REFERENCES users(id)
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla milestones verificada")
+            except Exception as e:
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS milestones (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            project_id INT NOT NULL,
+                            title VARCHAR(300) NOT NULL,
+                            date DATETIME NOT NULL,
+                            milestone_type VARCHAR(50) NOT NULL,
+                            description TEXT,
+                            created_by INT NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                            FOREIGN KEY (created_by) REFERENCES users(id)
+                        )
+                    """))
+                    conn.commit()
+                    print("✅ Tabla milestones verificada (MySQL)")
+                except Exception as e2:
+                    print(f"⚠️ Tabla milestones: {e2}")
+
+            # Crear tabla milestone_attachments
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS milestone_attachments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        milestone_id INT NOT NULL,
+                        file_url VARCHAR(500) NOT NULL,
+                        file_name VARCHAR(300) NOT NULL,
+                        file_type VARCHAR(100),
+                        uploaded_by INT NOT NULL,
+                        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+                        FOREIGN KEY (uploaded_by) REFERENCES users(id)
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla milestone_attachments verificada")
+            except Exception as e:
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS milestone_attachments (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            milestone_id INT NOT NULL,
+                            file_url VARCHAR(500) NOT NULL,
+                            file_name VARCHAR(300) NOT NULL,
+                            file_type VARCHAR(100),
+                            uploaded_by INT NOT NULL,
+                            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+                            FOREIGN KEY (uploaded_by) REFERENCES users(id)
+                        )
+                    """))
+                    conn.commit()
+                    print("✅ Tabla milestone_attachments verificada (MySQL)")
+                except Exception as e2:
+                    print(f"⚠️ Tabla milestone_attachments: {e2}")
+
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
 
@@ -356,6 +435,8 @@ app.add_middleware(NoCacheMiddleware)
 # Crear carpeta uploads si no existe (fallback local)
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+MILESTONE_UPLOAD_DIR = os.path.join(UPLOAD_DIR, "milestones")
+os.makedirs(MILESTONE_UPLOAD_DIR, exist_ok=True)
 
 # Configurar Cloudinary
 CLOUDINARY_CLOUD = os.environ.get("CLOUDINARY_CLOUD_NAME")
@@ -1062,6 +1143,215 @@ async def delete_stage(stage_id: int, db: Session = Depends(get_db), current_use
     db.delete(db_stage)
     db.commit()
     return {"message": "Etapa eliminada"}
+
+# ===================== HITOS (MILESTONES) =====================
+@app.get("/api/projects/{project_id}/milestones")
+async def get_milestones(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    milestones_list = db.query(Milestone).filter(Milestone.project_id == project_id).order_by(Milestone.date).all()
+    result = []
+    for m in milestones_list:
+        attachments = [
+            {"id": a.id, "milestone_id": a.milestone_id, "file_url": a.file_url,
+             "file_name": a.file_name, "file_type": a.file_type,
+             "uploaded_by": a.uploaded_by, "uploaded_at": a.uploaded_at}
+            for a in m.attachments
+        ]
+        result.append({
+            "id": m.id, "project_id": m.project_id, "title": m.title,
+            "date": m.date, "milestone_type": m.milestone_type,
+            "description": m.description, "created_by": m.created_by,
+            "created_by_name": m.creator.name if m.creator else None,
+            "created_at": m.created_at, "updated_at": m.updated_at,
+            "attachments": attachments
+        })
+    return result
+
+@app.post("/api/projects/{project_id}/milestones")
+async def create_milestone(project_id: int, milestone: MilestoneCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear hitos")
+
+    db_project = db.query(Project).filter(Project.id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+    new_milestone = Milestone(
+        project_id=project_id,
+        title=milestone.title,
+        date=milestone.date,
+        milestone_type=milestone.milestone_type,
+        description=milestone.description,
+        created_by=current_user.id
+    )
+    db.add(new_milestone)
+    db.commit()
+    db.refresh(new_milestone)
+
+    activity = Activity(
+        action="created", entity_type="milestone",
+        entity_id=new_milestone.id, entity_name=new_milestone.title,
+        user_id=current_user.id
+    )
+    db.add(activity)
+    db.commit()
+
+    return {
+        "id": new_milestone.id, "project_id": new_milestone.project_id,
+        "title": new_milestone.title, "date": new_milestone.date,
+        "milestone_type": new_milestone.milestone_type,
+        "description": new_milestone.description,
+        "created_by": new_milestone.created_by,
+        "created_by_name": current_user.name,
+        "created_at": new_milestone.created_at,
+        "updated_at": new_milestone.updated_at,
+        "attachments": []
+    }
+
+@app.put("/api/milestones/{milestone_id}")
+async def update_milestone(milestone_id: int, milestone: MilestoneUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar hitos")
+
+    db_milestone = db.query(Milestone).filter(Milestone.id == milestone_id).first()
+    if not db_milestone:
+        raise HTTPException(status_code=404, detail="Hito no encontrado")
+
+    update_data = milestone.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_milestone, key, value)
+
+    db.commit()
+    db.refresh(db_milestone)
+
+    attachments = [
+        {"id": a.id, "milestone_id": a.milestone_id, "file_url": a.file_url,
+         "file_name": a.file_name, "file_type": a.file_type,
+         "uploaded_by": a.uploaded_by, "uploaded_at": a.uploaded_at}
+        for a in db_milestone.attachments
+    ]
+    return {
+        "id": db_milestone.id, "project_id": db_milestone.project_id,
+        "title": db_milestone.title, "date": db_milestone.date,
+        "milestone_type": db_milestone.milestone_type,
+        "description": db_milestone.description,
+        "created_by": db_milestone.created_by,
+        "created_by_name": db_milestone.creator.name if db_milestone.creator else None,
+        "created_at": db_milestone.created_at,
+        "updated_at": db_milestone.updated_at,
+        "attachments": attachments
+    }
+
+@app.delete("/api/milestones/{milestone_id}")
+async def delete_milestone(milestone_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar hitos")
+
+    db_milestone = db.query(Milestone).filter(Milestone.id == milestone_id).first()
+    if not db_milestone:
+        raise HTTPException(status_code=404, detail="Hito no encontrado")
+
+    # Eliminar archivos físicos de los adjuntos
+    for att in db_milestone.attachments:
+        if "cloudinary" in (att.file_url or ""):
+            try:
+                public_id = att.file_url.split("/upload/")[-1].split(".")[0]
+                cloudinary.uploader.destroy(public_id, resource_type="raw")
+            except Exception:
+                pass
+        elif att.file_url and att.file_url.startswith("/uploads/"):
+            try:
+                local_path = att.file_url.lstrip("/")
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+            except Exception:
+                pass
+
+    db.delete(db_milestone)
+    db.commit()
+    return {"message": "Hito eliminado"}
+
+@app.post("/api/milestones/{milestone_id}/attachments")
+async def upload_milestone_attachment(milestone_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db_milestone = db.query(Milestone).filter(Milestone.id == milestone_id).first()
+    if not db_milestone:
+        raise HTTPException(status_code=404, detail="Hito no encontrado")
+
+    allowed_types = [
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "application/pdf",
+        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/zip", "application/x-zip-compressed"
+    ]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Tipo de archivo no permitido")
+
+    file_extension = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    unique_filename = f"milestone_{milestone_id}_{uuid.uuid4().hex}.{file_extension}"
+
+    if CLOUDINARY_CONFIGURED:
+        try:
+            contents = await file.read()
+            result = cloudinary.uploader.upload(
+                contents, folder=f"milestones/{milestone_id}",
+                resource_type="auto", public_id=unique_filename.split(".")[0]
+            )
+            file_url = result["secure_url"]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {str(e)}")
+    else:
+        file_path = os.path.join(MILESTONE_UPLOAD_DIR, unique_filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        file_url = f"/uploads/milestones/{unique_filename}"
+
+    attachment = MilestoneAttachment(
+        milestone_id=milestone_id,
+        file_url=file_url,
+        file_name=file.filename,
+        file_type=file.content_type,
+        uploaded_by=current_user.id
+    )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+
+    return {
+        "id": attachment.id, "milestone_id": attachment.milestone_id,
+        "file_url": attachment.file_url, "file_name": attachment.file_name,
+        "file_type": attachment.file_type, "uploaded_by": attachment.uploaded_by,
+        "uploaded_at": attachment.uploaded_at
+    }
+
+@app.delete("/api/milestones/{milestone_id}/attachments/{attachment_id}")
+async def delete_milestone_attachment(milestone_id: int, attachment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar adjuntos")
+
+    attachment = db.query(MilestoneAttachment).filter(
+        MilestoneAttachment.id == attachment_id,
+        MilestoneAttachment.milestone_id == milestone_id
+    ).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Adjunto no encontrado")
+
+    if "cloudinary" in (attachment.file_url or ""):
+        try:
+            public_id = attachment.file_url.split("/upload/")[-1].split(".")[0]
+            cloudinary.uploader.destroy(public_id, resource_type="raw")
+        except Exception:
+            pass
+    elif attachment.file_url and attachment.file_url.startswith("/uploads/"):
+        try:
+            local_path = attachment.file_url.lstrip("/")
+            if os.path.exists(local_path):
+                os.remove(local_path)
+        except Exception:
+            pass
+
+    db.delete(attachment)
+    db.commit()
+    return {"message": "Adjunto eliminado"}
 
 # ===================== EFECTIVIDAD =====================
 @app.get("/api/projects/{project_id}/effectiveness")

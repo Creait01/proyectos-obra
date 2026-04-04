@@ -55,6 +55,7 @@ class Project(Base):
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
     stages = relationship("Stage", back_populates="project", cascade="all, delete-orphan", order_by="Stage.position")
+    milestones = relationship("Milestone", back_populates="project", cascade="all, delete-orphan")
 
 class Stage(Base):
     """Etapas del proyecto - cada etapa representa un porcentaje de la obra"""
@@ -153,6 +154,42 @@ class Activity(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     user = relationship("User", back_populates="activities")
+
+
+# ==================== HITOS (MILESTONES) ====================
+class Milestone(Base):
+    """Hitos del proyecto - eventos importantes como reuniones, cambios, planos"""
+    __tablename__ = "milestones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    title = Column(String(300), nullable=False)
+    date = Column(DateTime, nullable=False)
+    milestone_type = Column(String(50), nullable=False)  # meeting, change, blueprint, other
+    description = Column(Text)  # Minuta / notas
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = relationship("Project", back_populates="milestones")
+    creator = relationship("User", foreign_keys=[created_by])
+    attachments = relationship("MilestoneAttachment", back_populates="milestone", cascade="all, delete-orphan")
+
+
+class MilestoneAttachment(Base):
+    """Archivos adjuntos de un hito"""
+    __tablename__ = "milestone_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    milestone_id = Column(Integer, ForeignKey("milestones.id"), nullable=False)
+    file_url = Column(String(500), nullable=False)
+    file_name = Column(String(300), nullable=False)
+    file_type = Column(String(100))
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    milestone = relationship("Milestone", back_populates="attachments")
+    uploader = relationship("User", foreign_keys=[uploaded_by])
 
 
 # ==================== PLANTILLAS ====================
