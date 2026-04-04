@@ -2269,8 +2269,6 @@ function renderGantt() {
         console.log('Milestone:', m.title, 'date:', m.date, 'parsed:', mDate, 'visible:', mDate >= minDate && mDate <= maxDate);
         return mDate >= minDate && mDate <= maxDate;
     });
-        return mDate >= minDate && mDate <= maxDate;
-    });
 
     if (visibleMilestones.length > 0) {
         ganttHtml += `
