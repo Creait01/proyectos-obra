@@ -270,7 +270,17 @@ def init_database():
                     print(f"✅ Migrados {len(tasks_to_migrate)} asignados a task_assignees")
             except Exception as e:
                 print(f"⚠️ Migración task_assignees: {e}")
-        
+
+            # Agregar columna typology a projects si no existe
+            try:
+                conn.execute(text("""
+                    ALTER TABLE projects ADD COLUMN typology VARCHAR(50)
+                """))
+                conn.commit()
+                print("✅ Columna typology agregada a projects")
+            except Exception as e:
+                pass  # Ya existe
+
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
 
@@ -590,6 +600,7 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
                 "coordinator_id": getattr(project, 'coordinator_id', None),
                 "leader_id": getattr(project, 'leader_id', None),
                 "supervisor_id": getattr(project, 'supervisor_id', None),
+                "typology": getattr(project, 'typology', None),
                 "coordinator": {"id": project.coordinator.id, "name": project.coordinator.name, "avatar_color": project.coordinator.avatar_color} if getattr(project, 'coordinator', None) else None,
                 "leader": {"id": project.leader.id, "name": project.leader.name, "avatar_color": project.leader.avatar_color} if getattr(project, 'leader', None) else None,
                 "supervisor": {"id": project.supervisor.id, "name": project.supervisor.name, "avatar_color": project.supervisor.avatar_color} if getattr(project, 'supervisor', None) else None,
@@ -616,6 +627,7 @@ async def get_projects(db: Session = Depends(get_db), current_user: User = Depen
             "coordinator_id": getattr(p, 'coordinator_id', None),
             "leader_id": getattr(p, 'leader_id', None),
             "supervisor_id": getattr(p, 'supervisor_id', None),
+            "typology": getattr(p, 'typology', None),
             "coordinator": None,
             "leader": None,
             "supervisor": None,
@@ -651,6 +663,8 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
             new_project.leader_id = project.leader_id
         if hasattr(Project, 'supervisor_id'):
             new_project.supervisor_id = project.supervisor_id
+        if hasattr(Project, 'typology'):
+            new_project.typology = project.typology
     except Exception as e:
         print(f"No se pudieron agregar campos nuevos: {e}")
     
@@ -691,6 +705,7 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db), 
         "coordinator_id": getattr(new_project, 'coordinator_id', None),
         "leader_id": getattr(new_project, 'leader_id', None),
         "supervisor_id": getattr(new_project, 'supervisor_id', None),
+        "typology": getattr(new_project, 'typology', None),
         "coordinator": None,
         "leader": None,
         "supervisor": None,
@@ -747,6 +762,7 @@ async def update_project(project_id: int, project: ProjectUpdate, db: Session = 
         "coordinator_id": getattr(db_project, 'coordinator_id', None),
         "leader_id": getattr(db_project, 'leader_id', None),
         "supervisor_id": getattr(db_project, 'supervisor_id', None),
+        "typology": getattr(db_project, 'typology', None),
         "coordinator": {"id": db_project.coordinator.id, "name": db_project.coordinator.name, "avatar_color": db_project.coordinator.avatar_color} if getattr(db_project, 'coordinator', None) else None,
         "leader": {"id": db_project.leader.id, "name": db_project.leader.name, "avatar_color": db_project.leader.avatar_color} if getattr(db_project, 'leader', None) else None,
         "supervisor": {"id": db_project.supervisor.id, "name": db_project.supervisor.name, "avatar_color": db_project.supervisor.avatar_color} if getattr(db_project, 'supervisor', None) else None,

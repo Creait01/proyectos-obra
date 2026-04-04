@@ -791,6 +791,11 @@ document.getElementById('show-inactive-projects')?.addEventListener('change', ()
     loadProjectsView();
 });
 
+// Filtro por tipología
+document.getElementById('filter-typology')?.addEventListener('change', () => {
+    loadProjectsView();
+});
+
 // Toggle para mostrar proyectos inactivos en vista de equipo
 document.getElementById('show-inactive-team-projects')?.addEventListener('change', () => {
     loadTeam();
@@ -924,8 +929,9 @@ document.getElementById('add-project-btn').addEventListener('click', async () =>
     // Poblar selectores de coordinador y líder
     populateRoleSelectors();
     
-    // Limpiar metros cuadrados
+    // Limpiar metros cuadrados y tipología
     document.getElementById('project-square-meters').value = '';
+    document.getElementById('project-typology').value = '';
     
     // Limpiar imagen
     showImagePreview(null);
@@ -951,6 +957,7 @@ async function editProject(projectId) {
     document.getElementById('project-start').value = project.start_date ? project.start_date.split('T')[0] : '';
     document.getElementById('project-end').value = project.end_date ? project.end_date.split('T')[0] : '';
     document.getElementById('project-square-meters').value = project.square_meters || '';
+    document.getElementById('project-typology').value = project.typology || '';
     document.getElementById('project-color').value = project.color;
     document.getElementById('project-active').checked = project.is_active !== false;
     document.getElementById('project-active').disabled = !(currentUser && currentUser.is_admin);
@@ -1001,6 +1008,7 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     const coordinatorId = document.getElementById('project-coordinator').value;
     const leaderId = document.getElementById('project-leader').value;
     const supervisorId = document.getElementById('project-supervisor').value;
+    const typology = document.getElementById('project-typology').value;
     
     // Validar que las etapas sumen 100% si hay etapas
     if (stagesToSave.length > 0) {
@@ -1022,6 +1030,7 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
         coordinator_id: coordinatorId ? parseInt(coordinatorId) : null,
         leader_id: leaderId ? parseInt(leaderId) : null,
         supervisor_id: supervisorId ? parseInt(supervisorId) : null,
+        typology: typology || null,
         member_ids: memberIds
     };
     
@@ -2587,13 +2596,32 @@ async function loadTeam() {
 }
 
 // ===================== PROJECTS VIEW =====================
+const TYPOLOGY_LABELS = {
+    residencial: 'Residencial',
+    comercial_corporativo: 'Comercial Corporativo',
+    comercial_residencial: 'Comercial Residencial',
+    deportivo: 'Deportivo',
+    hospitalario: 'Hospitalario',
+    otros: 'Otros'
+};
+
+function getTypologyLabel(typology) {
+    return TYPOLOGY_LABELS[typology] || typology || 'Sin especificar';
+}
+
 async function loadProjectsView() {
     const grid = document.getElementById('projects-grid');
     if (!grid) return;
     
     // Filtrar por activos/inactivos
     const showInactive = document.getElementById('show-inactive-projects')?.checked || false;
-    const filteredProjects = projects.filter(p => showInactive ? !p.is_active : p.is_active !== false);
+    const typologyFilter = document.getElementById('filter-typology')?.value || '';
+    let filteredProjects = projects.filter(p => showInactive ? !p.is_active : p.is_active !== false);
+
+    // Filtrar por tipología
+    if (typologyFilter) {
+        filteredProjects = filteredProjects.filter(p => p.typology === typologyFilter);
+    }
     
     // Ordenar por código/nombre
     filteredProjects.sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
@@ -2686,6 +2714,12 @@ async function loadProjectsView() {
                         <i class="fas fa-ruler-combined"></i>
                         <span>${project.square_meters ? project.square_meters.toLocaleString() + ' m²' : 'No especificado'}</span>
                     </div>
+                    ${project.typology ? `
+                    <div class="project-info-item">
+                        <i class="fas fa-building"></i>
+                        <span class="typology-badge typology-${project.typology}">${getTypologyLabel(project.typology)}</span>
+                    </div>
+                    ` : ''}
                     <div class="project-info-item">
                         <i class="fas fa-calendar-alt"></i>
                         <span>${startDate} - ${endDate}</span>
