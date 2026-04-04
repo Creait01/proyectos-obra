@@ -2545,6 +2545,13 @@ body {
     font-weight: 500;
 }
 
+.filter-group label.toggle-switch {
+    display: flex;
+    margin-bottom: 0;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
 .filter-group .select-styled {
     width: 100%;
     font-size: 0.85rem;
