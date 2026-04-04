@@ -2490,7 +2490,7 @@ body {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    background: var(--bg-card);
+    background: #1a1a2e;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     min-width: 280px;
