@@ -2057,13 +2057,15 @@ function renderGantt() {
         taskRows.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-hand-pointer" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>Selecciona un proyecto para ver las tareas</div>';
         return;
     }
-    
-    if (tasks.length === 0) {
+
+    const hasMilestones = milestones && milestones.length > 0;
+
+    if (tasks.length === 0 && !hasMilestones) {
         taskRows.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-tasks" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>Este proyecto no tiene tareas</div>';
         return;
     }
-    
-    if (tasksWithDates.length === 0) {
+
+    if (tasksWithDates.length === 0 && !hasMilestones) {
         taskRows.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-calendar-plus" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>Las tareas necesitan fechas para mostrar el Gantt</div>';
         return;
     }
@@ -2076,7 +2078,12 @@ function renderGantt() {
         return taskEnd >= minDate && taskStart <= maxDate;
     });
     
-    if (visibleTasks.length === 0) {
+    const hasVisibleMilestones = hasMilestones && milestones.some(m => {
+        const mDate = new Date(m.date);
+        return mDate >= minDate && mDate <= maxDate;
+    });
+
+    if (visibleTasks.length === 0 && !hasVisibleMilestones) {
         taskRows.innerHTML = `<div style="padding: 40px; text-align: center; color: var(--text-muted);"><i class="fas fa-calendar-alt" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>No hay tareas en ${monthNames[selectedMonth]} ${selectedYear}</div>`;
         return;
     }
