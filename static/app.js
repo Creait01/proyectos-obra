@@ -977,7 +977,10 @@ document.getElementById('add-project-btn').addEventListener('click', async () =>
     document.getElementById('project-square-meters').value = '';
     document.getElementById('project-typology').value = '';
     document.getElementById('project-work-modality').value = '';
-    
+    document.getElementById('perm-estudio-suelo').checked = false;
+    document.getElementById('perm-levantamiento-topografico').checked = false;
+    document.getElementById('perm-variables-urbanas').checked = false;
+
     // Limpiar imagen
     showImagePreview(null);
     document.getElementById('project-image-input').value = '';
@@ -1004,6 +1007,9 @@ async function editProject(projectId) {
     document.getElementById('project-square-meters').value = project.square_meters || '';
     document.getElementById('project-typology').value = project.typology || '';
     document.getElementById('project-work-modality').value = project.work_modality || '';
+    document.getElementById('perm-estudio-suelo').checked = project.perm_estudio_suelo || false;
+    document.getElementById('perm-levantamiento-topografico').checked = project.perm_levantamiento_topografico || false;
+    document.getElementById('perm-variables-urbanas').checked = project.perm_variables_urbanas || false;
     document.getElementById('project-color').value = project.color;
     document.getElementById('project-active').checked = project.is_active !== false;
     document.getElementById('project-active').disabled = !(currentUser && currentUser.is_admin);
@@ -1056,6 +1062,9 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
     const supervisorId = document.getElementById('project-supervisor').value;
     const typology = document.getElementById('project-typology').value;
     const workModality = document.getElementById('project-work-modality').value;
+    const permEstudioSuelo = document.getElementById('perm-estudio-suelo').checked;
+    const permLevantamientoTopografico = document.getElementById('perm-levantamiento-topografico').checked;
+    const permVariablesUrbanas = document.getElementById('perm-variables-urbanas').checked;
     
     // Validar que las etapas sumen 100% si hay etapas
     if (stagesToSave.length > 0) {
@@ -1079,6 +1088,9 @@ document.getElementById('project-form').addEventListener('submit', async (e) => 
         supervisor_id: supervisorId ? parseInt(supervisorId) : null,
         typology: typology || null,
         work_modality: workModality || null,
+        perm_estudio_suelo: permEstudioSuelo,
+        perm_levantamiento_topografico: permLevantamientoTopografico,
+        perm_variables_urbanas: permVariablesUrbanas,
         member_ids: memberIds
     };
     
@@ -2862,6 +2874,12 @@ async function loadProjectsView() {
                 <div class="project-card-typology">
                     <span class="typology-badge typology-${project.typology || 'none'}"><i class="fas fa-building"></i> ${getTypologyLabel(project.typology)}</span>
                     <span class="modality-badge modality-${project.work_modality || 'none'}"><i class="fas fa-briefcase"></i> ${getModalityLabel(project.work_modality)}</span>
+                </div>
+
+                <div class="project-card-permisologia">
+                    <span class="perm-badge ${project.perm_estudio_suelo ? 'perm-active' : 'perm-inactive'}"><i class="fas ${project.perm_estudio_suelo ? 'fa-check-circle' : 'fa-times-circle'}"></i> Estudio de suelo</span>
+                    <span class="perm-badge ${project.perm_levantamiento_topografico ? 'perm-active' : 'perm-inactive'}"><i class="fas ${project.perm_levantamiento_topografico ? 'fa-check-circle' : 'fa-times-circle'}"></i> Lev. topográfico</span>
+                    <span class="perm-badge ${project.perm_variables_urbanas ? 'perm-active' : 'perm-inactive'}"><i class="fas ${project.perm_variables_urbanas ? 'fa-check-circle' : 'fa-times-circle'}"></i> Variables urbanas</span>
                 </div>
 
                 <div class="project-card-roles">

@@ -59,6 +59,9 @@ class ProjectBase(BaseModel):
     supervisor_id: Optional[int] = None
     typology: Optional[str] = None
     work_modality: Optional[str] = None
+    perm_estudio_suelo: Optional[bool] = False
+    perm_levantamiento_topografico: Optional[bool] = False
+    perm_variables_urbanas: Optional[bool] = False
 
 class ProjectCreate(ProjectBase):
     pass
@@ -77,6 +80,9 @@ class ProjectUpdate(BaseModel):
     supervisor_id: Optional[int] = None
     typology: Optional[str] = None
     work_modality: Optional[str] = None
+    perm_estudio_suelo: Optional[bool] = None
+    perm_levantamiento_topografico: Optional[bool] = None
+    perm_variables_urbanas: Optional[bool] = None
     member_ids: Optional[List[int]] = None  # Lista de IDs de usuarios miembros
 
 class ProjectMemberResponse(BaseModel):

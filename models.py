@@ -45,6 +45,10 @@ class Project(Base):
     supervisor_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Supervisor de proyecto
     typology = Column(String(50), nullable=True)  # Tipología: residencial, comercial_corporativo, etc.
     work_modality = Column(String(50), nullable=True)  # Modalidad: anteproyecto, proyecto, probono, etc.
+    # Permisología
+    perm_estudio_suelo = Column(Boolean, default=False)
+    perm_levantamiento_topografico = Column(Boolean, default=False)
+    perm_variables_urbanas = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
