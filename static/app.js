@@ -2258,8 +2258,8 @@ function renderGantt() {
     let ganttHtml = '';
 
     // ===== RENDERIZAR GRUPO DE HITOS =====
-    const MILESTONE_TYPE_ICONS = { meeting: '🤝', change: '🔄', blueprint: '📐', other: '📌' };
-    const MILESTONE_TYPE_LABELS = { meeting: 'Reunión', change: 'Cambio', blueprint: 'Plano', other: 'Otro' };
+    const MILESTONE_TYPE_ICONS = { meeting: '🤝', change: '🔄', blueprint: '📐', team: '👥', other: '📌' };
+    const MILESTONE_TYPE_LABELS = { meeting: 'Reunión', change: 'Cambio', blueprint: 'Plano', team: 'Equipo', other: 'Otro' };
 
     console.log('Milestones para renderizar:', milestones, 'minDate:', minDate, 'maxDate:', maxDate);
 
@@ -4271,6 +4271,12 @@ function openMilestoneModal(milestoneId = null) {
     document.getElementById('milestone-type').value = 'meeting';
     document.getElementById('milestone-description').value = '';
 
+    // Reset pending files for create mode
+    window._pendingMilestoneFiles = [];
+
+    // Always show attachments section
+    attachmentsSection.style.display = 'block';
+
     if (milestoneId) {
         // Edit mode
         const milestone = milestones.find(m => m.id === milestoneId);
@@ -4285,22 +4291,22 @@ function openMilestoneModal(milestoneId = null) {
         document.getElementById('milestone-type').value = milestone.milestone_type;
         document.getElementById('milestone-description').value = milestone.description || '';
 
-        // Show delete button and attachments for admin
+        // Show delete button for admin
         if (currentUser && currentUser.is_admin) {
             deleteBtn.style.display = 'inline-flex';
         } else {
             deleteBtn.style.display = 'none';
         }
-        attachmentsSection.style.display = 'block';
         renderMilestoneAttachments(milestone.attachments || []);
     } else {
         // Create mode
         titleEl.innerHTML = '<i class="fas fa-diamond"></i> Nuevo Hito';
         deleteBtn.style.display = 'none';
-        attachmentsSection.style.display = 'none';
         // Default date to today
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('milestone-date').value = today;
+        // Show empty pending files list
+        renderPendingMilestoneFiles();
     }
 
     modal.classList.add('active');
@@ -4333,10 +4339,18 @@ async function saveMilestone() {
             });
             showToast('Hito actualizado', 'success');
         } else {
-            await apiRequest(`/api/projects/${currentProject.id}/milestones`, {
+            const created = await apiRequest(`/api/projects/${currentProject.id}/milestones`, {
                 method: 'POST',
                 body: JSON.stringify(data)
             });
+            // Upload pending files after creation
+            const pendingFiles = window._pendingMilestoneFiles || [];
+            if (pendingFiles.length > 0 && created && created.id) {
+                for (const file of pendingFiles) {
+                    await uploadMilestoneAttachment(created.id, file);
+                }
+                window._pendingMilestoneFiles = [];
+            }
             showToast('Hito creado', 'success');
         }
         document.getElementById('milestone-modal').classList.remove('active');
@@ -4442,14 +4456,49 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!file) return;
             const milestoneId = document.getElementById('milestone-id').value;
             if (!milestoneId) {
-                showToast('Guarda el hito primero para adjuntar archivos', 'warning');
-                return;
+                // Create mode: store file in pending list
+                if (!window._pendingMilestoneFiles) window._pendingMilestoneFiles = [];
+                window._pendingMilestoneFiles.push(file);
+                renderPendingMilestoneFiles();
+                showToast('Archivo agregado, se subirá al guardar el hito', 'info');
+            } else {
+                // Edit mode: upload immediately
+                uploadMilestoneAttachment(parseInt(milestoneId), file);
             }
-            uploadMilestoneAttachment(parseInt(milestoneId), file);
             fileInput.value = ''; // Reset input
         });
     }
 });
+
+function renderPendingMilestoneFiles() {
+    const list = document.getElementById('milestone-attachments-list');
+    const pendingFiles = window._pendingMilestoneFiles || [];
+    if (pendingFiles.length === 0) {
+        list.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 8px 0;">Sin archivos adjuntos</div>';
+        return;
+    }
+    list.innerHTML = pendingFiles.map((file, index) => {
+        const isImage = file.type && file.type.startsWith('image/');
+        const icon = isImage ? 'fa-image' : file.type && file.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file';
+        return `
+            <div class="milestone-attachment-item">
+                <i class="fas ${icon} attachment-icon"></i>
+                <span class="attachment-name" title="${file.name}">${file.name}</span>
+                <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 4px;">(pendiente)</span>
+                <button class="btn-icon btn-delete-attachment" onclick="removePendingMilestoneFile(${index})" title="Quitar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+function removePendingMilestoneFile(index) {
+    if (window._pendingMilestoneFiles) {
+        window._pendingMilestoneFiles.splice(index, 1);
+        renderPendingMilestoneFiles();
+    }
+}
 
 // Recalcular Gantt cuando cambie el tamaño de la ventana
 let resizeTimeout;
