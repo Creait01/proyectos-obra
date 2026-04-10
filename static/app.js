@@ -805,6 +805,20 @@ document.getElementById('filter-modality')?.addEventListener('change', () => {
     loadProjectsView();
 });
 
+// Filtros de permisología
+document.getElementById('filter-perm-suelo')?.addEventListener('change', () => {
+    updateFilterCount();
+    loadProjectsView();
+});
+document.getElementById('filter-perm-topografico')?.addEventListener('change', () => {
+    updateFilterCount();
+    loadProjectsView();
+});
+document.getElementById('filter-perm-urbanas')?.addEventListener('change', () => {
+    updateFilterCount();
+    loadProjectsView();
+});
+
 // Toggle panel de filtros
 document.getElementById('projects-filter-btn')?.addEventListener('click', () => {
     const panel = document.getElementById('projects-filter-panel');
@@ -825,6 +839,9 @@ document.getElementById('clear-all-filters')?.addEventListener('click', () => {
     document.getElementById('filter-typology').value = '';
     document.getElementById('filter-modality').value = '';
     document.getElementById('show-inactive-projects').checked = false;
+    document.getElementById('filter-perm-suelo').checked = false;
+    document.getElementById('filter-perm-topografico').checked = false;
+    document.getElementById('filter-perm-urbanas').checked = false;
     updateFilterCount();
     loadProjectsView();
 });
@@ -832,7 +849,10 @@ document.getElementById('clear-all-filters')?.addEventListener('click', () => {
 function updateFilterCount() {
     const count = (document.getElementById('filter-typology')?.value ? 1 : 0)
         + (document.getElementById('filter-modality')?.value ? 1 : 0)
-        + (document.getElementById('show-inactive-projects')?.checked ? 1 : 0);
+        + (document.getElementById('show-inactive-projects')?.checked ? 1 : 0)
+        + (document.getElementById('filter-perm-suelo')?.checked ? 1 : 0)
+        + (document.getElementById('filter-perm-topografico')?.checked ? 1 : 0)
+        + (document.getElementById('filter-perm-urbanas')?.checked ? 1 : 0);
     const badge = document.getElementById('filter-active-count');
     if (badge) {
         badge.textContent = count;
@@ -2772,6 +2792,20 @@ async function loadProjectsView() {
     // Filtrar por modalidad
     if (modalityFilter) {
         filteredProjects = filteredProjects.filter(p => p.work_modality === modalityFilter);
+    }
+
+    // Filtrar por permisología
+    const filterPermSuelo = document.getElementById('filter-perm-suelo')?.checked || false;
+    const filterPermTopografico = document.getElementById('filter-perm-topografico')?.checked || false;
+    const filterPermUrbanas = document.getElementById('filter-perm-urbanas')?.checked || false;
+    if (filterPermSuelo) {
+        filteredProjects = filteredProjects.filter(p => p.perm_estudio_suelo);
+    }
+    if (filterPermTopografico) {
+        filteredProjects = filteredProjects.filter(p => p.perm_levantamiento_topografico);
+    }
+    if (filterPermUrbanas) {
+        filteredProjects = filteredProjects.filter(p => p.perm_variables_urbanas);
     }
     
     // Ordenar por código/nombre
