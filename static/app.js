@@ -2913,7 +2913,7 @@ async function loadProjectsView() {
                 <div class="project-card-permisologia">
                     <span class="perm-badge ${project.perm_estudio_suelo ? 'perm-active' : 'perm-inactive'}"><i class="fas ${project.perm_estudio_suelo ? 'fa-check-circle' : 'fa-times-circle'}"></i> Estudio de suelo</span>
                     <span class="perm-badge ${project.perm_levantamiento_topografico ? 'perm-active' : 'perm-inactive'}"><i class="fas ${project.perm_levantamiento_topografico ? 'fa-check-circle' : 'fa-times-circle'}"></i> Lev. topográfico</span>
-                    <span class="perm-badge ${project.perm_variables_urbanas ? 'perm-active' : 'perm-inactive'}"><i class="fas ${project.perm_variables_urbanas ? 'fa-check-circle' : 'fa-times-circle'}"></i> Variables urbanas</span>
+                    <span class="perm-badge ${project.perm_variables_urbanas ? 'perm-active' : 'perm-inactive'}"><i class="fas ${project.perm_variables_urbanas ? 'fa-check-circle' : 'fa-times-circle'}"></i> Permisología</span>
                 </div>
 
                 <div class="project-card-roles">
