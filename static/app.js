@@ -1,4 +1,4 @@
-// ===================== STATE =====================
+﻿// ===================== STATE =====================
 let currentUser = null;
 let currentProject = null;
 let projects = [];
@@ -268,22 +268,13 @@ function initSidebarToggle() {
     const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
     if (isCollapsed) {
         sidebar.classList.add('collapsed');
-        toggleBtn.querySelector('i').classList.remove('fa-angles-left');
-        toggleBtn.querySelector('i').classList.add('fa-angles-right');
     }
 
     toggleBtn.addEventListener('click', () => {
         sidebar.classList.toggle('collapsed');
         const collapsedNow = sidebar.classList.contains('collapsed');
         localStorage.setItem('sidebar-collapsed', collapsedNow ? 'true' : 'false');
-        const icon = toggleBtn.querySelector('i');
-        if (collapsedNow) {
-            icon.classList.remove('fa-angles-left');
-            icon.classList.add('fa-angles-right');
-        } else {
-            icon.classList.remove('fa-angles-right');
-            icon.classList.add('fa-angles-left');
-        }
+        toggleBtn.setAttribute('title', collapsedNow ? 'Expandir' : 'Contraer');
     });
 }
 
@@ -319,6 +310,7 @@ function setupAdminUI() {
             const adminAllUsers = document.getElementById('admin-all-users');
             const adminTemplates = document.getElementById('admin-templates');
             const adminTeams = document.getElementById('admin-teams');
+            const adminReports = document.getElementById('admin-reports');
             
             console.log('Elementos encontrados:', {
                 pending: !!adminPending,
@@ -331,6 +323,7 @@ function setupAdminUI() {
             adminAllUsers?.classList.toggle('hidden', tabName !== 'all-users');
             adminTemplates?.classList.toggle('hidden', tabName !== 'templates');
             adminTeams?.classList.toggle('hidden', tabName !== 'teams');
+            adminReports?.classList.toggle('hidden', tabName !== 'reports');
             
             if (tabName === 'pending') {
                 loadPendingUsers();
@@ -341,6 +334,8 @@ function setupAdminUI() {
                 loadTemplates();
             } else if (tabName === 'teams') {
                 loadAdminTeams();
+            } else if (tabName === 'reports') {
+                loadReportsPanel();
             }
         });
     });
@@ -391,6 +386,7 @@ function switchView(view) {
         'my-tasks': 'Mis Tareas',
         'projects': 'Proyectos',
         'team': 'Equipo',
+        'supervision': 'Supervisión',
         'admin': 'Administración'
     };
     document.getElementById('page-title').textContent = titles[view] || view;
@@ -400,6 +396,7 @@ function switchView(view) {
     if (view === 'team') loadTeam();
     if (view === 'gantt') renderGantt();
     if (view === 'admin') loadPendingUsers();
+    if (view === 'supervision') renderSupervisionView();
 }
 
 // ===================== PROJECTS =====================
@@ -1409,7 +1406,54 @@ async function handleDrop(e) {
 }
 
 // ===================== TASK MODAL =====================
-document.getElementById('add-task-btn').addEventListener('click', () => {
+async function populateTaskSupGruposChips(selectedComprasIds = [], selectedServiciosIds = []) {
+    const projectId = currentProject?.id;
+    if (!projectId) return;
+
+    const comprasContainer = document.getElementById('task-sup-compras-chips');
+    const serviciosContainer = document.getElementById('task-sup-servicios-chips');
+    if (!comprasContainer || !serviciosContainer) return;
+
+    // Mostrar loading mientras se cargan
+    comprasContainer.innerHTML = '<span style="color:var(--text-muted);font-size:11px">Cargando...</span>';
+    serviciosContainer.innerHTML = '<span style="color:var(--text-muted);font-size:11px">Cargando...</span>';
+
+    let comprasGrupos = [];
+    let serviciosGrupos = [];
+
+    try {
+        const [c, s] = await Promise.all([
+            apiRequest(`/api/supervision/${projectId}/compras`),
+            apiRequest(`/api/supervision/${projectId}/servicios`),
+        ]);
+        comprasGrupos = c || [];
+        serviciosGrupos = s || [];
+    } catch (err) {
+        console.warn('No se pudieron cargar grupos de supervisión:', err);
+    }
+
+    if (comprasGrupos.length) {
+        comprasContainer.innerHTML = comprasGrupos.map(g => `
+            <div class="assignee-chip ${selectedComprasIds.includes(g.id) ? 'selected' : ''}" data-grupo-id="${g.id}" style="cursor:pointer" onclick="this.classList.toggle('selected')">
+                <i class="fas fa-box" style="font-size:9px;opacity:.7"></i>
+                <span class="assignee-chip-name">${escapeHtml(g.nombre)}</span>
+            </div>`).join('');
+    } else {
+        comprasContainer.innerHTML = '<span style="color:var(--text-muted);font-size:11px">Sin grupos de compras</span>';
+    }
+
+    if (serviciosGrupos.length) {
+        serviciosContainer.innerHTML = serviciosGrupos.map(g => `
+            <div class="assignee-chip ${selectedServiciosIds.includes(g.id) ? 'selected' : ''}" data-grupo-id="${g.id}" style="cursor:pointer" onclick="this.classList.toggle('selected')">
+                <i class="fas fa-handshake" style="font-size:9px;opacity:.7"></i>
+                <span class="assignee-chip-name">${escapeHtml(g.nombre)}</span>
+            </div>`).join('');
+    } else {
+        serviciosContainer.innerHTML = '<span style="color:var(--text-muted);font-size:11px">Sin grupos de servicios</span>';
+    }
+}
+
+document.getElementById('add-task-btn').addEventListener('click', async () => {
     if (!currentProject) {
         showToast('Selecciona un proyecto primero', 'warning');
         return;
@@ -1444,6 +1488,7 @@ document.getElementById('add-task-btn').addEventListener('click', () => {
     
     updateAssigneeSelect();
     updateStageSelect();
+    await populateTaskSupGruposChips([], []);
     openModal('task-modal');
 });
 
@@ -1486,7 +1531,7 @@ function updateAssigneeSelect() {
     });
 }
 
-function openTaskModal(taskId) {
+async function openTaskModal(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
@@ -1548,6 +1593,12 @@ function openTaskModal(taskId) {
     if (submitBtn) {
         submitBtn.style.display = (isAdmin || isLeader || canEdit) ? 'block' : 'none';
     }
+
+    // Cargar chips de supervisión con los grupos ya vinculados
+    await populateTaskSupGruposChips(
+        task.sup_compras_grupo_ids || [],
+        task.sup_servicios_grupo_ids || []
+    );
     
     openModal('task-modal');
 }
@@ -1584,7 +1635,9 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
             stage_id: stageValue ? parseInt(stageValue) : null,
             start_date: startDateValue ? new Date(startDateValue).toISOString() : null,
             due_date: dueDateValue ? new Date(dueDateValue).toISOString() : null,
-            progress: parseInt(document.getElementById('task-progress').value) || 0
+            progress: parseInt(document.getElementById('task-progress').value) || 0,
+            sup_compras_grupo_ids: _getSelectedExtraGrupoIds('task-sup-compras-chips'),
+            sup_servicios_grupo_ids: _getSelectedExtraGrupoIds('task-sup-servicios-chips'),
         };
     } else {
         // Usuario normal solo puede enviar: estado, descripción, progreso, etapa
@@ -1594,7 +1647,9 @@ document.getElementById('task-form').addEventListener('submit', async (e) => {
             status: document.getElementById('task-status').value,
             description: document.getElementById('task-description').value || null,
             progress: parseInt(document.getElementById('task-progress').value) || 0,
-            stage_id: stageValue ? parseInt(stageValue) : null
+            stage_id: stageValue ? parseInt(stageValue) : null,
+            sup_compras_grupo_ids: _getSelectedExtraGrupoIds('task-sup-compras-chips'),
+            sup_servicios_grupo_ids: _getSelectedExtraGrupoIds('task-sup-servicios-chips'),
         };
     }
     
@@ -3611,7 +3666,7 @@ document.getElementById('gantt-today').addEventListener('click', () => {
 });
 
 // Botón para agregar nueva actividad desde Gantt
-document.getElementById('gantt-add-task')?.addEventListener('click', () => {
+document.getElementById('gantt-add-task')?.addEventListener('click', async () => {
     // Verificar si hay un proyecto seleccionado en el Gantt
     const ganttProjectSelect = document.getElementById('gantt-project-select');
     const selectedProjectId = ganttProjectSelect?.value;
@@ -3658,10 +3713,12 @@ document.getElementById('gantt-add-task')?.addEventListener('click', () => {
     
     updateAssigneeSelect();
     updateStageSelect();
+    // Mostrar botón guardar (admin ya verificado arriba)
+    const saveBtn = document.getElementById('save-task-btn');
+    if (saveBtn) saveBtn.style.display = 'block';
+    await populateTaskSupGruposChips([], []);
     openModal('task-modal');
 });
-
-// Habilitar scroll horizontal con shift+wheel o directamente con wheel
 document.querySelector('.gantt-container')?.addEventListener('wheel', (e) => {
     const container = e.currentTarget;
     // Permitir scroll horizontal siempre (con o sin Shift)
@@ -3684,6 +3741,8 @@ async function loadTemplates() {
         console.log('Plantillas de tareas:', taskTemplates);
         renderStageTemplates();
         renderTaskTemplates();
+        // Plantillas de supervisión
+        await loadSupTemplates();
     } catch (error) {
         console.error('Error loading templates:', error);
         // Mostrar mensaje de error en la UI
@@ -4245,6 +4304,320 @@ async function removeTeamMember(adminId, memberId) {
     }
 }
 
+// ===================== PLANTILLAS DE SUPERVISIÓN =====================
+let supTemplates = [];
+let supTemplateFilterActive = 'all';
+let applySupTemplateFilterActive = 'all';
+
+async function loadSupTemplates() {
+    try {
+        supTemplates = await apiRequest('/api/templates/supervision');
+    } catch (e) {
+        supTemplates = [];
+    }
+    renderSupTemplates();
+}
+
+function renderSupTemplates() {
+    const container = document.getElementById('sup-templates-list');
+    if (!container) return;
+
+    const filtered = supTemplateFilterActive === 'all'
+        ? supTemplates
+        : supTemplates.filter(t => t.tipo === supTemplateFilterActive);
+
+    if (!filtered.length) {
+        container.innerHTML = `<div class="empty-state"><i class="fas fa-folder-open"></i><p>No hay plantillas de supervisión</p></div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(t => {
+        const isCompras = t.tipo === 'COMPRAS';
+        const badgeColor = isCompras ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'linear-gradient(135deg,#10b981,#34d399)';
+        const icon = isCompras ? 'fa-box' : 'fa-handshake';
+        return `
+        <div class="template-card">
+            <div class="template-card-header">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span style="background:${badgeColor};color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">
+                        <i class="fas ${icon}"></i> ${t.tipo}
+                    </span>
+                    <h5 style="margin:0">${escapeHtml(t.nombre)}</h5>
+                </div>
+                <div class="template-card-actions">
+                    <button class="btn-icon" onclick="openSupTemplateModal('${t.tipo}', ${t.id})" title="Editar"><i class="fas fa-edit"></i></button>
+                    <button class="btn-icon" onclick="deleteSupTemplate(${t.id})" title="Eliminar"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            ${t.descripcion ? `<p class="template-card-description">${escapeHtml(t.descripcion)}</p>` : ''}
+            <div class="template-card-items">
+                ${(t.items || []).slice(0, 4).map(i => `<span class="template-item-badge">${escapeHtml(i.actividad)}</span>`).join('')}
+                ${(t.items || []).length > 4 ? `<span class="template-item-badge">+${t.items.length - 4} más</span>` : ''}
+            </div>
+            <div class="template-card-footer">
+                <span class="template-card-meta">${(t.items || []).length} actividades</span>
+                <button class="btn btn-sm btn-primary" onclick="openApplySupTemplateModal(${t.id})">
+                    <i class="fas fa-copy"></i> Aplicar a obra
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function filterSupTemplates(tipo, btn) {
+    supTemplateFilterActive = tipo;
+    document.querySelectorAll('[data-stfilter]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderSupTemplates();
+}
+
+function filterApplySupTemplates(tipo, btn) {
+    applySupTemplateFilterActive = tipo;
+    const parent = btn.closest('.modal-body') || btn.closest('.modal-overlay');
+    parent.querySelectorAll('.sup-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderApplySupTemplateList();
+}
+
+function renderApplySupTemplateList() {
+    const container = document.getElementById('apply-sup-template-list');
+    if (!container) return;
+    const filtered = applySupTemplateFilterActive === 'all'
+        ? supTemplates
+        : supTemplates.filter(t => t.tipo === applySupTemplateFilterActive);
+
+    if (!filtered.length) {
+        container.innerHTML = `<div class="empty-state" style="padding:20px"><i class="fas fa-folder-open"></i><p>No hay plantillas</p></div>`;
+        return;
+    }
+    container.innerHTML = filtered.map(t => {
+        const isC = t.tipo === 'COMPRAS';
+        const col = isC ? '#6366f1' : '#10b981';
+        return `
+        <label class="sup-template-check-row" style="display:flex;align-items:flex-start;gap:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:10px 12px;cursor:pointer">
+            <input type="checkbox" class="apply-sup-chk" data-id="${t.id}" style="margin-top:3px;accent-color:${col}">
+            <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                    <span style="background:${col}22;color:${col};border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">${t.tipo}</span>
+                    <span style="font-weight:600;font-size:13px">${escapeHtml(t.nombre)}</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted)">${(t.items||[]).length} actividades${t.descripcion ? ' · ' + escapeHtml(t.descripcion.substring(0,60)) : ''}</div>
+            </div>
+        </label>`;
+    }).join('');
+}
+
+async function openSupTemplateModal(tipo, editId = null) {
+    // Reset
+    document.getElementById('sup-template-id').value = editId || '';
+    document.getElementById('sup-template-tipo').value = tipo;
+    document.getElementById('sup-template-items').innerHTML = '';
+
+    const isCompras = tipo === 'COMPRAS';
+    const color = isCompras ? '#6366f1' : '#10b981';
+    const icon  = isCompras ? 'fa-box' : 'fa-handshake';
+    document.getElementById('sup-template-modal-title').innerHTML =
+        `<i class="fas fa-clipboard-check"></i> Plantilla de ${isCompras ? 'Compras' : 'Servicios'}`;
+    document.getElementById('sup-template-tipo-badge').innerHTML =
+        `<span style="background:${color};color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:700"><i class="fas ${icon}"></i> ${tipo}</span>`;
+
+    if (editId) {
+        const t = supTemplates.find(x => x.id === editId);
+        if (t) {
+            document.getElementById('sup-template-nombre').value = t.nombre;
+            document.getElementById('sup-template-desc').value = t.descripcion || '';
+            (t.items || []).forEach(item => addSupTemplateItem(item.actividad, item.prioridad));
+        }
+    } else {
+        document.getElementById('sup-template-nombre').value = '';
+        document.getElementById('sup-template-desc').value = '';
+        addSupTemplateItem();
+    }
+    document.getElementById('sup-template-modal').classList.add('active');
+}
+
+function addSupTemplateItem(actividad = '', prioridad = 3) {
+    const container = document.getElementById('sup-template-items');
+    const row = document.createElement('div');
+    row.className = 'template-item-row';
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px';
+    row.innerHTML = `
+        <input type="text" placeholder="Nombre de la actividad" class="sup-item-actividad"
+               value="${escapeHtml(actividad)}" required style="flex:1">
+        <select class="sup-item-prioridad" style="width:90px;font-size:12px">
+            ${[1,2,3,4,5].map(n => `<option value="${n}"${n==prioridad?' selected':''}>${n===1?'Urgente':n===5?'Baja':n}</option>`).join('')}
+        </select>
+        <button type="button" class="btn-icon" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+    `;
+    container.appendChild(row);
+}
+
+document.getElementById('sup-template-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id   = document.getElementById('sup-template-id').value;
+    const tipo = document.getElementById('sup-template-tipo').value;
+    const nombre = document.getElementById('sup-template-nombre').value.trim();
+    const descripcion = document.getElementById('sup-template-desc').value.trim();
+    const items = [];
+    document.querySelectorAll('#sup-template-items .template-item-row').forEach((row, idx) => {
+        const actividad = row.querySelector('.sup-item-actividad').value.trim();
+        const prioridad = parseInt(row.querySelector('.sup-item-prioridad').value);
+        if (actividad) items.push({ actividad, prioridad, position: idx });
+    });
+    if (!nombre) { showToast('El nombre es obligatorio', 'warning'); return; }
+    if (!items.length) { showToast('Agrega al menos una actividad', 'warning'); return; }
+
+    try {
+        const payload = { nombre, tipo, descripcion, items };
+        if (id) {
+            await apiRequest(`/api/templates/supervision/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        } else {
+            await apiRequest('/api/templates/supervision', { method: 'POST', body: JSON.stringify(payload) });
+        }
+        showToast(id ? 'Plantilla actualizada' : 'Plantilla creada', 'success');
+        document.getElementById('sup-template-modal').classList.remove('active');
+        await loadSupTemplates();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+});
+
+async function deleteSupTemplate(id) {
+    if (!confirm('¿Eliminar esta plantilla de supervisión?')) return;
+    try {
+        await apiRequest(`/api/templates/supervision/${id}`, { method: 'DELETE' });
+        showToast('Plantilla eliminada', 'success');
+        await loadSupTemplates();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+// -- Aplicar plantillas a proyecto --
+async function openApplySupTemplateModal(preSelectId = null) {
+    // Cargar plantillas si no están
+    if (!supTemplates.length) await loadSupTemplates();
+
+    // Poblar selector de proyectos
+    const sel = document.getElementById('apply-sup-project');
+    try {
+        const projs = await apiRequest('/api/projects');
+        sel.innerHTML = '<option value="">Seleccionar proyecto…</option>' +
+            projs.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+        // Pre-seleccionar proyecto actual de supervisión
+        if (supCurrentProject) sel.value = supCurrentProject;
+    } catch (e) { /* ignore */ }
+
+    applySupTemplateFilterActive = 'all';
+    // Reset filter pills UI
+    document.querySelectorAll('#apply-sup-template-modal .sup-pill').forEach((b, i) => {
+        b.classList.toggle('active', i === 0);
+    });
+    renderApplySupTemplateList();
+
+    // Pre-seleccionar si viene de un template específico
+    if (preSelectId) {
+        setTimeout(() => {
+            const chk = document.querySelector(`#apply-sup-template-list .apply-sup-chk[data-id="${preSelectId}"]`);
+            if (chk) chk.checked = true;
+        }, 50);
+    }
+
+    document.getElementById('apply-sup-template-modal').classList.add('active');
+}
+
+async function applySelectedSupTemplates() {
+    const projectId = document.getElementById('apply-sup-project').value;
+    if (!projectId) { showToast('Selecciona un proyecto', 'warning'); return; }
+
+    const checked = [...document.querySelectorAll('#apply-sup-template-list .apply-sup-chk:checked')];
+    if (!checked.length) { showToast('Selecciona al menos una plantilla', 'warning'); return; }
+
+    let ok = 0, fail = 0;
+    for (const chk of checked) {
+        try {
+            await apiRequest(`/api/projects/${projectId}/apply-sup-template/${chk.dataset.id}`, { method: 'POST' });
+            ok++;
+        } catch (e) { fail++; }
+    }
+
+    if (ok) showToast(`${ok} categoría(s) aplicada(s) al proyecto`, 'success');
+    if (fail) showToast(`${fail} no pudieron aplicarse`, 'error');
+
+    document.getElementById('apply-sup-template-modal').classList.remove('active');
+
+    // Recargar supervisión si el proyecto activo es el mismo
+    if (supCurrentProject && parseInt(projectId) === supCurrentProject) {
+        await supLoadProject(supCurrentProject);
+    }
+}
+
+// ===================== REPORTES PDF =====================
+async function downloadPendingTasksReport() {
+    const projectId = document.getElementById('report-project-filter')?.value || '';
+    const userId = document.getElementById('report-user-filter')?.value || '';
+    let url = `/api/reports/pending-tasks-pdf`;
+    const params = [];
+    if (projectId) params.push('project_id=' + projectId);
+    if (userId) params.push('user_id=' + userId);
+    if (params.length) url += '?' + params.join('&');
+    try {
+        showToast('Generando PDF…', 'info');
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (!response.ok) throw new Error('Error generando reporte');
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `tareas_pendientes_${new Date().toISOString().slice(0,10)}.pdf`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        showToast('PDF descargado', 'success');
+    } catch (err) {
+        showToast('Error al generar el reporte', 'error');
+    }
+}
+
+async function downloadMyTasksReport() {
+    if (!currentUser) return;
+    const url = `/api/reports/pending-tasks-pdf?user_id=${currentUser.id}`;
+    try {
+        showToast('Generando PDF…', 'info');
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (!response.ok) throw new Error('Error generando reporte');
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `mis_tareas_pendientes_${new Date().toISOString().slice(0,10)}.pdf`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        showToast('PDF descargado', 'success');
+    } catch (err) {
+        showToast('Error al generar el reporte', 'error');
+    }
+}
+
+async function loadReportsPanel() {
+    // Poblar selector de proyectos en reportes
+    const sel = document.getElementById('report-project-filter');
+    const selUser = document.getElementById('report-user-filter');
+    try {
+        if (sel) {
+            const projs = await apiRequest('/api/projects');
+            sel.innerHTML = '<option value="">Todas las obras</option>' +
+                projs.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+        }
+        if (selUser) {
+            const users = await apiRequest('/api/users');
+            selUser.innerHTML = '<option value="">Todos los usuarios</option>' +
+                users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+        }
+    } catch (e) { /* ignore */ }
+}
+
 // ===================== EXPONER FUNCIONES GLOBALES =====================
 // Exponer funciones para onclick en HTML
 window.openStageTemplateModal = openStageTemplateModal;
@@ -4274,6 +4647,17 @@ window.updateTempStage = updateTempStage;
 window.applyStageTemplateToProject = applyStageTemplateToProject;
 window.openQuickTaskTemplateModal = openQuickTaskTemplateModal;
 window.toggleGanttStages = toggleGanttStages;
+// Plantillas de supervisión
+window.openSupTemplateModal = openSupTemplateModal;
+window.addSupTemplateItem = addSupTemplateItem;
+window.deleteSupTemplate = deleteSupTemplate;
+window.filterSupTemplates = filterSupTemplates;
+window.filterApplySupTemplates = filterApplySupTemplates;
+window.openApplySupTemplateModal = openApplySupTemplateModal;
+window.applySelectedSupTemplates = applySelectedSupTemplates;
+// Reportes
+window.downloadPendingTasksReport = downloadPendingTasksReport;
+window.downloadMyTasksReport = downloadMyTasksReport;
 
 // ===================== INIT ON LOAD =====================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -4563,3 +4947,1084 @@ window.addEventListener('resize', () => {
         }
     }, 250);
 });
+
+// ===================== SUPERVISIÓN =====================
+let supActiveTab = 'resumen';
+let supResumenFilter = 'all';
+let supComprasFilter = 'all';
+let supServiciosFilter = 'all';
+let supCurrentProject = null;
+
+// Loaded data
+let SUP_RESUMEN = [];
+let SUP_COMPRAS = [];
+let SUP_SERVICIOS = [];
+
+function supStatusClass(status) {
+  if (!status) return 'sin-estado';
+  const s = status.toUpperCase();
+  if (s === 'CONTRATADO') return 'contratado';
+  if (s === 'EN PROCESO') return 'en-proceso';
+  if (s === 'PENDIENTE') return 'pendiente';
+  if (s === 'ENTREGADO') return 'entregado';
+  if (s === 'APROBADO') return 'aprobado';
+  if (s === 'POR COTIZAR') return 'por-cotizar';
+  return 'sin-estado';
+}
+
+function supStatusDot(status) {
+  const map = { 'CONTRATADO': '●', 'EN PROCESO': '◐', 'PENDIENTE': '○', 'ENTREGADO': '✓', 'APROBADO': '✓', 'POR COTIZAR': '◌' };
+  return map[(status || '').toUpperCase()] || '–';
+}
+
+function supProgressClass(pct) {
+  if (pct === 0) return 'zero';
+  if (pct >= 50) return 'high';
+  if (pct >= 20) return 'medium';
+  return 'low';
+}
+
+function supPriorityClass(p) {
+  if (p === 1) return 'prio-1';
+  if (p === 2) return 'prio-2';
+  if (p === 3) return 'prio-3';
+  return 'prio-other';
+}
+
+async function supLoadGlobal() {
+  supCurrentProject = null;
+  // Mostrar dashboard global, ocultar resumen por proyecto
+  const globalDash = document.getElementById('sup-global-dashboard');
+  const projectResumen = document.getElementById('sup-project-resumen');
+  if (globalDash) globalDash.style.display = '';
+  if (projectResumen) projectResumen.style.display = 'none';
+  // Ocultar tabs de compras/servicios (no aplica para vista global)
+  document.querySelectorAll('#sup-tabs .sup-tab[data-tab="compras"], #sup-tabs .sup-tab[data-tab="servicios"]')
+    .forEach(b => b.style.display = 'none');
+  // Activar tab resumen
+  document.querySelectorAll('#sup-tabs .sup-tab').forEach(b => b.classList.remove('active'));
+  const resumenTab = document.querySelector('#sup-tabs .sup-tab[data-tab="resumen"]');
+  if (resumenTab) resumenTab.classList.add('active');
+  document.querySelectorAll('.sup-content').forEach(c => c.classList.remove('active'));
+  const resumenContent = document.getElementById('sup-resumen');
+  if (resumenContent) resumenContent.classList.add('active');
+
+  try {
+    const data = await apiRequest('/api/supervision/global/resumen');
+    renderSupGlobalDashboard(data || []);
+  } catch (e) {
+    renderSupGlobalDashboard([]);
+  }
+}
+
+function renderSupGlobalDashboard(data) {
+  // KPIs globales
+  const totalObras = data.length;
+  const totalGrupos = data.reduce((a, p) => a + p.total_grupos, 0);
+  const totalItems = data.reduce((a, p) => a + p.total_items, 0);
+  const totalAprobados = data.reduce((a, p) => a + p.aprobados, 0);
+  const totalPendientes = data.reduce((a, p) => a + p.pendientes, 0);
+  const avgAvance = totalObras ? Math.round(data.reduce((a, p) => a + p.avg_avance, 0) / totalObras) : 0;
+
+  const kpisEl = document.getElementById('sup-global-kpis');
+  if (kpisEl) {
+    const kpis = [
+      { value: totalObras,    label: 'Obras activas',    icon: 'fa-hard-hat',    color: 'linear-gradient(135deg,#6366f1,#8b5cf6)' },
+      { value: totalGrupos,   label: 'Grupos totales',   icon: 'fa-layer-group', color: 'linear-gradient(135deg,#06b6d4,#0ea5e9)' },
+      { value: totalItems,    label: 'Actividades',      icon: 'fa-list',        color: 'linear-gradient(135deg,#3b82f6,#6366f1)' },
+      { value: totalAprobados,label: 'Aprobados',        icon: 'fa-check-circle',color: 'linear-gradient(135deg,#10b981,#34d399)' },
+      { value: totalPendientes,label:'Pendientes',       icon: 'fa-clock',       color: 'linear-gradient(135deg,#ef4444,#f87171)' },
+      { value: avgAvance + '%',label:'Avance promedio',  icon: 'fa-chart-line',  color: 'linear-gradient(135deg,#f59e0b,#fbbf24)' },
+    ];
+    kpisEl.innerHTML = kpis.map(k => `
+      <div class="sup-kpi">
+        <div class="sup-kpi-icon" style="background:${k.color}"><i class="fas ${k.icon}"></i></div>
+        <div class="sup-kpi-body">
+          <span class="sup-kpi-value">${k.value}</span>
+          <span class="sup-kpi-label">${k.label}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Tabla por obra
+  const tbody = document.getElementById('sup-global-tbody');
+  if (!tbody) return;
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="sup-empty"><i class="fas fa-inbox"></i><p>No hay datos de supervisión en ninguna obra</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.map(p => {
+    const pctClass = p.avg_avance >= 80 ? 'sup-prog-high' : p.avg_avance >= 40 ? 'sup-prog-mid' : 'sup-prog-low';
+    const avColor = p.avg_avance >= 80 ? '#34d399' : p.avg_avance >= 40 ? '#fbbf24' : '#f87171';
+    return `
+      <tr style="cursor:pointer" onclick="document.getElementById('sup-project-select').value='${p.project_id}'; supLoadProject(${p.project_id})">
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${p.project_color};flex-shrink:0"></div>
+            <span style="font-weight:600">${escapeHtml(p.project_name)}</span>
+          </div>
+        </td>
+        <td style="text-align:center">
+          <span title="Compras">${p.compras_grupos}<i class="fas fa-box" style="font-size:9px;opacity:.6;margin-left:3px;color:#6366f1"></i></span>
+          <span style="color:var(--text-muted);margin:0 4px">+</span>
+          <span title="Servicios">${p.servicios_grupos}<i class="fas fa-handshake" style="font-size:9px;opacity:.6;margin-left:3px;color:#34d399"></i></span>
+        </td>
+        <td style="text-align:center;font-weight:600">${p.total_items}</td>
+        <td style="text-align:center">${p.aprobados > 0 ? `<span style="color:#34d399;font-weight:600">${p.aprobados}</span>` : '–'}</td>
+        <td style="text-align:center">${p.pendientes > 0 ? `<span style="color:#f87171;font-weight:600">${p.pendientes}</span>` : '–'}</td>
+        <td class="date-cell">${p.fecha_proxima || '–'}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="sup-avance-bar" style="flex:1;min-width:80px">
+              <div class="sup-avance-fill ${pctClass}" style="width:${p.avg_avance}%"></div>
+            </div>
+            <span class="sup-avance-text" style="color:${avColor}">${p.avg_avance}%</span>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function supLoadProject(projectId) {
+  supCurrentProject = projectId;
+  // Restaurar tabs de compras/servicios
+  document.querySelectorAll('#sup-tabs .sup-tab[data-tab="compras"], #sup-tabs .sup-tab[data-tab="servicios"]')
+    .forEach(b => b.style.display = '');
+  // Mostrar resumen por proyecto, ocultar dashboard global
+  const globalDash = document.getElementById('sup-global-dashboard');
+  const projectResumen = document.getElementById('sup-project-resumen');
+  if (globalDash) globalDash.style.display = 'none';
+  if (projectResumen) projectResumen.style.display = '';
+  try {
+    const [resumen, compras, servicios] = await Promise.all([
+      apiRequest(`/api/supervision/${projectId}/resumen`),
+      apiRequest(`/api/supervision/${projectId}/compras`),
+      apiRequest(`/api/supervision/${projectId}/servicios`),
+    ]);
+    SUP_RESUMEN = resumen || [];
+    SUP_COMPRAS = compras || [];
+    SUP_SERVICIOS = servicios || [];
+  } catch (e) {
+    SUP_RESUMEN = [];
+    SUP_COMPRAS = [];
+    SUP_SERVICIOS = [];
+  }
+  renderSupKPIs();
+  renderSupResumen(supResumenFilter, document.getElementById('sup-search')?.value || '');
+  renderSupCompras(supComprasFilter, document.getElementById('sup-compras-search')?.value || '');
+  renderSupServicios(supServiciosFilter, document.getElementById('sup-servicios-search')?.value || '');
+}
+
+async function renderSupervisionView() {
+  // Populate project selector
+  try {
+    const projectsList = await apiRequest('/api/projects');
+    const select = document.getElementById('sup-project-select');
+    select.innerHTML = '<option value="">Todas las obras</option>' +
+      projectsList.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    select.onchange = () => {
+      if (select.value) {
+        supLoadProject(parseInt(select.value));
+      } else {
+        supLoadGlobal();
+      }
+    };
+    if (supCurrentProject) {
+      select.value = supCurrentProject;
+      await supLoadProject(supCurrentProject);
+    } else {
+      // Sin proyecto seleccionado: mostrar resumen global
+      await supLoadGlobal();
+    }
+  } catch (e) {}
+
+  // Tabs
+  document.querySelectorAll('#sup-tabs .sup-tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#sup-tabs .sup-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      supActiveTab = btn.dataset.tab;
+      document.querySelectorAll('.sup-content').forEach(c => c.classList.remove('active'));
+      document.getElementById('sup-' + supActiveTab).classList.add('active');
+    };
+  });
+
+  // Resumen filters
+  document.querySelectorAll('#sup-status-filters .sup-pill').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#sup-status-filters .sup-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      supResumenFilter = btn.dataset.filter;
+      renderSupResumen(supResumenFilter, document.getElementById('sup-search').value);
+    };
+  });
+  document.getElementById('sup-search').oninput = (e) => {
+    renderSupResumen(supResumenFilter, e.target.value);
+  };
+
+  // Compras filters
+  document.querySelectorAll('#sup-compras-filters .sup-pill').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#sup-compras-filters .sup-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      supComprasFilter = btn.dataset.filter;
+      renderSupCompras(supComprasFilter, document.getElementById('sup-compras-search').value);
+    };
+  });
+  document.getElementById('sup-compras-search').oninput = (e) => {
+    renderSupCompras(supComprasFilter, e.target.value);
+  };
+
+  // Servicios filters
+  document.querySelectorAll('#sup-servicios-filters .sup-pill').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#sup-servicios-filters .sup-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      supServiciosFilter = btn.dataset.filter;
+      renderSupServicios(supServiciosFilter, document.getElementById('sup-servicios-search').value);
+    };
+  });
+  document.getElementById('sup-servicios-search').oninput = (e) => {
+    renderSupServicios(supServiciosFilter, e.target.value);
+  };
+
+  // "Nuevo grupo" buttons
+  const newComprasGrupoBtn = document.getElementById('sup-compras-new-grupo');
+  if (newComprasGrupoBtn) newComprasGrupoBtn.onclick = () => openSupComprasGrupoModal();
+  const newServiciosGrupoBtn = document.getElementById('sup-servicios-new-grupo');
+  if (newServiciosGrupoBtn) newServiciosGrupoBtn.onclick = () => openSupServiciosGrupoModal();
+
+  // Wire the modal forms (idempotent)
+  initSupModals();
+}
+
+function _allItems() {
+  const c = SUP_COMPRAS.flatMap(g => (g.items || []).map(i => ({ ...i, _tipo: 'compra' })));
+  const s = SUP_SERVICIOS.flatMap(g => (g.items || []).map(i => ({ ...i, _tipo: 'servicio' })));
+  return [...c, ...s];
+}
+
+function renderSupKPIs() {
+  const allItems = _allItems();
+  const totalItems = allItems.length;
+  const totalGrupos = SUP_COMPRAS.length + SUP_SERVICIOS.length;
+  const aprobados = allItems.filter(i => (i.status_compra || '').toUpperCase() === 'APROBADO').length;
+  const pendientes = allItems.filter(i => (i.status_compra || '').toUpperCase() === 'PENDIENTE').length;
+  const avgAvance = totalItems ? Math.round(allItems.reduce((a, i) => a + (i.avance || 0), 0) / totalItems) : 0;
+
+  const kpis = [
+    { value: totalGrupos, label: 'Grupos', icon: 'fa-layer-group', color: 'linear-gradient(135deg,#6366f1,#8b5cf6)' },
+    { value: totalItems,  label: 'Total Actividades', icon: 'fa-list', color: 'linear-gradient(135deg,#06b6d4,#0ea5e9)' },
+    { value: aprobados,   label: 'Aprobados', icon: 'fa-check-circle', color: 'linear-gradient(135deg,#10b981,#34d399)' },
+    { value: pendientes,  label: 'Pendientes', icon: 'fa-clock', color: 'linear-gradient(135deg,#ef4444,#f87171)' },
+    { value: avgAvance + '%', label: 'Avance Promedio', icon: 'fa-chart-line', color: 'linear-gradient(135deg,#f59e0b,#fbbf24)' },
+  ];
+
+  document.getElementById('sup-kpis').innerHTML = kpis.map(k => `
+    <div class="sup-kpi">
+      <div class="sup-kpi-icon" style="background:${k.color}"><i class="fas ${k.icon}"></i></div>
+      <div class="sup-kpi-body">
+        <span class="sup-kpi-value">${k.value}</span>
+        <span class="sup-kpi-label">${k.label}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSupResumen(filter, search) {
+  // Build rows from actual compras + servicios groups
+  const rows = [
+    ...SUP_COMPRAS.map(g => ({ ...g, _tipo: 'Compra' })),
+    ...SUP_SERVICIOS.map(g => ({ ...g, _tipo: 'Servicio' })),
+  ];
+
+  let data = rows;
+  if (filter !== 'all') data = data.filter(r => r._tipo.toUpperCase() === filter);
+  if (search) {
+    const q = search.toLowerCase();
+    data = data.filter(r => (r.nombre || '').toLowerCase().includes(q));
+  }
+
+  const tbody = document.getElementById('sup-resumen-tbody');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="sup-empty"><i class="fas fa-inbox"></i><p>Sin grupos creados aún</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.map(g => {
+    const items = g.items || [];
+    const total = items.length;
+    const aprobados = items.filter(i => (i.status_compra || '').toUpperCase() === 'APROBADO').length;
+    const pendientes = items.filter(i => (i.status_compra || '').toUpperCase() === 'PENDIENTE').length;
+    const avgAvance = total ? Math.round(items.reduce((a, i) => a + (i.avance || 0), 0) / total) : 0;
+    const pctClass = avgAvance >= 80 ? 'sup-prog-high' : avgAvance >= 40 ? 'sup-prog-mid' : 'sup-prog-low';
+    const tipoClass = g._tipo === 'Compra' ? 'sup-tipo-compra' : 'sup-tipo-servicio';
+    // find nearest fecha_limite among items
+    const fechas = items.map(i => i.fecha_limite).filter(Boolean).sort();
+    const fechaProxima = fechas[0] || '–';
+    return `
+      <tr>
+        <td><span class="sup-badge ${tipoClass}">${g._tipo}</span></td>
+        <td class="rubro-cell" style="font-weight:600">${escapeHtml(g.nombre)}</td>
+        <td style="text-align:center">${total}</td>
+        <td style="text-align:center">${aprobados > 0 ? `<span style="color:#34d399;font-weight:600">${aprobados}</span>` : '–'}</td>
+        <td style="text-align:center">${pendientes > 0 ? `<span style="color:#f87171;font-weight:600">${pendientes}</span>` : '–'}</td>
+        <td class="date-cell">${fechaProxima}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="sup-avance-bar" style="flex:1;min-width:80px"><div class="sup-avance-fill ${pctClass}" style="width:${avgAvance}%"></div></div>
+            <span class="sup-avance-text">${avgAvance}%</span>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderSupCompras(filter, search) {
+  const container = document.getElementById('sup-compras-list');
+  let html = '';
+
+  SUP_COMPRAS.forEach(group => {
+    let items = group.items || [];
+    if (filter !== 'all') items = items.filter(i => (i.status_compra || '').toUpperCase() === filter);
+    if (search) {
+      const q = search.toLowerCase();
+      items = items.filter(i =>
+        (i.actividad || '').toLowerCase().includes(q) ||
+        (i.proveedor || '').toLowerCase().includes(q) ||
+        (i.observaciones || '').toLowerCase().includes(q)
+      );
+    }
+
+    const allGroupItems = group.items || [];
+    const groupAvg = allGroupItems.length ? Math.round(allGroupItems.reduce((a, i) => a + (i.avance || 0), 0) / allGroupItems.length) : 0;
+    const groupAprobados = allGroupItems.filter(i => (i.status_compra || '').toUpperCase() === 'APROBADO').length;
+    const groupPendientes = allGroupItems.filter(i => (i.status_compra || '').toUpperCase() === 'PENDIENTE').length;
+    const gAvColor = groupAvg >= 80 ? '#34d399' : groupAvg >= 40 ? '#fbbf24' : '#f87171';
+
+    html += `
+      <div class="sup-group">
+        <div class="sup-group-header">
+          <span class="sup-group-toggle-area" onclick="supToggleGroup(this.parentElement)" style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;">
+            <i class="fas fa-chevron-down sup-group-toggle"></i>
+            <span class="sup-group-title">${escapeHtml(group.nombre)}</span>
+            <span class="sup-group-count">${allGroupItems.length} items</span>
+            <div style="display:flex;align-items:center;gap:6px;margin-left:8px">
+              <div style="width:90px;height:6px;border-radius:4px;background:rgba(255,255,255,0.1);overflow:hidden">
+                <div style="height:100%;width:${groupAvg}%;background:${gAvColor};border-radius:4px;transition:width .4s"></div>
+              </div>
+              <span style="font-size:11px;font-weight:700;color:${gAvColor}">${groupAvg}%</span>
+            </div>
+            ${groupAprobados > 0 ? `<span style="font-size:10.5px;color:#34d399"><i class="fas fa-check-circle"></i> ${groupAprobados} aprobados</span>` : ''}
+            ${groupPendientes > 0 ? `<span style="font-size:10.5px;color:#f87171"><i class="fas fa-clock"></i> ${groupPendientes} pendientes</span>` : ''}
+          </span>
+          <div class="sup-group-actions">
+            <button class="btn-icon btn-icon-sm" title="Agregar item" onclick="event.stopPropagation();openSupComprasItemModal(${group.id})"><i class="fas fa-plus"></i></button>
+            <button class="btn-icon btn-icon-sm" title="Editar grupo" onclick="event.stopPropagation();openSupComprasGrupoModal(${group.id}, ${JSON.stringify(group.nombre)})"><i class="fas fa-pen"></i></button>
+            <button class="btn-icon btn-icon-sm btn-icon-danger" title="Eliminar grupo" onclick="event.stopPropagation();deleteSupComprasGrupo(${group.id})"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+        <div class="sup-group-body">
+          ${items.length ? `
+          <table class="sup-detail-table sup-compras-table">
+            <thead>
+              <tr>
+                <th>Prior.</th>
+                <th>Actividad</th>
+                <th>Categoría</th>
+                <th>Proveedor</th>
+                <th title="Procura" class="sup-check-th">PR</th>
+                <th title="Contratado" class="sup-check-th">CT</th>
+                <th title="Fabricado" class="sup-check-th">FB</th>
+                <th title="Despacho" class="sup-check-th">DS</th>
+                <th title="Recepción" class="sup-check-th">RC</th>
+                <th>Status</th>
+                <th>F. Llegada</th>
+                <th>F. Límite</th>
+                <th>Prod./Envío</th>
+                <th title="Días instalación">Días inst.</th>
+                <th>Programación</th>
+                <th>Observaciones</th>
+                <th>Avance</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(i => {
+                const avance = i.avance ?? 0;
+                const catClass = (i.categoria || '').toUpperCase() === 'IMPORTADO' ? 'sup-cat-importado' : (i.categoria || '').toUpperCase() === 'NACIONAL' ? 'sup-cat-nacional' : '';
+                return `
+                <tr>
+                  <td><span class="priority-dot-cell ${supPriorityClass(i.prioridad)}">${i.prioridad ?? '–'}</span></td>
+                  <td class="act-cell">${escapeHtml(i.actividad || '')}${(i.extra_grupo_ids && i.extra_grupo_ids.length > 0) ? ` <span class="sup-badge" style="background:rgba(99,102,241,.25);color:#a5b4fc;font-size:9px" title="Vinculado a ${i.extra_grupo_ids.length} grupo(s) adicional(es)"><i class="fas fa-link"></i> +${i.extra_grupo_ids.length}</span>` : ''}${i.avance_proyecto > 0 ? ` <span class="sup-badge" style="background:rgba(251,191,36,.15);color:#fbbf24;font-size:9px" title="Avance proyecto: ${i.avance_proyecto}%"><i class="fas fa-tasks"></i> ${i.avance_proyecto}%</span>` : ''}</td>
+                  <td>${i.categoria ? `<span class="sup-badge ${catClass}">${escapeHtml(i.categoria)}</span>` : '–'}</td>
+                  <td class="sup-prov-cell">${escapeHtml(i.proveedor || '–')}</td>
+                  <td class="sup-check-cell">${supCheckCell(i.procura, i.id, 'procura')}</td>
+                  <td class="sup-check-cell">${supCheckCell(i.contratado, i.id, 'contratado')}</td>
+                  <td class="sup-check-cell">${supCheckCell(i.fabricado, i.id, 'fabricado')}</td>
+                  <td class="sup-check-cell">${supCheckCell(i.despacho, i.id, 'despacho')}</td>
+                  <td class="sup-check-cell">${supCheckCell(i.recepcion, i.id, 'recepcion')}</td>
+                  <td>${i.status_compra ? `<span class="sup-badge ${supStatusCompraClass(i.status_compra)}">${escapeHtml(i.status_compra)}</span>` : '–'}</td>
+                  <td class="date-cell">${i.fecha_llegada || '–'}</td>
+                  <td class="date-cell">${i.fecha_limite || '–'}</td>
+                  <td class="sup-prov-cell">${escapeHtml(i.tiempo_prod || '–')}</td>
+                  <td style="text-align:center">${supDiasHtml(i.inicio_project)}</td>
+                  <td>${i.programacion ? `<span class="sup-badge ${supProgramacionClass(i.programacion)}">${escapeHtml(i.programacion)}</span>` : '–'}</td>
+                  <td class="sup-obs-cell" title="${escapeHtml(i.observaciones || '')}">${escapeHtml((i.observaciones || '').slice(0, 55))}${(i.observaciones || '').length > 55 ? '…' : ''}</td>
+                  <td class="sup-avance-cell">
+                    <div class="sup-avance-bar"><div class="sup-avance-fill" style="width:${avance}%"></div></div>
+                    <span class="sup-avance-text">${avance}%</span>
+                  </td>
+                  <td class="sup-row-actions">
+                    <button class="btn-icon btn-icon-sm" title="Editar" onclick="openSupComprasItemModal(${group.id}, ${i.id})"><i class="fas fa-pen"></i></button>
+                    <button class="btn-icon btn-icon-sm btn-icon-danger" title="Eliminar" onclick="deleteSupComprasItem(${i.id})"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>
+              `;}).join('')}
+            </tbody>
+          </table>` : `<div class="sup-empty" style="padding:24px;text-align:center;color:var(--text-muted)"><i class="fas fa-inbox"></i> Sin items en este grupo</div>`}
+        </div>
+      </div>
+    `;
+  });
+
+  if (!html) {
+    html = `<div class="sup-empty glass-card" style="padding:60px"><i class="fas fa-box-open"></i><p>Aún no hay grupos. Crea uno con el botón <strong>Nuevo grupo</strong>.</p></div>`;
+  }
+  container.innerHTML = html;
+}
+
+function supCheckCell(checked, itemId, field) {
+  return `<button type="button" class="sup-check-toggle ${checked ? 'is-on' : ''}" onclick="toggleSupComprasCheck(${itemId}, '${field}', ${!checked})" title="${field}">${checked ? '<i class="fas fa-check"></i>' : ''}</button>`;
+}
+
+function supDiasParaInstalacion(fechaStr) {
+  if (!fechaStr) return null;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const inicio = new Date(fechaStr);
+  if (isNaN(inicio)) return null;
+  return Math.ceil((inicio - hoy) / (1000 * 60 * 60 * 24));
+}
+
+function supDiasHtml(fechaStr) {
+  const d = supDiasParaInstalacion(fechaStr);
+  if (d === null) return '–';
+  if (d > 0) return `<span class="dias-inst-badge dias-inst-ok">${d} d</span>`;
+  if (d === 0) return `<span class="dias-inst-badge dias-inst-hoy">Hoy</span>`;
+  return `<span class="dias-inst-badge dias-inst-vencido">${d} d</span>`;
+}
+
+function supStatusCompraClass(s) {
+  const v = (s || '').toUpperCase();
+  if (v === 'APROBADO') return 'sup-status-aprobado';
+  if (v === 'PENDIENTE') return 'sup-status-pendiente';
+  if (v.startsWith('EN REVIS')) return 'sup-status-revision';
+  if (v === 'RECHAZADO') return 'sup-status-rechazado';
+  return 'sup-status-default';
+}
+
+function supProgramacionClass(p) {
+  const v = (p || '').toUpperCase();
+  if (v.startsWith('PROCURA')) return 'sup-prog-procura';
+  if (v.startsWith('CONTRAT')) return 'sup-prog-contratacion';
+  if (v.startsWith('FABRIC')) return 'sup-prog-fabricacion';
+  if (v.startsWith('TRANS')) return 'sup-prog-transito';
+  if (v.startsWith('RECEP')) return 'sup-prog-recepcion';
+  if (v.startsWith('INSTAL')) return 'sup-prog-instalacion';
+  if (v === 'FINALIZADO') return 'sup-prog-finalizado';
+  return 'sup-prog-default';
+}
+
+async function toggleSupComprasCheck(itemId, field, newValue) {
+  try {
+    await apiRequest(`/api/supervision/compras/item/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ [field]: newValue })
+    });
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al actualizar', 'error');
+  }
+}
+
+function supServiciosStatusClass(s) {
+  const v = (s || '').toUpperCase();
+  if (v === 'APROBADO') return 'sup-status-aprobado';
+  if (v === 'CONTRATADO') return 'sup-status-aprobado';
+  if (v === 'POR COTIZAR') return 'sup-status-pendiente';
+  return 'sup-status-default';
+}
+
+function supServCheckCell(checked, itemId, field) {
+  return `<button type="button" class="sup-check-toggle ${checked ? 'is-on' : ''}" onclick="toggleSupServiciosCheck(${itemId}, '${field}', ${!checked})" title="${field}">${checked ? '<i class="fas fa-check"></i>' : ''}</button>`;
+}
+
+async function toggleSupServiciosCheck(itemId, field, newValue) {
+  try {
+    await apiRequest(`/api/supervision/servicios/item/${itemId}`, { method: 'PUT', body: JSON.stringify({ [field]: newValue }) });
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast('Error al actualizar', 'error');
+  }
+}
+
+function renderSupServicios(filter, search) {
+  const container = document.getElementById('sup-servicios-list');
+  let html = '';
+
+  SUP_SERVICIOS.forEach(group => {
+    let items = group.items || [];
+    if (filter !== 'all') items = items.filter(i => (i.status || '').toUpperCase() === filter);
+    if (search) {
+      const q = search.toLowerCase();
+      items = items.filter(i =>
+        (i.actividad || '').toLowerCase().includes(q) ||
+        (i.proveedor || '').toLowerCase().includes(q) ||
+        (i.observaciones || '').toLowerCase().includes(q)
+      );
+    }
+
+    const allGroupItems = group.items || [];
+    const groupAvg = allGroupItems.length ? Math.round(allGroupItems.reduce((a, i) => a + (i.avance || 0), 0) / allGroupItems.length) : 0;
+    const groupAprobados = allGroupItems.filter(i => ['APROBADO','CONTRATADO'].includes((i.status || '').toUpperCase())).length;
+    const groupPendientes = allGroupItems.filter(i => (i.status || '').toUpperCase() === 'POR COTIZAR').length;
+    const gAvColor = groupAvg >= 80 ? '#34d399' : groupAvg >= 40 ? '#fbbf24' : '#f87171';
+
+    html += `
+      <div class="sup-group">
+        <div class="sup-group-header">
+          <span class="sup-group-toggle-area" onclick="supToggleGroup(this.parentElement)" style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;">
+            <i class="fas fa-chevron-down sup-group-toggle"></i>
+            <span class="sup-group-title">${escapeHtml(group.nombre)}</span>
+            <span class="sup-group-count">${allGroupItems.length} items</span>
+            <div style="display:flex;align-items:center;gap:6px;margin-left:8px">
+              <div style="width:90px;height:6px;border-radius:4px;background:rgba(255,255,255,0.1);overflow:hidden">
+                <div style="height:100%;width:${groupAvg}%;background:${gAvColor};border-radius:4px;transition:width .4s"></div>
+              </div>
+              <span style="font-size:11px;font-weight:700;color:${gAvColor}">${groupAvg}%</span>
+            </div>
+            ${groupAprobados > 0 ? `<span style="font-size:10.5px;color:#34d399"><i class="fas fa-check-circle"></i> ${groupAprobados} contratados</span>` : ''}
+            ${groupPendientes > 0 ? `<span style="font-size:10.5px;color:#f87171"><i class="fas fa-clock"></i> ${groupPendientes} por cotizar</span>` : ''}
+          </span>
+          <div class="sup-group-actions">
+            <button class="btn-icon btn-icon-sm" title="Agregar item" onclick="event.stopPropagation();openSupServiciosItemModal(${group.id})"><i class="fas fa-plus"></i></button>
+            <button class="btn-icon btn-icon-sm" title="Editar grupo" onclick="event.stopPropagation();openSupServiciosGrupoModal(${group.id}, ${JSON.stringify(group.nombre)})"><i class="fas fa-pen"></i></button>
+            <button class="btn-icon btn-icon-sm btn-icon-danger" title="Eliminar grupo" onclick="event.stopPropagation();deleteSupServiciosGrupo(${group.id})"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+        <div class="sup-group-body">
+          ${items.length ? `
+          <table class="sup-detail-table sup-compras-table">
+            <thead>
+              <tr>
+                <th>Prior.</th>
+                <th>Actividad</th>
+                <th>Proveedor</th>
+                <th title="Solicitud" class="sup-check-th">SL</th>
+                <th title="Contratado" class="sup-check-th">CT</th>
+                <th title="Fabricado" class="sup-check-th">FB</th>
+                <th title="Instalado" class="sup-check-th">IN</th>
+                <th>Status</th>
+                <th>F. Límite</th>
+                <th>Prod./Servicio</th>
+                <th title="Días para instalación">Días inst.</th>
+                <th>Presup. ODC</th>
+                <th>Por contratar</th>
+                <th>Observaciones</th>
+                <th>Avance</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(i => {
+                const avance = i.avance ?? 0;
+                return `
+                <tr>
+                  <td><span class="priority-dot-cell ${supPriorityClass(i.prioridad)}">${i.prioridad ?? '–'}</span></td>
+                  <td class="act-cell">${escapeHtml(i.actividad || '')}${(i.extra_grupo_ids && i.extra_grupo_ids.length > 0) ? ` <span class="sup-badge" style="background:rgba(99,102,241,.25);color:#a5b4fc;font-size:9px" title="Vinculado a ${i.extra_grupo_ids.length} grupo(s) adicional(es)"><i class="fas fa-link"></i> +${i.extra_grupo_ids.length}</span>` : ''}${i.avance_proyecto > 0 ? ` <span class="sup-badge" style="background:rgba(251,191,36,.15);color:#fbbf24;font-size:9px" title="Avance proyecto: ${i.avance_proyecto}%"><i class="fas fa-tasks"></i> ${i.avance_proyecto}%</span>` : ''}</td>
+                  <td class="sup-prov-cell">${escapeHtml(i.proveedor || '–')}</td>
+                  <td class="sup-check-cell">${supServCheckCell(i.solicitud, i.id, 'solicitud')}</td>
+                  <td class="sup-check-cell">${supServCheckCell(i.contratado, i.id, 'contratado')}</td>
+                  <td class="sup-check-cell">${supServCheckCell(i.fabricado, i.id, 'fabricado')}</td>
+                  <td class="sup-check-cell">${supServCheckCell(i.instalado, i.id, 'instalado')}</td>
+                  <td>${i.status ? `<span class="sup-badge ${supServiciosStatusClass(i.status)}">${escapeHtml(i.status)}</span>` : '–'}</td>
+                  <td class="date-cell">${i.fecha_limite || '–'}</td>
+                  <td class="sup-prov-cell">${escapeHtml(i.tiempo_prod || '–')}</td>
+                  <td style="text-align:center">${supDiasHtml(i.inicio_project)}</td>
+                  <td style="text-align:right">${i.presupuesto_odc != null ? '$' + Number(i.presupuesto_odc).toLocaleString('es', {minimumFractionDigits:2}) : '–'}</td>
+                  <td style="text-align:right">${i.por_contratar != null ? '$' + Number(i.por_contratar).toLocaleString('es', {minimumFractionDigits:2}) : '–'}</td>
+                  <td class="sup-obs-cell" title="${escapeHtml(i.observaciones || '')}">${escapeHtml((i.observaciones || '').slice(0, 55))}${(i.observaciones || '').length > 55 ? '…' : ''}</td>
+                  <td class="sup-avance-cell">
+                    <div class="sup-avance-bar"><div class="sup-avance-fill" style="width:${avance}%"></div></div>
+                    <span class="sup-avance-text">${avance}%</span>
+                  </td>
+                  <td class="sup-row-actions">
+                    <button class="btn-icon btn-icon-sm" title="Editar" onclick="openSupServiciosItemModal(${group.id}, ${i.id})"><i class="fas fa-pen"></i></button>
+                    <button class="btn-icon btn-icon-sm btn-icon-danger" title="Eliminar" onclick="deleteSupServiciosItem(${i.id})"><i class="fas fa-trash"></i></button>
+                  </td>
+                </tr>
+              `}).join('')}
+            </tbody>
+          </table>` : `<div class="sup-empty" style="padding:24px;text-align:center;color:var(--text-muted)"><i class="fas fa-inbox"></i> Sin items en este grupo</div>`}
+        </div>
+      </div>
+    `;
+  });
+
+  if (!html) {
+    html = `<div class="sup-empty glass-card" style="padding:60px"><i class="fas fa-handshake"></i><p>Aún no hay grupos. Crea uno con el botón <strong>Nuevo grupo</strong>.</p></div>`;
+  }
+  container.innerHTML = html;
+}
+
+function supToggleGroup(header) {
+  header.classList.toggle('collapsed');
+  const body = header.nextElementSibling;
+  body.classList.toggle('collapsed');
+}
+
+// ===================== SUPERVISIÓN - CRUD COMPRAS / SERVICIOS =====================
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+let _supModalsInited = false;
+function initSupModals() {
+  if (_supModalsInited) return;
+  _supModalsInited = true;
+
+  document.getElementById('sup-compras-grupo-form').addEventListener('submit', submitSupComprasGrupo);
+  document.getElementById('sup-compras-item-form').addEventListener('submit', submitSupComprasItem);
+  document.getElementById('sup-servicios-grupo-form').addEventListener('submit', submitSupServiciosGrupo);
+  document.getElementById('sup-servicios-item-form').addEventListener('submit', submitSupServiciosItem);
+}
+
+function _ensureSupProject() {
+  if (!supCurrentProject) {
+    showToast('Selecciona un proyecto primero', 'warning');
+    return false;
+  }
+  return true;
+}
+
+// ---------- COMPRAS: GRUPO ----------
+function openSupComprasGrupoModal(grupoId = null, nombre = '') {
+  if (!_ensureSupProject()) return;
+  document.getElementById('sup-compras-grupo-id').value = grupoId || '';
+  document.getElementById('sup-compras-grupo-nombre').value = nombre || '';
+  document.getElementById('sup-compras-grupo-title').innerHTML = grupoId
+    ? '<i class="fas fa-pen"></i> Editar grupo de compras'
+    : '<i class="fas fa-folder-plus"></i> Nuevo grupo de compras';
+  openModal('sup-compras-grupo-modal');
+}
+
+async function submitSupComprasGrupo(e) {
+  e.preventDefault();
+  const id = document.getElementById('sup-compras-grupo-id').value;
+  const nombre = document.getElementById('sup-compras-grupo-nombre').value.trim();
+  if (!nombre) return;
+  try {
+    if (id) {
+      await apiRequest(`/api/supervision/compras/grupo/${id}`, { method: 'PUT', body: JSON.stringify({ nombre }) });
+      showToast('Grupo actualizado', 'success');
+    } else {
+      await apiRequest(`/api/supervision/${supCurrentProject}/compras/grupo`, { method: 'POST', body: JSON.stringify({ nombre }) });
+      showToast('Grupo creado', 'success');
+    }
+    closeModal('sup-compras-grupo-modal');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al guardar', 'error');
+  }
+}
+
+async function deleteSupComprasGrupo(grupoId) {
+  if (!confirm('¿Eliminar este grupo y todos sus items?')) return;
+  try {
+    await apiRequest(`/api/supervision/compras/grupo/${grupoId}`, { method: 'DELETE' });
+    showToast('Grupo eliminado', 'success');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al eliminar', 'error');
+  }
+}
+
+// ---------- COMPRAS: ITEM ----------
+function _buildExtraGruposChips(containerId, allGroups, currentGroupId, selectedIds) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  // Excluir el grupo primario de la lista de extra grupos
+  const otherGroups = allGroups.filter(g => g.id !== parseInt(currentGroupId));
+  if (!otherGroups.length) {
+    container.innerHTML = '<span style="color:var(--text-muted);font-size:12px">No hay otros grupos disponibles</span>';
+    return;
+  }
+  container.innerHTML = otherGroups.map(g => `
+    <div class="assignee-chip ${selectedIds.includes(g.id) ? 'selected' : ''}" data-grupo-id="${g.id}" style="cursor:pointer" onclick="this.classList.toggle('selected')">
+      <i class="fas fa-layer-group" style="font-size:10px;opacity:.7"></i>
+      <span class="assignee-chip-name">${escapeHtml(g.nombre)}</span>
+    </div>
+  `).join('');
+}
+
+function _getSelectedExtraGrupoIds(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  return Array.from(container.querySelectorAll('.assignee-chip.selected'))
+    .map(c => parseInt(c.dataset.grupoId));
+}
+
+function openSupComprasItemModal(grupoId, itemId = null) {
+  if (!_ensureSupProject()) return;
+  const form = document.getElementById('sup-compras-item-form');
+  form.reset();
+  document.getElementById('sup-compras-item-id').value = itemId || '';
+  document.getElementById('sup-compras-item-grupo-id').value = grupoId;
+  document.getElementById('sup-compras-item-avance-proyecto').value = 0;
+  document.getElementById('sup-compras-item-avance-proyecto-val').textContent = '0';
+
+  // Poblar selector de tareas del proyecto actual
+  const taskSel = document.getElementById('sup-compras-item-task-id');
+  taskSel.innerHTML = '<option value="">Sin tarea vinculada</option>';
+  (tasks || []).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.title}${t.progress ? ' (' + t.progress + '%)' : ''}`;
+    taskSel.appendChild(opt);
+  });
+  const apSliderC = document.getElementById('sup-compras-item-avance-proyecto');
+  apSliderC.oninput = function() {
+    document.getElementById('sup-compras-item-avance-proyecto-val').textContent = this.value;
+  };
+
+  function _setComprasSliderEnabled(enabled) {
+    apSliderC.disabled = !enabled;
+    apSliderC.style.opacity = enabled ? '' : '0.5';
+    apSliderC.style.cursor = enabled ? '' : 'not-allowed';
+  }
+
+  taskSel.onchange = function() {
+    const tid = parseInt(this.value) || 0;
+    const t = tid ? tasks.find(x => x.id === tid) : null;
+    if (t) {
+      const ap = t.progress || 0;
+      apSliderC.value = ap;
+      document.getElementById('sup-compras-item-avance-proyecto-val').textContent = ap;
+      _setComprasSliderEnabled(false);
+      document.getElementById('sup-compras-item-avance-hint').textContent = `Avance tomado de la tarea "${t.title}" — solo cambia actualizando la tarea`;
+    } else {
+      _setComprasSliderEnabled(true);
+      document.getElementById('sup-compras-item-avance-hint').textContent = 'Vincula una tarea de proyecto para que el avance se actualice automáticamente';
+    }
+  };
+
+  let selectedExtraIds = [];
+  if (itemId) {
+    // Buscar el item en cualquier grupo (puede ser primario o extra)
+    let item = null;
+    for (const g of SUP_COMPRAS) {
+      item = g.items?.find(i => i.id === itemId);
+      if (item) break;
+    }
+    if (item) {
+      document.getElementById('sup-compras-item-actividad').value = item.actividad || '';
+      document.getElementById('sup-compras-item-prioridad').value = item.prioridad ?? '';
+      document.getElementById('sup-compras-item-categoria').value = item.categoria || '';
+      document.getElementById('sup-compras-item-proveedor').value = item.proveedor || '';
+      document.getElementById('sup-compras-item-status-compra').value = item.status_compra || '';
+      document.getElementById('sup-compras-item-fecha-limite').value = item.fecha_limite || '';
+      document.getElementById('sup-compras-item-fecha-llegada').value = item.fecha_llegada || '';
+      document.getElementById('sup-compras-item-tiempo-prod').value = item.tiempo_prod || '';
+      document.getElementById('sup-compras-item-inicio-project').value = item.inicio_project || '';
+      document.getElementById('sup-compras-item-programacion').value = item.programacion || '';
+      document.getElementById('sup-compras-item-procura').checked = !!item.procura;
+      document.getElementById('sup-compras-item-contratado').checked = !!item.contratado;
+      document.getElementById('sup-compras-item-fabricado').checked = !!item.fabricado;
+      document.getElementById('sup-compras-item-despacho').checked = !!item.despacho;
+      document.getElementById('sup-compras-item-recepcion').checked = !!item.recepcion;
+      document.getElementById('sup-compras-item-observaciones').value = item.observaciones || '';
+      const ap = item.avance_proyecto ?? 0;
+      apSliderC.value = ap;
+      document.getElementById('sup-compras-item-avance-proyecto-val').textContent = ap;
+      // Task vinculada
+      if (item.task_id) {
+        taskSel.value = item.task_id;
+        const linkedTask = tasks.find(t => t.id === item.task_id);
+        document.getElementById('sup-compras-item-avance-hint').textContent = linkedTask
+          ? `Avance tomado de la tarea "${linkedTask.title}" — solo cambia actualizando la tarea`
+          : 'Avance controlado por la tarea vinculada';
+        _setComprasSliderEnabled(false);
+      } else {
+        _setComprasSliderEnabled(true);
+      }
+      selectedExtraIds = item.extra_grupo_ids || [];
+    }
+    document.getElementById('sup-compras-item-title').innerHTML = '<i class="fas fa-pen"></i> Editar compra / importación';
+  } else {
+    // Nuevo item: habilitar slider de avance (sin tarea vinculada)
+    _setComprasSliderEnabled(true);
+    document.getElementById('sup-compras-item-title').innerHTML = '<i class="fas fa-box"></i> Nueva compra / importación';
+  }
+  _buildExtraGruposChips('sup-compras-item-extra-grupos', SUP_COMPRAS, grupoId, selectedExtraIds);
+  openModal('sup-compras-item-modal');
+}
+
+async function submitSupComprasItem(e) {
+  e.preventDefault();
+  const id = document.getElementById('sup-compras-item-id').value;
+  const grupoId = document.getElementById('sup-compras-item-grupo-id').value;
+  const extraGrupoIds = _getSelectedExtraGrupoIds('sup-compras-item-extra-grupos');
+  const taskIdRaw = document.getElementById('sup-compras-item-task-id').value;
+  const taskId = taskIdRaw ? parseInt(taskIdRaw) : (id ? 0 : null); // 0 = desvincular al editar
+  const payload = {
+    actividad: document.getElementById('sup-compras-item-actividad').value.trim(),
+    prioridad: parseInt(document.getElementById('sup-compras-item-prioridad').value) || null,
+    categoria: document.getElementById('sup-compras-item-categoria').value || null,
+    proveedor: document.getElementById('sup-compras-item-proveedor').value.trim() || null,
+    status_compra: document.getElementById('sup-compras-item-status-compra').value || null,
+    fecha_limite: document.getElementById('sup-compras-item-fecha-limite').value || null,
+    fecha_llegada: document.getElementById('sup-compras-item-fecha-llegada').value || null,
+    tiempo_prod: document.getElementById('sup-compras-item-tiempo-prod').value.trim() || null,
+    inicio_project: document.getElementById('sup-compras-item-inicio-project').value || null,
+    programacion: document.getElementById('sup-compras-item-programacion').value || null,
+    procura: document.getElementById('sup-compras-item-procura').checked,
+    contratado: document.getElementById('sup-compras-item-contratado').checked,
+    fabricado: document.getElementById('sup-compras-item-fabricado').checked,
+    despacho: document.getElementById('sup-compras-item-despacho').checked,
+    recepcion: document.getElementById('sup-compras-item-recepcion').checked,
+    observaciones: document.getElementById('sup-compras-item-observaciones').value.trim() || null,
+    extra_grupo_ids: extraGrupoIds,
+    task_id: taskId,
+  };
+  // avance_proyecto solo se envía si NO hay tarea vinculada (de lo contrario el backend lo sincroniza)
+  if (!taskIdRaw) {
+    payload.avance_proyecto = parseFloat(document.getElementById('sup-compras-item-avance-proyecto').value) || 0;
+  }
+  if (!payload.actividad) return;
+  try {
+    if (id) {
+      await apiRequest(`/api/supervision/compras/item/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('Item actualizado', 'success');
+    } else {
+      await apiRequest(`/api/supervision/compras/grupo/${grupoId}/item`, { method: 'POST', body: JSON.stringify(payload) });
+      showToast('Item creado', 'success');
+    }
+    closeModal('sup-compras-item-modal');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al guardar', 'error');
+  }
+}
+
+async function deleteSupComprasItem(itemId) {
+  if (!confirm('¿Eliminar este item?')) return;
+  try {
+    await apiRequest(`/api/supervision/compras/item/${itemId}`, { method: 'DELETE' });
+    showToast('Item eliminado', 'success');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al eliminar', 'error');
+  }
+}
+
+// ---------- SERVICIOS: GRUPO ----------
+function openSupServiciosGrupoModal(grupoId = null, nombre = '') {
+  if (!_ensureSupProject()) return;
+  document.getElementById('sup-servicios-grupo-id').value = grupoId || '';
+  document.getElementById('sup-servicios-grupo-nombre').value = nombre || '';
+  document.getElementById('sup-servicios-grupo-title').innerHTML = grupoId
+    ? '<i class="fas fa-pen"></i> Editar grupo de servicios'
+    : '<i class="fas fa-folder-plus"></i> Nuevo grupo de servicios';
+  openModal('sup-servicios-grupo-modal');
+}
+
+async function submitSupServiciosGrupo(e) {
+  e.preventDefault();
+  const id = document.getElementById('sup-servicios-grupo-id').value;
+  const nombre = document.getElementById('sup-servicios-grupo-nombre').value.trim();
+  if (!nombre) return;
+  try {
+    if (id) {
+      await apiRequest(`/api/supervision/servicios/grupo/${id}`, { method: 'PUT', body: JSON.stringify({ nombre }) });
+      showToast('Grupo actualizado', 'success');
+    } else {
+      await apiRequest(`/api/supervision/${supCurrentProject}/servicios/grupo`, { method: 'POST', body: JSON.stringify({ nombre }) });
+      showToast('Grupo creado', 'success');
+    }
+    closeModal('sup-servicios-grupo-modal');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al guardar', 'error');
+  }
+}
+
+async function deleteSupServiciosGrupo(grupoId) {
+  if (!confirm('¿Eliminar este grupo y todos sus items?')) return;
+  try {
+    await apiRequest(`/api/supervision/servicios/grupo/${grupoId}`, { method: 'DELETE' });
+    showToast('Grupo eliminado', 'success');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al eliminar', 'error');
+  }
+}
+
+// ---------- SERVICIOS: ITEM ----------
+function openSupServiciosItemModal(grupoId, itemId = null) {
+  if (!_ensureSupProject()) return;
+  const form = document.getElementById('sup-servicios-item-form');
+  form.reset();
+  document.getElementById('sup-servicios-item-id').value = itemId || '';
+  document.getElementById('sup-servicios-item-grupo-id').value = grupoId;
+  document.getElementById('sup-servicios-item-avance-proyecto').value = 0;
+  document.getElementById('sup-servicios-item-avance-proyecto-val').textContent = '0';
+
+  // Poblar selector de tareas del proyecto actual
+  const taskSel = document.getElementById('sup-servicios-item-task-id');
+  taskSel.innerHTML = '<option value="">Sin tarea vinculada</option>';
+  (tasks || []).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.title}${t.progress ? ' (' + t.progress + '%)' : ''}`;
+    taskSel.appendChild(opt);
+  });
+  const apSliderS = document.getElementById('sup-servicios-item-avance-proyecto');
+  apSliderS.oninput = function() {
+    document.getElementById('sup-servicios-item-avance-proyecto-val').textContent = this.value;
+  };
+
+  function _setServiciosSliderEnabled(enabled) {
+    apSliderS.disabled = !enabled;
+    apSliderS.style.opacity = enabled ? '' : '0.5';
+    apSliderS.style.cursor = enabled ? '' : 'not-allowed';
+  }
+
+  taskSel.onchange = function() {
+    const tid = parseInt(this.value) || 0;
+    const t = tid ? tasks.find(x => x.id === tid) : null;
+    if (t) {
+      const ap = t.progress || 0;
+      apSliderS.value = ap;
+      document.getElementById('sup-servicios-item-avance-proyecto-val').textContent = ap;
+      _setServiciosSliderEnabled(false);
+      document.getElementById('sup-servicios-item-avance-hint').textContent = `Avance tomado de la tarea "${t.title}" — solo cambia actualizando la tarea`;
+    } else {
+      _setServiciosSliderEnabled(true);
+      document.getElementById('sup-servicios-item-avance-hint').textContent = 'Vincula una tarea de proyecto para que el avance se actualice automáticamente';
+    }
+  };
+
+  let selectedExtraIds = [];
+  if (itemId) {
+    let item = null;
+    for (const g of SUP_SERVICIOS) {
+      item = g.items?.find(i => i.id === itemId);
+      if (item) break;
+    }
+    if (item) {
+      document.getElementById('sup-servicios-item-actividad').value = item.actividad || '';
+      document.getElementById('sup-servicios-item-prioridad').value = item.prioridad ?? '';
+      document.getElementById('sup-servicios-item-status').value = item.status || '';
+      document.getElementById('sup-servicios-item-proveedor').value = item.proveedor || '';
+      document.getElementById('sup-servicios-item-tiempo-prod').value = item.tiempo_prod || '';
+      document.getElementById('sup-servicios-item-fecha-limite').value = item.fecha_limite || '';
+      document.getElementById('sup-servicios-item-inicio-project').value = item.inicio_project || '';
+      document.getElementById('sup-servicios-item-presupuesto-odc').value = item.presupuesto_odc ?? '';
+      document.getElementById('sup-servicios-item-por-contratar').value = item.por_contratar ?? '';
+      document.getElementById('sup-servicios-item-solicitud').checked = !!item.solicitud;
+      document.getElementById('sup-servicios-item-contratado').checked = !!item.contratado;
+      document.getElementById('sup-servicios-item-fabricado').checked = !!item.fabricado;
+      document.getElementById('sup-servicios-item-instalado').checked = !!item.instalado;
+      document.getElementById('sup-servicios-item-observaciones').value = item.observaciones || '';
+      const ap = item.avance_proyecto ?? 0;
+      apSliderS.value = ap;
+      document.getElementById('sup-servicios-item-avance-proyecto-val').textContent = ap;
+      // Task vinculada
+      if (item.task_id) {
+        taskSel.value = item.task_id;
+        const linkedTask = tasks.find(t => t.id === item.task_id);
+        document.getElementById('sup-servicios-item-avance-hint').textContent = linkedTask
+          ? `Avance tomado de la tarea "${linkedTask.title}" — solo cambia actualizando la tarea`
+          : 'Avance controlado por la tarea vinculada';
+        _setServiciosSliderEnabled(false);
+      } else {
+        _setServiciosSliderEnabled(true);
+      }
+      selectedExtraIds = item.extra_grupo_ids || [];
+    }
+    document.getElementById('sup-servicios-item-title').innerHTML = '<i class="fas fa-pen"></i> Editar contratación de servicio';
+  } else {
+    // Nuevo item: habilitar slider de avance (sin tarea vinculada)
+    _setServiciosSliderEnabled(true);
+    document.getElementById('sup-servicios-item-title').innerHTML = '<i class="fas fa-handshake"></i> Nueva contratación de servicio';
+  }
+  _buildExtraGruposChips('sup-servicios-item-extra-grupos', SUP_SERVICIOS, grupoId, selectedExtraIds);
+  openModal('sup-servicios-item-modal');
+}
+
+async function submitSupServiciosItem(e) {
+  e.preventDefault();
+  const id = document.getElementById('sup-servicios-item-id').value;
+  const grupoId = document.getElementById('sup-servicios-item-grupo-id').value;
+  const extraGrupoIds = _getSelectedExtraGrupoIds('sup-servicios-item-extra-grupos');
+  const taskIdRaw = document.getElementById('sup-servicios-item-task-id').value;
+  const taskId = taskIdRaw ? parseInt(taskIdRaw) : (id ? 0 : null); // 0 = desvincular al editar
+  const payload = {
+    actividad: document.getElementById('sup-servicios-item-actividad').value.trim(),
+    prioridad: parseInt(document.getElementById('sup-servicios-item-prioridad').value) || null,
+    status: document.getElementById('sup-servicios-item-status').value || null,
+    proveedor: document.getElementById('sup-servicios-item-proveedor').value.trim() || null,
+    tiempo_prod: document.getElementById('sup-servicios-item-tiempo-prod').value.trim() || null,
+    fecha_limite: document.getElementById('sup-servicios-item-fecha-limite').value || null,
+    inicio_project: document.getElementById('sup-servicios-item-inicio-project').value || null,
+    presupuesto_odc: parseFloat(document.getElementById('sup-servicios-item-presupuesto-odc').value) || null,
+    por_contratar: parseFloat(document.getElementById('sup-servicios-item-por-contratar').value) || null,
+    solicitud: document.getElementById('sup-servicios-item-solicitud').checked,
+    contratado: document.getElementById('sup-servicios-item-contratado').checked,
+    fabricado: document.getElementById('sup-servicios-item-fabricado').checked,
+    instalado: document.getElementById('sup-servicios-item-instalado').checked,
+    observaciones: document.getElementById('sup-servicios-item-observaciones').value.trim() || null,
+    extra_grupo_ids: extraGrupoIds,
+    task_id: taskId,
+  };
+  // avance_proyecto solo se envía si NO hay tarea vinculada
+  if (!taskIdRaw) {
+    payload.avance_proyecto = parseFloat(document.getElementById('sup-servicios-item-avance-proyecto').value) || 0;
+  }
+  if (!payload.actividad) return;
+  try {
+    if (id) {
+      await apiRequest(`/api/supervision/servicios/item/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('Item actualizado', 'success');
+    } else {
+      await apiRequest(`/api/supervision/servicios/grupo/${grupoId}/item`, { method: 'POST', body: JSON.stringify(payload) });
+      showToast('Item creado', 'success');
+    }
+    closeModal('sup-servicios-item-modal');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al guardar', 'error');
+  }
+}
+
+async function deleteSupServiciosItem(itemId) {
+  if (!confirm('¿Eliminar este item?')) return;
+  try {
+    await apiRequest(`/api/supervision/servicios/item/${itemId}`, { method: 'DELETE' });
+    showToast('Item eliminado', 'success');
+    await supLoadProject(supCurrentProject);
+  } catch (err) {
+    showToast(err.message || 'Error al eliminar', 'error');
+  }
+}

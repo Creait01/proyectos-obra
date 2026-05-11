@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>ProyectOS - Gestión de Proyectos de Obra</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3.7.0">
+    <link rel="stylesheet" href="/static/styles.css?v=4.5.2">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -110,6 +110,10 @@
                     <i class="fas fa-users"></i>
                     <span>Equipo</span>
                 </a>
+                <a href="#" class="nav-item" data-view="supervision" data-label="Supervisión">
+                    <i class="fas fa-eye"></i>
+                    <span>Supervisión</span>
+                </a>
                 <a href="#" class="nav-item admin-only hidden" data-view="admin" data-label="Administración">
                     <i class="fas fa-user-shield"></i>
                     <span>Administración</span>
@@ -117,8 +121,8 @@
                 </a>
             </nav>
 
-            <button class="btn-icon" id="sidebar-toggle" title="Expandir/Contraer">
-                <i class="fas fa-angles-left"></i>
+            <button class="btn-icon" id="sidebar-toggle" title="Expandir/Contraer" aria-label="Expandir o contraer barra lateral">
+                <i class="fas fa-chevron-left"></i>
             </button>
             
             <div class="sidebar-projects">
@@ -484,7 +488,7 @@
                                 <div class="metric-label">Real <i class="fas fa-info-circle info-icon"></i></div>
                             </div>
                         </div>
-                        <div class="gantt-effectiveness-item effectiveness" title="Efectividad = (Real / Programado) × 100. Mayor a 100% = Adelantado">
+                        <div class="gantt-effectiveness-item effectiveness" title="Efectividad = (Real / Programado) Ã— 100. Mayor a 100% = Adelantado">
                             <div>
                                 <div class="metric-value" id="gantt-effectiveness-value">--%</div>
                                 <div class="metric-label">Efectividad <i class="fas fa-info-circle info-icon"></i></div>
@@ -512,7 +516,7 @@
                         </div>
                         <div class="legend-item">
                             <i class="fas fa-chart-line"></i>
-                            <span><strong>Efectividad:</strong> Real ÷ Programado × 100 (≥100% = adelantado)</span>
+                            <span><strong>Efectividad:</strong> Real ÷ Programado Ã— 100 (≥100% = adelantado)</span>
                         </div>
                     </div>
                     
@@ -553,6 +557,9 @@
                                 <option value="done">Completadas</option>
                             </select>
                         </div>
+                        <button class="btn btn-secondary" onclick="downloadMyTasksReport()" title="Descargar PDF con mis tareas pendientes" style="white-space:nowrap;align-self:flex-end">
+                            <i class="fas fa-file-pdf"></i> Descargar PDF
+                        </button>
                     </div>
                     <div class="tasks-list" id="my-tasks-list"></div>
                 </section>
@@ -638,6 +645,132 @@
                     <div class="projects-grid" id="projects-grid"></div>
                 </section>
 
+                <!-- Supervision View -->
+                <section id="supervision-view" class="view">
+                    <div class="sup-header">
+                        <div class="sup-meta">
+                            <select id="sup-project-select" class="sup-project-select">
+                                <option value="">Todas las obras</option>
+                            </select>
+                            <button class="btn btn-sm" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;margin-left:8px" onclick="openApplySupTemplateModal()" id="btn-apply-sup-template" title="Aplicar plantillas de supervisión">
+                                <i class="fas fa-magic"></i> Plantillas
+                            </button>
+                        </div>
+                        <nav class="sup-tabs" id="sup-tabs">
+                            <button class="sup-tab active" data-tab="resumen">
+                                <i class="fas fa-layer-group"></i> Resumen
+                            </button>
+                            <button class="sup-tab" data-tab="compras">
+                                <i class="fas fa-boxes"></i> Compras e Importaciones
+                            </button>
+                            <button class="sup-tab" data-tab="servicios">
+                                <i class="fas fa-handshake"></i> Contrataciones de Servicio
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- RESUMEN TAB -->
+                    <div class="sup-content active" id="sup-resumen">
+                        <!-- Dashboard global (sin proyecto seleccionado) -->
+                        <div id="sup-global-dashboard" style="display:none">
+                            <div class="sup-kpis" id="sup-global-kpis"></div>
+                            <div class="sup-table-wrap glass-card" style="margin-top:16px">
+                                <div class="sup-table-toolbar">
+                                    <h3 style="margin:0;font-size:14px;font-weight:700;color:var(--text-primary)">
+                                        <i class="fas fa-hard-hat" style="color:#fbbf24;margin-right:6px"></i>Resumen por obra
+                                    </h3>
+                                </div>
+                                <table class="sup-table" id="sup-global-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Obra</th>
+                                            <th style="text-align:center">Grupos</th>
+                                            <th style="text-align:center">Actividades</th>
+                                            <th style="text-align:center">Aprobados</th>
+                                            <th style="text-align:center">Pendientes</th>
+                                            <th>F. Límite próxima</th>
+                                            <th>Avance global</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sup-global-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <!-- Resumen de un proyecto específico -->
+                        <div id="sup-project-resumen">
+                        <div class="sup-kpis" id="sup-kpis"></div>
+                        <div class="sup-table-wrap glass-card">
+                            <div class="sup-table-toolbar">
+                                <div class="sup-search-box">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" id="sup-search" placeholder="Buscar rubro…">
+                                </div>
+                                <div class="sup-filter-pills" id="sup-status-filters">
+                                    <button class="sup-pill active" data-filter="all">Todos</button>
+                                    <button class="sup-pill" data-filter="COMPRA">Compras</button>
+                                    <button class="sup-pill" data-filter="SERVICIO">Servicios</button>
+                                </div>
+                            </div>
+                            <table class="sup-table" id="sup-resumen-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Grupo</th>
+                                        <th style="text-align:center">Items</th>
+                                        <th style="text-align:center">Aprobados</th>
+                                        <th style="text-align:center">Pendientes</th>
+                                        <th>F. Límite más próxima</th>
+                                        <th>Avance del grupo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sup-resumen-tbody"></tbody>
+                            </table>
+                        </div>
+                        </div> <!-- /sup-project-resumen -->
+                    </div>
+
+                    <!-- COMPRAS TAB -->
+                    <div class="sup-content" id="sup-compras">
+                        <div class="sup-detail-toolbar">
+                            <div class="sup-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="sup-compras-search" placeholder="Buscar actividad…">
+                            </div>
+                            <div class="sup-filter-pills" id="sup-compras-filters">
+                                <button class="sup-pill active" data-filter="all">Todos</button>
+                                <button class="sup-pill" data-filter="APROBADO">Aprobado</button>
+                                <button class="sup-pill" data-filter="PENDIENTE">Pendiente</button>
+                                <button class="sup-pill" data-filter="EN REVISION">En Revisión</button>
+                                <button class="sup-pill" data-filter="RECHAZADO">Rechazado</button>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="sup-compras-new-grupo">
+                                <i class="fas fa-plus"></i> Nuevo grupo
+                            </button>
+                        </div>
+                        <div id="sup-compras-list"></div>
+                    </div>
+
+                    <!-- SERVICIOS TAB -->
+                    <div class="sup-content" id="sup-servicios">
+                        <div class="sup-detail-toolbar">
+                            <div class="sup-search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="sup-servicios-search" placeholder="Buscar actividad…">
+                            </div>
+                            <div class="sup-filter-pills" id="sup-servicios-filters">
+                                <button class="sup-pill active" data-filter="all">Todos</button>
+                                <button class="sup-pill" data-filter="APROBADO">Aprobado</button>
+                                <button class="sup-pill" data-filter="POR COTIZAR">Por Cotizar</button>
+                                <button class="sup-pill" data-filter="CONTRATADO">Contratado</button>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="sup-servicios-new-grupo">
+                                <i class="fas fa-plus"></i> Nuevo grupo
+                            </button>
+                        </div>
+                        <div id="sup-servicios-list"></div>
+                    </div>
+                </section>
+
                 <!-- Admin View -->
                 <section id="admin-view" class="view">
                     <div class="admin-container">
@@ -654,6 +787,9 @@
                             </button>
                             <button class="admin-tab" data-tab="teams">
                                 <i class="fas fa-user-friends"></i> Equipos
+                            </button>
+                            <button class="admin-tab" data-tab="reports">
+                                <i class="fas fa-file-pdf"></i> Reportes
                             </button>
                         </div>
 
@@ -717,6 +853,32 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Plantillas de Supervisión -->
+                                <div class="template-category">
+                                    <div class="template-category-header">
+                                        <h4><i class="fas fa-clipboard-check"></i> Plantillas de Supervisión</h4>
+                                        <div style="display:flex;gap:8px">
+                                            <button class="btn btn-sm" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff" onclick="openSupTemplateModal('COMPRAS')">
+                                                <i class="fas fa-box"></i> Compras
+                                            </button>
+                                            <button class="btn btn-sm" style="background:linear-gradient(135deg,#10b981,#34d399);color:#fff" onclick="openSupTemplateModal('SERVICIOS')">
+                                                <i class="fas fa-handshake"></i> Servicios
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="sup-template-filters" style="display:flex;gap:8px;margin-bottom:12px">
+                                        <button class="sup-pill active" data-stfilter="all" onclick="filterSupTemplates('all',this)">Todos</button>
+                                        <button class="sup-pill" data-stfilter="COMPRAS" onclick="filterSupTemplates('COMPRAS',this)">Compras</button>
+                                        <button class="sup-pill" data-stfilter="SERVICIOS" onclick="filterSupTemplates('SERVICIOS',this)">Servicios</button>
+                                    </div>
+                                    <div class="templates-list" id="sup-templates-list">
+                                        <div class="empty-state">
+                                            <i class="fas fa-folder-open"></i>
+                                            <p>No hay plantillas de supervisión</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -728,6 +890,44 @@
                             </div>
                             <div class="teams-grid" id="teams-grid">
                                 <!-- Se llenará dinámicamente -->
+                            </div>
+                        </div>
+
+                        <!-- Panel Reportes -->
+                        <div class="admin-panel hidden" id="admin-reports">
+                            <div class="admin-header">
+                                <h3><i class="fas fa-file-pdf"></i> Reportes</h3>
+                                <p class="admin-subtitle">Genera reportes en PDF para análisis y seguimiento</p>
+                            </div>
+
+                            <div class="reports-grid">
+                                <!-- Reporte de tareas pendientes por usuario -->
+                                <div class="report-card glass-card">
+                                    <div class="report-card-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                                        <i class="fas fa-user-clock"></i>
+                                    </div>
+                                    <div class="report-card-body">
+                                        <h4>Tareas Pendientes por Usuario</h4>
+                                        <p>Listado detallado de todas las tareas pendientes agrupadas por persona asignada. Incluye tareas vencidas, del día y próximas.</p>
+                                        <div class="report-card-options">
+                                            <div class="form-group" style="margin:0;flex:1">
+                                                <label style="font-size:12px;color:var(--text-muted)">Filtrar por obra (opcional)</label>
+                                                <select id="report-project-filter" class="select-styled" style="font-size:13px">
+                                                    <option value="">Todas las obras</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group" style="margin:0;flex:1">
+                                                <label style="font-size:12px;color:var(--text-muted)">Filtrar por usuario (opcional)</label>
+                                                <select id="report-user-filter" class="select-styled" style="font-size:13px">
+                                                    <option value="">Todos los usuarios</option>
+                                                </select>
+                                            </div>
+                                            <button class="btn btn-primary" onclick="downloadPendingTasksReport()" style="white-space:nowrap;align-self:flex-end">
+                                                <i class="fas fa-download"></i> Descargar PDF
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -984,6 +1184,33 @@
                     <label>Progreso: <span id="progress-value">0</span>%</label>
                     <input type="range" id="task-progress" min="0" max="100" value="0">
                 </div>
+
+                <div class="form-group" id="task-sup-section">
+                    <label style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
+                        <i class="fas fa-hard-hat" style="color:#fbbf24"></i>
+                        Categorías de Supervisión
+                        <span style="font-size:11px;color:var(--text-muted);font-weight:400">(opcional — aparece en esos grupos)</span>
+                    </label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                        <div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+                                <i class="fas fa-box" style="color:#6366f1"></i> Compras / Importación
+                            </div>
+                            <div class="sup-extra-grupos-container" id="task-sup-compras-chips" style="min-height:44px">
+                                <span style="color:var(--text-muted);font-size:11px" id="task-sup-compras-empty">Sin grupos disponibles</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+                                <i class="fas fa-handshake" style="color:#34d399"></i> Servicios / Contratación
+                            </div>
+                            <div class="sup-extra-grupos-container" id="task-sup-servicios-chips" style="min-height:44px">
+                                <span style="color:var(--text-muted);font-size:11px" id="task-sup-servicios-empty">Sin grupos disponibles</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="view-history-btn" style="margin-right: auto;">
                         <i class="fas fa-history"></i> Historial
@@ -1276,6 +1503,82 @@
         </div>
     </div>
 
+    <!-- Modal: Plantilla de Supervisión (Compras / Servicios) -->
+    <div class="modal-overlay" id="sup-template-modal">
+        <div class="modal glass-card modal-lg">
+            <div class="modal-header">
+                <h2 id="sup-template-modal-title"><i class="fas fa-clipboard-check"></i> Plantilla de Supervisión</h2>
+                <button class="btn-icon modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="sup-template-form">
+                <input type="hidden" id="sup-template-id">
+                <input type="hidden" id="sup-template-tipo">
+                <div class="form-row">
+                    <div class="form-group" style="flex:2">
+                        <label>Nombre del grupo / categoría *</label>
+                        <input type="text" id="sup-template-nombre" required placeholder="Ej: Estructura Metálica, Iluminación…">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Tipo</label>
+                        <div id="sup-template-tipo-badge" class="sup-tipo-badge" style="margin-top:6px"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descripción (opcional)</label>
+                    <textarea id="sup-template-desc" rows="2" placeholder="Notas sobre esta categoría…"></textarea>
+                </div>
+                <div class="template-items-section">
+                    <div class="template-items-header">
+                        <h4>Actividades / Ítems</h4>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addSupTemplateItem()">
+                            <i class="fas fa-plus"></i> Agregar ítem
+                        </button>
+                    </div>
+                    <div class="template-items-list" id="sup-template-items" style="max-height:300px;overflow-y:auto"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Plantilla
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Aplicar plantillas de supervisión a un proyecto -->
+    <div class="modal-overlay" id="apply-sup-template-modal">
+        <div class="modal glass-card modal-lg">
+            <div class="modal-header">
+                <h2><i class="fas fa-magic"></i> Aplicar Plantillas de Supervisión</h2>
+                <button class="btn-icon modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Proyecto destino</label>
+                    <select id="apply-sup-project" class="select-styled">
+                        <option value="">Seleccionar proyecto…</option>
+                    </select>
+                </div>
+                <p style="font-size:13px;color:var(--text-muted);margin:8px 0 4px">
+                    Selecciona las categorías que deseas agregar al proyecto:
+                </p>
+                <div class="sup-template-filters" style="display:flex;gap:8px;margin-bottom:10px">
+                    <button class="sup-pill active" onclick="filterApplySupTemplates('all',this)">Todos</button>
+                    <button class="sup-pill" onclick="filterApplySupTemplates('COMPRAS',this)">Compras</button>
+                    <button class="sup-pill" onclick="filterApplySupTemplates('SERVICIOS',this)">Servicios</button>
+                </div>
+                <div id="apply-sup-template-list" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="applySelectedSupTemplates()">
+                    <i class="fas fa-check"></i> Aplicar seleccionadas
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Team Member Modal -->
     <div class="modal-overlay" id="add-team-member-modal">
         <div class="modal glass-card">
@@ -1330,11 +1633,11 @@
                     <div class="form-group">
                         <label>Tipo *</label>
                         <select id="milestone-type" class="select-styled">
-                            <option value="meeting">🤝 Reunión</option>
-                            <option value="change">🔄 Cambio</option>
-                            <option value="blueprint">📐 Plano</option>
-                            <option value="team">👥 Equipo</option>
-                            <option value="other">📌 Otro</option>
+                            <option value="meeting">ðŸ¤ Reunión</option>
+                            <option value="change">ðŸ”„ Cambio</option>
+                            <option value="blueprint">ðŸ“ Plano</option>
+                            <option value="team">ðŸ‘¥ Equipo</option>
+                            <option value="other">ðŸ“Œ Otro</option>
                         </select>
                     </div>
                 </div>
@@ -1371,6 +1674,338 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="/static/app.js?v=3.7.0"></script>
+    <!-- Supervisión: Grupo Compras Modal -->
+    <div class="modal-overlay" id="sup-compras-grupo-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2 id="sup-compras-grupo-title"><i class="fas fa-folder-plus"></i> Nuevo grupo de compras</h2>
+                <button class="btn-icon modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="sup-compras-grupo-form">
+                <input type="hidden" id="sup-compras-grupo-id">
+                <div class="form-group">
+                    <label>Nombre del grupo</label>
+                    <input type="text" id="sup-compras-grupo-nombre" required placeholder="Ej: Importaciones China">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Supervision: Item Compras Modal -->
+    <div class="modal-overlay" id="sup-compras-item-modal">
+        <div class="modal glass-card modal-lg">
+            <div class="modal-header">
+                <h2 id="sup-compras-item-title"><i class="fas fa-box"></i> Nueva compra / importacion</h2>
+                <button class="btn-icon modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="sup-compras-item-form">
+                <input type="hidden" id="sup-compras-item-id">
+                <input type="hidden" id="sup-compras-item-grupo-id">
+
+                <div class="form-group">
+                    <label>Actividad / Rubro *</label>
+                    <input type="text" id="sup-compras-item-actividad" required placeholder="Ej: Griferia importada">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-flag"></i> Orden de prioridad</label>
+                        <select id="sup-compras-item-prioridad" class="select-styled">
+                            <option value="">Sin prioridad</option>
+                            <option value="1">1 - Critica</option>
+                            <option value="2">2 - Alta</option>
+                            <option value="3">3 - Media</option>
+                            <option value="4">4 - Baja</option>
+                            <option value="5">5 - Muy baja</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-globe"></i> Categoria</label>
+                        <select id="sup-compras-item-categoria" class="select-styled">
+                            <option value="">Sin clasificar</option>
+                            <option value="NACIONAL">Nacional</option>
+                            <option value="IMPORTADO">Importado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-truck"></i> Proveedor</label>
+                        <input type="text" id="sup-compras-item-proveedor" placeholder="Nombre del proveedor o distribuidor">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Status compra</label>
+                        <select id="sup-compras-item-status-compra" class="select-styled">
+                            <option value="">Sin status</option>
+                            <option value="APROBADO">Aprobado</option>
+                            <option value="PENDIENTE">Pendiente</option>
+                            <option value="EN REVISION">En revision</option>
+                            <option value="RECHAZADO">Rechazado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-times"></i> Fecha limite contratacion</label>
+                        <input type="date" id="sup-compras-item-fecha-limite">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-check"></i> Fecha de llegada estimada</label>
+                        <input type="date" id="sup-compras-item-fecha-llegada">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-industry"></i> Tiempo de produccion / envio</label>
+                        <input type="text" id="sup-compras-item-tiempo-prod" placeholder="Ej: 45 dias, 6 semanas">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-check"></i> Fecha de inicio de proyecto</label>
+                        <input type="date" id="sup-compras-item-inicio-project">
+                        <small class="field-hint">Los dias para instalacion se calculan automaticamente: esta fecha − hoy</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-calendar-alt"></i> Programacion (etapa actual)</label>
+                    <select id="sup-compras-item-programacion" class="select-styled">
+                        <option value="">Sin programar</option>
+                        <option value="PROCURA">Procura</option>
+                        <option value="CONTRATACION">Contratacion</option>
+                        <option value="FABRICACION">Fabricacion</option>
+                        <option value="TRANSITO">Transito</option>
+                        <option value="RECEPCION">Recepcion</option>
+                        <option value="INSTALACION">Instalacion</option>
+                        <option value="FINALIZADO">Finalizado</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-tasks"></i> Seguimiento</label>
+                    <div class="sup-track-checks">
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-compras-item-procura">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Procura</span>
+                        </label>
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-compras-item-contratado">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Contratado</span>
+                        </label>
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-compras-item-fabricado">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Fabricado</span>
+                        </label>
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-compras-item-despacho">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Despacho</span>
+                        </label>
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-compras-item-recepcion">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Recepcion</span>
+                        </label>
+                    </div>
+                    <div class="sup-track-hint">Avance se calcula automaticamente: cada check = 20%</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-layer-group"></i> Grupos adicionales <small style="color:var(--text-muted);font-weight:400">(aparece en múltiples grupos)</small></label>
+                        <div class="sup-extra-grupos-container" id="sup-compras-item-extra-grupos">
+                            <!-- chips de grupos generados dinámicamente -->
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-project-diagram"></i> Tarea del proyecto vinculada <small style="color:var(--text-muted);font-weight:400">(el avance se toma de la tarea)</small></label>
+                        <select id="sup-compras-item-task-id" class="select-styled">
+                            <option value="">Sin tarea vinculada</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-tasks"></i> Avance del proyecto: <span id="sup-compras-item-avance-proyecto-val">0</span>%</label>
+                        <input type="range" id="sup-compras-item-avance-proyecto" min="0" max="100" value="0" disabled style="opacity:0.5;cursor:not-allowed">
+                        <small class="field-hint" id="sup-compras-item-avance-hint">Vincula una tarea de proyecto para que el avance se actualice automáticamente</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-comment-alt"></i> Observaciones</label>
+                    <textarea id="sup-compras-item-observaciones" rows="3" placeholder="Notas, retrasos, detalles de negociacion, etc."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Supervisión: Grupo Servicios Modal -->
+    <div class="modal-overlay" id="sup-servicios-grupo-modal">
+        <div class="modal glass-card">
+            <div class="modal-header">
+                <h2 id="sup-servicios-grupo-title"><i class="fas fa-folder-plus"></i> Nuevo grupo de servicios</h2>
+                <button class="btn-icon modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="sup-servicios-grupo-form">
+                <input type="hidden" id="sup-servicios-grupo-id">
+                <div class="form-group">
+                    <label>Nombre del grupo</label>
+                    <input type="text" id="sup-servicios-grupo-nombre" required placeholder="Ej: Subcontratistas">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Supervisión: Item Servicios Modal -->
+    <div class="modal-overlay" id="sup-servicios-item-modal">
+        <div class="modal glass-card modal-lg">
+            <div class="modal-header">
+                <h2 id="sup-servicios-item-title"><i class="fas fa-handshake"></i> Nueva contratación de servicio</h2>
+                <button class="btn-icon modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="sup-servicios-item-form">
+                <input type="hidden" id="sup-servicios-item-id">
+                <input type="hidden" id="sup-servicios-item-grupo-id">
+
+                <div class="form-group">
+                    <label><i class="fas fa-tools"></i> Actividad / Servicio *</label>
+                    <input type="text" id="sup-servicios-item-actividad" required placeholder="Ej: Instalación eléctrica">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-sort-numeric-up"></i> Orden de prioridad (1-5)</label>
+                        <select id="sup-servicios-item-prioridad" class="select-styled">
+                            <option value="">Sin prioridad</option>
+                            <option value="1">1 — Crítico</option>
+                            <option value="2">2 — Alto</option>
+                            <option value="3">3 — Medio</option>
+                            <option value="4">4 — Bajo</option>
+                            <option value="5">5 — Mínimo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Status</label>
+                        <select id="sup-servicios-item-status" class="select-styled">
+                            <option value="">Sin estatus</option>
+                            <option value="POR COTIZAR">Por cotizar</option>
+                            <option value="APROBADO">Aprobado</option>
+                            <option value="CONTRATADO">Contratado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-building"></i> Proveedor / Contratista</label>
+                        <input type="text" id="sup-servicios-item-proveedor" placeholder="Nombre del proveedor">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-industry"></i> Tiempo de producción / servicio</label>
+                        <input type="text" id="sup-servicios-item-tiempo-prod" placeholder="Ej: 15 días">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-times"></i> Fecha límite de contratación</label>
+                        <input type="date" id="sup-servicios-item-fecha-limite">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-check"></i> Fecha de inicio de proyecto</label>
+                        <input type="date" id="sup-servicios-item-inicio-project">
+                        <small class="field-hint">Los días para instalación se calculan automáticamente</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-file-invoice-dollar"></i> Presupuesto con ODC ($)</label>
+                        <input type="number" id="sup-servicios-item-presupuesto-odc" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-hand-holding-usd"></i> Por contratar ($)</label>
+                        <input type="number" id="sup-servicios-item-por-contratar" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-tasks"></i> Seguimiento</label>
+                    <div class="sup-track-checks" style="grid-template-columns: repeat(4, 1fr);">
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-servicios-item-solicitud">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Solicitud</span>
+                        </label>
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-servicios-item-contratado">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Contratado</span>
+                        </label>
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-servicios-item-fabricado">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Fabricado</span>
+                        </label>
+                        <label class="sup-track-check">
+                            <input type="checkbox" id="sup-servicios-item-instalado">
+                            <span class="sup-track-check-box"><i class="fas fa-check"></i></span>
+                            <span class="sup-track-check-label">Instalado</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-comment-alt"></i> Observaciones</label>
+                    <textarea id="sup-servicios-item-observaciones" rows="3" placeholder="Notas adicionales..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-layer-group"></i> Grupos adicionales <small style="color:var(--text-muted);font-weight:400">(aparece en múltiples grupos)</small></label>
+                        <div class="sup-extra-grupos-container" id="sup-servicios-item-extra-grupos">
+                            <!-- chips de grupos generados dinámicamente -->
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-project-diagram"></i> Tarea del proyecto vinculada <small style="color:var(--text-muted);font-weight:400">(el avance se toma de la tarea)</small></label>
+                        <select id="sup-servicios-item-task-id" class="select-styled">
+                            <option value="">Sin tarea vinculada</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-tasks"></i> Avance del proyecto: <span id="sup-servicios-item-avance-proyecto-val">0</span>%</label>
+                    <input type="range" id="sup-servicios-item-avance-proyecto" min="0" max="100" value="0" disabled style="opacity:0.5;cursor:not-allowed">
+                    <small class="field-hint" id="sup-servicios-item-avance-hint">Vincula una tarea de proyecto para que el avance se actualice automáticamente</small>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=4.8.0"></script>
 </body>
 </html>
+

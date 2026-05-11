@@ -16,7 +16,7 @@ import cloudinary
 import cloudinary.uploader
 
 from database import engine, get_db, Base, SessionLocal
-from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam, task_assignees, Milestone, MilestoneAttachment
+from models import Project, Task, User, Activity, TaskProgress, ProjectMember, Stage, TaskHistory, StageTemplate, StageTemplateItem, TaskTemplate, TaskTemplateItem, AdminTeam, task_assignees, Milestone, MilestoneAttachment, SupResumenItem, SupComprasGrupo, SupComprasItem, SupServiciosGrupo, SupServiciosItem, sup_compras_item_grupos, sup_servicios_item_grupos, task_sup_compras_grupos, task_sup_servicios_grupos, SupCategoriaTemplate, SupCategoriaTemplateItem, stage_template_sup_cats
 from schemas import (
     ProjectCreate, ProjectResponse, ProjectUpdate,
     TaskCreate, TaskResponse, TaskUpdate,
@@ -24,7 +24,12 @@ from schemas import (
     ActivityResponse, DashboardStats, TaskProgressCreate, TaskProgressResponse,
     ProjectMemberResponse, StageCreate, StageResponse, StageUpdate,
     EffectivenessMetric, ProjectEffectiveness, TaskHistoryResponse,
-    MilestoneCreate, MilestoneUpdate, MilestoneResponse, MilestoneAttachmentResponse
+    MilestoneCreate, MilestoneUpdate, MilestoneResponse, MilestoneAttachmentResponse,
+    SupResumenItemCreate, SupResumenItemUpdate, SupResumenItemResponse,
+    SupComprasGrupoCreate, SupComprasGrupoUpdate, SupComprasGrupoResponse,
+    SupComprasItemCreate, SupComprasItemUpdate, SupComprasItemResponse,
+    SupServiciosGrupoCreate, SupServiciosGrupoUpdate, SupServiciosGrupoResponse,
+    SupServiciosItemCreate, SupServiciosItemUpdate, SupServiciosItemResponse,
 )
 from auth import get_current_user, create_access_token, verify_password, get_password_hash
 
@@ -380,6 +385,183 @@ def init_database():
                     print("✅ Tabla milestone_attachments verificada (MySQL)")
                 except Exception as e2:
                     print(f"⚠️ Tabla milestone_attachments: {e2}")
+
+            # Migración: nuevas columnas para sup_compras_items (seguimiento simplificado)
+            for col_def in [
+                "ADD COLUMN procura BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN contratado BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN fabricado BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN despacho BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN recepcion BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN status_compra VARCHAR(50)",
+                "ADD COLUMN observaciones TEXT",
+                "ADD COLUMN programacion VARCHAR(50)",
+                "ADD COLUMN inicio_project VARCHAR(20)",
+                "ADD COLUMN estatus VARCHAR(50)",
+                "ADD COLUMN proveedor VARCHAR(200)",
+                "ADD COLUMN categoria VARCHAR(50)",
+                "ADD COLUMN fecha_llegada VARCHAR(20)",
+                "ADD COLUMN fecha_limite VARCHAR(20)",
+                "ADD COLUMN tiempo_prod VARCHAR(100)",
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE sup_compras_items {col_def}"))
+                    conn.commit()
+                except Exception:
+                    pass  # Columna ya existe
+
+            # Migración: nuevas columnas para sup_servicios_items
+            for col_def in [
+                "ADD COLUMN solicitud BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN contratado BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN fabricado BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN instalado BOOLEAN DEFAULT FALSE",
+                "ADD COLUMN observaciones TEXT",
+                "ADD COLUMN presupuesto_odc FLOAT",
+                "ADD COLUMN por_contratar FLOAT",
+                "ADD COLUMN inicio_project VARCHAR(20)",
+                "ADD COLUMN fecha_limite VARCHAR(20)",
+                "ADD COLUMN tiempo_prod VARCHAR(100)",
+                "ADD COLUMN proveedor VARCHAR(200)",
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE sup_servicios_items {col_def}"))
+                    conn.commit()
+                except Exception:
+                    pass  # Columna ya existe
+
+            # Migración: avance_proyecto en items de supervisión
+            for table, col in [
+                ("sup_compras_items", "ADD COLUMN avance_proyecto FLOAT DEFAULT 0"),
+                ("sup_servicios_items", "ADD COLUMN avance_proyecto FLOAT DEFAULT 0"),
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE {table} {col}"))
+                    conn.commit()
+                except Exception:
+                    pass  # Columna ya existe
+
+            # Migración: tablas many-to-many para grupos adicionales de supervisión
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS sup_compras_item_grupos (
+                        item_id INTEGER NOT NULL,
+                        grupo_id INTEGER NOT NULL,
+                        PRIMARY KEY (item_id, grupo_id),
+                        FOREIGN KEY (item_id) REFERENCES sup_compras_items(id) ON DELETE CASCADE,
+                        FOREIGN KEY (grupo_id) REFERENCES sup_compras_grupos(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla sup_compras_item_grupos verificada")
+            except Exception as e2:
+                print(f"⚠️ Tabla sup_compras_item_grupos: {e2}")
+
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS sup_servicios_item_grupos (
+                        item_id INTEGER NOT NULL,
+                        grupo_id INTEGER NOT NULL,
+                        PRIMARY KEY (item_id, grupo_id),
+                        FOREIGN KEY (item_id) REFERENCES sup_servicios_items(id) ON DELETE CASCADE,
+                        FOREIGN KEY (grupo_id) REFERENCES sup_servicios_grupos(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla sup_servicios_item_grupos verificada")
+            except Exception as e2:
+                print(f"⚠️ Tabla sup_servicios_item_grupos: {e2}")
+
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS task_sup_compras_grupos (
+                        task_id INTEGER NOT NULL,
+                        grupo_id INTEGER NOT NULL,
+                        PRIMARY KEY (task_id, grupo_id),
+                        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                        FOREIGN KEY (grupo_id) REFERENCES sup_compras_grupos(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla task_sup_compras_grupos verificada")
+            except Exception as e2:
+                print(f"⚠️ Tabla task_sup_compras_grupos: {e2}")
+
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS task_sup_servicios_grupos (
+                        task_id INTEGER NOT NULL,
+                        grupo_id INTEGER NOT NULL,
+                        PRIMARY KEY (task_id, grupo_id),
+                        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                        FOREIGN KEY (grupo_id) REFERENCES sup_servicios_grupos(id) ON DELETE CASCADE
+                    )
+                """))
+                conn.commit()
+                print("✅ Tabla task_sup_servicios_grupos verificada")
+            except Exception as e2:
+                print(f"⚠️ Tabla task_sup_servicios_grupos: {e2}")
+
+        # Columna task_id en items de supervisión (vinculo directo a tarea del proyecto)
+        for tbl in ('sup_compras_items', 'sup_servicios_items'):
+            try:
+                with engine.connect() as conn2:
+                    conn2.execute(text(f"ALTER TABLE {tbl} ADD COLUMN task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL"))
+                    conn2.commit()
+                print(f"✅ Columna task_id en {tbl} agregada")
+            except Exception as e2:
+                print(f"⚠️ Columna task_id en {tbl}: {e2}")
+
+        # Plantillas de categorías de supervisión
+        try:
+            with engine.connect() as conn3:
+                conn3.execute(text("""
+                    CREATE TABLE IF NOT EXISTS sup_categoria_templates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nombre VARCHAR(300) NOT NULL,
+                        tipo VARCHAR(20) NOT NULL,
+                        descripcion TEXT,
+                        created_by INTEGER REFERENCES users(id),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn3.commit()
+            print("✅ Tabla sup_categoria_templates verificada")
+        except Exception as e2:
+            print(f"⚠️ Tabla sup_categoria_templates: {e2}")
+
+        try:
+            with engine.connect() as conn3:
+                conn3.execute(text("""
+                    CREATE TABLE IF NOT EXISTS sup_categoria_template_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        template_id INTEGER NOT NULL,
+                        actividad VARCHAR(400) NOT NULL,
+                        prioridad INTEGER DEFAULT 3,
+                        position INTEGER DEFAULT 0,
+                        FOREIGN KEY (template_id) REFERENCES sup_categoria_templates(id) ON DELETE CASCADE
+                    )
+                """))
+                conn3.commit()
+            print("✅ Tabla sup_categoria_template_items verificada")
+        except Exception as e2:
+            print(f"⚠️ Tabla sup_categoria_template_items: {e2}")
+
+        try:
+            with engine.connect() as conn3:
+                conn3.execute(text("""
+                    CREATE TABLE IF NOT EXISTS stage_template_sup_cats (
+                        stage_template_id INTEGER NOT NULL,
+                        sup_cat_template_id INTEGER NOT NULL,
+                        PRIMARY KEY (stage_template_id, sup_cat_template_id),
+                        FOREIGN KEY (stage_template_id) REFERENCES stage_templates(id) ON DELETE CASCADE,
+                        FOREIGN KEY (sup_cat_template_id) REFERENCES sup_categoria_templates(id) ON DELETE CASCADE
+                    )
+                """))
+                conn3.commit()
+            print("✅ Tabla stage_template_sup_cats verificada")
+        except Exception as e2:
+            print(f"⚠️ Tabla stage_template_sup_cats: {e2}")
 
     except Exception as e:
         print(f"⚠️ Error inicializando BD: {e}")
@@ -1511,7 +1693,7 @@ async def get_project_effectiveness(project_id: int, db: Session = Depends(get_d
 @app.get("/api/projects/{project_id}/tasks", response_model=List[TaskResponse])
 async def get_tasks(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     tasks = db.query(Task).filter(Task.project_id == project_id).order_by(Task.position).all()
-    # Convertir a TaskResponse con assignee_ids
+    # Convertir a TaskResponse con assignee_ids y sup grupos
     return [
         TaskResponse(
             id=t.id,
@@ -1522,6 +1704,8 @@ async def get_tasks(project_id: int, db: Session = Depends(get_db), current_user
             project_id=t.project_id,
             stage_id=t.stage_id,
             assignee_ids=[u.id for u in t.assignees],
+            sup_compras_grupo_ids=[g.id for g in t.sup_compras_grupos],
+            sup_servicios_grupo_ids=[g.id for g in t.sup_servicios_grupos],
             position=t.position,
             start_date=t.start_date,
             due_date=t.due_date,
@@ -1567,11 +1751,29 @@ async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(g
     if task.assignee_ids:
         assignees = db.query(User).filter(User.id.in_(task.assignee_ids)).all()
         new_task.assignees = assignees
+
+    # Vincular a grupos de supervisión
+    comp_grupos_link = []
+    serv_grupos_link = []
+    if task.sup_compras_grupo_ids:
+        comp_grupos_link = db.query(SupComprasGrupo).filter(SupComprasGrupo.id.in_(task.sup_compras_grupo_ids)).all()
+        new_task.sup_compras_grupos = comp_grupos_link
+    if task.sup_servicios_grupo_ids:
+        serv_grupos_link = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.id.in_(task.sup_servicios_grupo_ids)).all()
+        new_task.sup_servicios_grupos = serv_grupos_link
     
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
-    
+
+    # Auto-crear un item de supervisión por cada grupo seleccionado
+    for grupo in comp_grupos_link:
+        db.add(SupComprasItem(grupo_id=grupo.id, actividad=new_task.title, task_id=new_task.id, avance_proyecto=new_task.progress or 0))
+    for grupo in serv_grupos_link:
+        db.add(SupServiciosItem(grupo_id=grupo.id, actividad=new_task.title, task_id=new_task.id, avance_proyecto=new_task.progress or 0))
+    if comp_grupos_link or serv_grupos_link:
+        db.commit()
+
     # Registrar actividad
     activity = Activity(
         action="created",
@@ -1583,7 +1785,7 @@ async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(g
     db.add(activity)
     db.commit()
     
-    # Preparar respuesta con assignee_ids
+    # Preparar respuesta con assignee_ids y sup grupos
     task_response = TaskResponse(
         id=new_task.id,
         title=new_task.title,
@@ -1593,6 +1795,8 @@ async def create_task(project_id: int, task: TaskCreate, db: Session = Depends(g
         project_id=new_task.project_id,
         stage_id=new_task.stage_id,
         assignee_ids=[u.id for u in new_task.assignees],
+        sup_compras_grupo_ids=[g.id for g in new_task.sup_compras_grupos],
+        sup_servicios_grupo_ids=[g.id for g in new_task.sup_servicios_grupos],
         position=new_task.position,
         start_date=new_task.start_date,
         due_date=new_task.due_date,
@@ -1634,7 +1838,7 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         if task.status == "done":
             raise HTTPException(status_code=403, detail="Solo un administrador puede marcar una tarea como completada")
         # Usuarios normales pueden cambiar: estado, descripción, progreso y etapa
-        allowed_fields = {'status', 'description', 'progress', 'stage_id'}
+        allowed_fields = {'status', 'description', 'progress', 'stage_id', 'sup_compras_grupo_ids', 'sup_servicios_grupo_ids'}
         update_fields = set(task.model_dump(exclude_unset=True).keys())
         if not update_fields.issubset(allowed_fields):
             raise HTTPException(status_code=403, detail="Solo puedes actualizar estado, descripción, progreso y etapa de tus tareas")
@@ -1655,16 +1859,51 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
     
     old_status = db_task.status
     
-    # Aplicar cambios (excepto assignee_ids que se maneja aparte)
+    # Aplicar cambios (excepto assignee_ids y sup_*_grupo_ids que se manejan aparte)
     for key, value in task.model_dump(exclude_unset=True).items():
-        if key != 'assignee_ids':
+        if key not in ('assignee_ids', 'sup_compras_grupo_ids', 'sup_servicios_grupo_ids'):
             setattr(db_task, key, value)
     
     # Actualizar asignados si se proporcionaron
     if task.assignee_ids is not None:
         new_assignees = db.query(User).filter(User.id.in_(task.assignee_ids)).all()
         db_task.assignees = new_assignees
-    
+
+    # Actualizar grupos de supervisión
+    comp_grupos_upd = []
+    serv_grupos_upd = []
+    if task.sup_compras_grupo_ids is not None:
+        comp_grupos_upd = db.query(SupComprasGrupo).filter(SupComprasGrupo.id.in_(task.sup_compras_grupo_ids)).all()
+        db_task.sup_compras_grupos = comp_grupos_upd
+    if task.sup_servicios_grupo_ids is not None:
+        serv_grupos_upd = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.id.in_(task.sup_servicios_grupo_ids)).all()
+        db_task.sup_servicios_grupos = serv_grupos_upd
+
+    # Sincronizar avance_proyecto en items de supervisión vinculados a esta tarea
+    new_progress = db_task.progress or 0
+    linked_compras = db.query(SupComprasItem).filter(SupComprasItem.task_id == task_id).all()
+    for ci in linked_compras:
+        ci.avance_proyecto = new_progress
+    linked_servicios = db.query(SupServiciosItem).filter(SupServiciosItem.task_id == task_id).all()
+    for si in linked_servicios:
+        si.avance_proyecto = new_progress
+
+    # Auto-crear items en grupos de supervisión recién asociados (si no existe ya uno vinculado)
+    for grupo in comp_grupos_upd:
+        exists = db.query(SupComprasItem).filter(
+            SupComprasItem.task_id == task_id,
+            SupComprasItem.grupo_id == grupo.id
+        ).first()
+        if not exists:
+            db.add(SupComprasItem(grupo_id=grupo.id, actividad=db_task.title, task_id=task_id, avance_proyecto=new_progress))
+    for grupo in serv_grupos_upd:
+        exists = db.query(SupServiciosItem).filter(
+            SupServiciosItem.task_id == task_id,
+            SupServiciosItem.grupo_id == grupo.id
+        ).first()
+        if not exists:
+            db.add(SupServiciosItem(grupo_id=grupo.id, actividad=db_task.title, task_id=task_id, avance_proyecto=new_progress))
+
     db.commit()
     db.refresh(db_task)
 
@@ -1863,7 +2102,7 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         db.add(activity)
         db.commit()
     
-    # Preparar respuesta con assignee_ids
+    # Preparar respuesta con assignee_ids y sup grupos
     task_response = TaskResponse(
         id=db_task.id,
         title=db_task.title,
@@ -1873,6 +2112,8 @@ async def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_
         project_id=db_task.project_id,
         stage_id=db_task.stage_id,
         assignee_ids=[u.id for u in db_task.assignees],
+        sup_compras_grupo_ids=[g.id for g in db_task.sup_compras_grupos],
+        sup_servicios_grupo_ids=[g.id for g in db_task.sup_servicios_grupos],
         position=db_task.position,
         start_date=db_task.start_date,
         due_date=db_task.due_date,
@@ -2659,6 +2900,462 @@ async def apply_task_template(project_id: int, template_id: int, stage_id: Optio
     
     return {"message": f"Se crearon {len(created_tasks)} tareas", "tasks": created_tasks}
 
+# ===================== PLANTILLAS DE SUPERVISIÓN =====================
+
+def _sup_cat_template_to_dict(t: SupCategoriaTemplate) -> dict:
+    return {
+        "id": t.id,
+        "nombre": t.nombre,
+        "tipo": t.tipo,
+        "descripcion": t.descripcion,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "items": [{"id": i.id, "actividad": i.actividad, "prioridad": i.prioridad, "position": i.position} for i in t.items],
+    }
+
+@app.get("/api/templates/supervision")
+def get_sup_templates(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Listar todas las plantillas de categorías de supervisión (compras + servicios)."""
+    templates = db.query(SupCategoriaTemplate).order_by(SupCategoriaTemplate.tipo, SupCategoriaTemplate.nombre).all()
+    return [_sup_cat_template_to_dict(t) for t in templates]
+
+@app.post("/api/templates/supervision")
+def create_sup_template(data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Crear plantilla de categoría de supervisión. Solo admins."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear plantillas")
+    nombre = (data.get("nombre") or "").strip()
+    tipo = (data.get("tipo") or "").upper()
+    if not nombre:
+        raise HTTPException(status_code=400, detail="nombre es obligatorio")
+    if tipo not in ("COMPRAS", "SERVICIOS"):
+        raise HTTPException(status_code=400, detail="tipo debe ser COMPRAS o SERVICIOS")
+    t = SupCategoriaTemplate(nombre=nombre, tipo=tipo, descripcion=data.get("descripcion"), created_by=current_user.id)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    for idx, item in enumerate(data.get("items", [])):
+        actividad = (item.get("actividad") or "").strip()
+        if actividad:
+            db.add(SupCategoriaTemplateItem(template_id=t.id, actividad=actividad, prioridad=item.get("prioridad", 3), position=idx))
+    db.commit()
+    db.refresh(t)
+    return _sup_cat_template_to_dict(t)
+
+@app.put("/api/templates/supervision/{template_id}")
+def update_sup_template(template_id: int, data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Actualizar plantilla de supervisión."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden editar plantillas")
+    t = db.query(SupCategoriaTemplate).filter(SupCategoriaTemplate.id == template_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    if data.get("nombre"):
+        t.nombre = data["nombre"].strip()
+    if data.get("tipo") and data["tipo"].upper() in ("COMPRAS", "SERVICIOS"):
+        t.tipo = data["tipo"].upper()
+    if "descripcion" in data:
+        t.descripcion = data["descripcion"]
+    # Reemplazar items si se envían
+    if "items" in data:
+        db.query(SupCategoriaTemplateItem).filter(SupCategoriaTemplateItem.template_id == template_id).delete()
+        for idx, item in enumerate(data["items"]):
+            actividad = (item.get("actividad") or "").strip()
+            if actividad:
+                db.add(SupCategoriaTemplateItem(template_id=t.id, actividad=actividad, prioridad=item.get("prioridad", 3), position=idx))
+    db.commit()
+    db.refresh(t)
+    return _sup_cat_template_to_dict(t)
+
+@app.delete("/api/templates/supervision/{template_id}")
+def delete_sup_template(template_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Eliminar plantilla de supervisión."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar plantillas")
+    t = db.query(SupCategoriaTemplate).filter(SupCategoriaTemplate.id == template_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    db.delete(t)
+    db.commit()
+    return {"message": "Plantilla eliminada"}
+
+@app.post("/api/projects/{project_id}/apply-sup-template/{template_id}")
+def apply_sup_template(project_id: int, template_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Aplica una plantilla de supervisión a un proyecto creando el grupo y sus actividades."""
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    t = db.query(SupCategoriaTemplate).filter(SupCategoriaTemplate.id == template_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+
+    if t.tipo == "COMPRAS":
+        pos = db.query(SupComprasGrupo).filter(SupComprasGrupo.project_id == project_id).count()
+        grupo = SupComprasGrupo(project_id=project_id, nombre=t.nombre, position=pos)
+        db.add(grupo)
+        db.commit()
+        db.refresh(grupo)
+        for idx, item in enumerate(t.items):
+            db.add(SupComprasItem(grupo_id=grupo.id, actividad=item.actividad, prioridad=item.prioridad, position=idx))
+        db.commit()
+        return {"message": f"Grupo '{t.nombre}' creado en Compras", "grupo_id": grupo.id, "tipo": "COMPRAS"}
+    else:
+        pos = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.project_id == project_id).count()
+        grupo = SupServiciosGrupo(project_id=project_id, nombre=t.nombre, position=pos)
+        db.add(grupo)
+        db.commit()
+        db.refresh(grupo)
+        for idx, item in enumerate(t.items):
+            db.add(SupServiciosItem(grupo_id=grupo.id, actividad=item.actividad, prioridad=item.prioridad, position=idx))
+        db.commit()
+        return {"message": f"Grupo '{t.nombre}' creado en Servicios", "grupo_id": grupo.id, "tipo": "SERVICIOS"}
+
+# Vinculación stage_template ↔ sup_categoria_templates
+@app.get("/api/templates/stages/{template_id}/sup-cats")
+def get_stage_template_sup_cats(template_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    t = db.query(StageTemplate).filter(StageTemplate.id == template_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    return [_sup_cat_template_to_dict(s) for s in t.sup_cat_templates]
+
+@app.put("/api/templates/stages/{template_id}/sup-cats")
+def set_stage_template_sup_cats(template_id: int, data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Establece las plantillas de supervisión vinculadas a una plantilla de etapas."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    t = db.query(StageTemplate).filter(StageTemplate.id == template_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    ids = data.get("sup_cat_ids", [])
+    sup_cats = db.query(SupCategoriaTemplate).filter(SupCategoriaTemplate.id.in_(ids)).all() if ids else []
+    t.sup_cat_templates = sup_cats
+    db.commit()
+    return {"message": "Vinculación actualizada", "count": len(sup_cats)}
+
+# ===================== REPORTE PDF: TAREAS PENDIENTES POR USUARIO =====================
+
+@app.get("/api/reports/pending-tasks-pdf")
+def report_pending_tasks_pdf(
+    project_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Genera un PDF con las tareas pendientes agrupadas por usuario asignado."""
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm, cm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, KeepTogether
+    from reportlab.platypus import PageBreak
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    from datetime import date as date_type
+    import math
+
+    today = datetime.now().date()
+    today_str = today.strftime("%d/%m/%Y")
+
+    # ── Colores de marca ──────────────────────────────────────────────
+    COLOR_PRIMARY   = colors.HexColor("#6366f1")   # indigo
+    COLOR_SUCCESS   = colors.HexColor("#10b981")   # green
+    COLOR_WARNING   = colors.HexColor("#f59e0b")   # amber
+    COLOR_DANGER    = colors.HexColor("#ef4444")   # red
+    COLOR_MUTED     = colors.HexColor("#6b7280")   # gray-500
+    COLOR_BG_HEADER = colors.HexColor("#1e1b4b")   # dark indigo
+    COLOR_BG_ROW1   = colors.HexColor("#f8f7ff")   # very light lavender
+    COLOR_BG_ROW2   = colors.white
+    COLOR_BORDER    = colors.HexColor("#e5e7eb")
+
+    # ── Consultar proyectos accesibles ────────────────────────────────
+    if current_user.is_admin:
+        projects_q = db.query(Project).filter(Project.is_active == True)
+    else:
+        pm_ids = [m.project_id for m in db.query(ProjectMember).filter(ProjectMember.user_id == current_user.id).all()]
+        own_ids = [p.id for p in db.query(Project).filter(Project.owner_id == current_user.id).all()]
+        lead_ids = [p.id for p in db.query(Project).filter(Project.leader_id == current_user.id).all()]
+        all_ids = list(set(pm_ids + own_ids + lead_ids))
+        projects_q = db.query(Project).filter(Project.id.in_(all_ids), Project.is_active == True)
+
+    if project_id:
+        projects_q = projects_q.filter(Project.id == project_id)
+
+    projects_list = projects_q.order_by(Project.name).all()
+    project_ids = [p.id for p in projects_list]
+    project_map = {p.id: p for p in projects_list}
+
+    # ── Filtro por usuario ─────────────────────────────────────────────
+    # Usuarios no admin solo pueden ver sus propias tareas
+    if not current_user.is_admin:
+        user_id = current_user.id
+    # Si se pide un user_id concreto, obtener ese usuario para el título del reporte
+    filter_user = None
+    if user_id:
+        filter_user = db.query(User).filter(User.id == user_id).first()
+
+    # ── Tareas pendientes (no terminadas) ──────────────────────────────
+    from sqlalchemy import or_
+    tasks_q = db.query(Task).filter(
+        Task.project_id.in_(project_ids),
+        Task.status.in_(["todo", "in_progress", "review"]),
+    ).order_by(Task.due_date.asc(), Task.title).all()
+
+    # Si hay filtro de usuario, quedarnos solo con tareas donde ese usuario está asignado
+    if user_id:
+        tasks_q = [t for t in tasks_q if any(u.id == user_id for u in (t.assignees or []))]
+
+    # Agrupar por usuario asignado (usa el relationship ORM, no raw SQL)
+    user_tasks: dict = {}
+    for task in tasks_q:
+        if task.assignees:
+            for u in task.assignees:
+                # Si hay filtro de usuario, solo agregar esa persona
+                if user_id and u.id != user_id:
+                    continue
+                user_tasks.setdefault(u.id, []).append(task)
+        else:
+            if not user_id:  # Sin asignar solo aparece en el reporte global
+                user_tasks.setdefault(None, []).append(task)
+
+    # Helper: convertir due_date a date de forma segura (SQLite puede devolver date o datetime)
+    def to_date(d):
+        if d is None:
+            return None
+        return d.date() if hasattr(d, 'date') and callable(d.date) else d
+
+    # Cargar info de usuarios
+    all_uids = [uid for uid in user_tasks.keys() if uid is not None]
+    user_map = {u.id: u for u in db.query(User).filter(User.id.in_(all_uids)).all()} if all_uids else {}
+
+    # ── PDF ────────────────────────────────────────────────────────────
+    buf = BytesIO()
+    PAGE_W, PAGE_H = landscape(A4)
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=landscape(A4),
+        leftMargin=15*mm, rightMargin=15*mm,
+        topMargin=15*mm, bottomMargin=15*mm,
+        title="Reporte Tareas Pendientes",
+        author="Sistema Proyectos",
+    )
+
+    styles = getSampleStyleSheet()
+    style_normal = ParagraphStyle("N", fontName="Helvetica", fontSize=8, textColor=COLOR_MUTED, leading=11)
+    style_bold   = ParagraphStyle("B", fontName="Helvetica-Bold", fontSize=9, textColor=colors.HexColor("#111827"), leading=12)
+    style_task   = ParagraphStyle("T", fontName="Helvetica", fontSize=8, textColor=colors.HexColor("#1f2937"), leading=11)
+    style_overdue= ParagraphStyle("O", fontName="Helvetica-Bold", fontSize=8, textColor=COLOR_DANGER, leading=11)
+    style_proj   = ParagraphStyle("P", fontName="Helvetica", fontSize=7, textColor=COLOR_MUTED, leading=10)
+
+    story = []
+
+    # Título dinámico según filtro
+    report_title = "REPORTE DE TAREAS PENDIENTES"
+    if filter_user:
+        report_title = f"TAREAS PENDIENTES · {filter_user.name.upper()}"
+
+    # ── Portada / Encabezado global ───────────────────────────────────
+    # Banner
+    header_table = Table(
+        [[
+            Paragraph(f"<font color='white'><b>{report_title}</b></font>", ParagraphStyle("H", fontName="Helvetica-Bold", fontSize=16, textColor=colors.white, leading=20)),
+            Paragraph(f"<font color='#a5b4fc'>Generado: {today_str}</font>", ParagraphStyle("HS", fontName="Helvetica", fontSize=9, textColor=colors.HexColor("#a5b4fc"), alignment=TA_RIGHT, leading=12)),
+        ]],
+        colWidths=[185*mm, 80*mm],
+    )
+    header_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), COLOR_BG_HEADER),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ("LEFTPADDING", (0,0), (0,-1), 12),
+        ("RIGHTPADDING", (-1,0), (-1,-1), 12),
+        ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 8))
+
+    # KPIs globales
+    total_tasks   = len(tasks_q)
+    overdue_count = sum(1 for t in tasks_q if to_date(t.due_date) and to_date(t.due_date) < today)
+    today_count   = sum(1 for t in tasks_q if to_date(t.due_date) and to_date(t.due_date) == today)
+    pending_users = len(user_tasks)
+
+    def kpi_cell(label, value, color):
+        return [
+            Paragraph(f"<b><font color='{color.hexval()}'>{value}</font></b>",
+                      ParagraphStyle("KV", fontName="Helvetica-Bold", fontSize=20, alignment=TA_CENTER, leading=24)),
+            Paragraph(f"<font color='#6b7280'>{label}</font>",
+                      ParagraphStyle("KL", fontName="Helvetica", fontSize=8, alignment=TA_CENTER, leading=10)),
+        ]
+
+    kpi_table = Table(
+        [[kpi_cell("Total pendientes", total_tasks, COLOR_PRIMARY),
+          kpi_cell("Vencidas", overdue_count, COLOR_DANGER),
+          kpi_cell("Vencen hoy", today_count, COLOR_WARNING),
+          kpi_cell("Usuarios", pending_users, COLOR_SUCCESS)]],
+        colWidths=[66*mm]*4,
+    )
+    kpi_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#f8f7ff")),
+        ("BOX", (0,0), (-1,-1), 0.5, COLOR_BORDER),
+        ("INNERGRID", (0,0), (-1,-1), 0.5, COLOR_BORDER),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+    ]))
+    story.append(kpi_table)
+    story.append(Spacer(1, 14))
+
+    # ── Sección por usuario ────────────────────────────────────────────
+    STATUS_LABELS = {"todo": "Por hacer", "in_progress": "En proceso", "review": "En revisión"}
+    PRIORITY_COLORS = {"high": COLOR_DANGER, "medium": COLOR_WARNING, "low": COLOR_SUCCESS, "critical": colors.HexColor("#7c3aed")}
+    PRIORITY_LABELS = {"high": "Alta", "medium": "Media", "low": "Baja", "critical": "Crítica"}
+
+    # Ordenar: None (sin asignar) al final
+    sorted_uids = sorted(user_tasks.keys(), key=lambda uid: (uid is None, (user_map.get(uid).name if uid and uid in user_map else "zzz")))
+
+    for uid in sorted_uids:
+        tasks_for_user = user_tasks[uid]
+        user = user_map.get(uid) if uid else None
+        uname = user.name if user else "Sin asignar"
+        urole = user.email if user else ""
+
+        overdue_u = sum(1 for t in tasks_for_user if to_date(t.due_date) and to_date(t.due_date) < today)
+
+        # Encabezado de usuario
+        user_header = Table([[
+            Paragraph(f"<font color='white'>👤  {uname}</font>", ParagraphStyle("UH", fontName="Helvetica-Bold", fontSize=11, textColor=colors.white, leading=14)),
+            Paragraph(f"<font color='#c7d2fe'>{urole}</font>", ParagraphStyle("UR", fontName="Helvetica", fontSize=8, textColor=colors.HexColor("#c7d2fe"), alignment=TA_CENTER, leading=11)),
+            Paragraph(
+                f"<font color='white'><b>{len(tasks_for_user)}</b> tarea(s)"
+                + (f"  ·  <font color='#fca5a5'>{overdue_u} vencida(s)</font>" if overdue_u else "")
+                + "</font>",
+                ParagraphStyle("UC", fontName="Helvetica-Bold", fontSize=9, textColor=colors.white, alignment=TA_RIGHT, leading=12)
+            ),
+        ]], colWidths=[120*mm, 80*mm, 67*mm])
+        user_header.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), COLOR_PRIMARY),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("TOPPADDING", (0,0), (-1,-1), 7),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+            ("LEFTPADDING", (0,0), (0,-1), 10),
+            ("RIGHTPADDING", (-1,0), (-1,-1), 10),
+        ]))
+
+        # Tabla de tareas
+        col_widths = [80*mm, 38*mm, 35*mm, 25*mm, 22*mm, 32*mm, 35*mm]
+        thead = [
+            Paragraph("<b>Tarea</b>", ParagraphStyle("TH", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)),
+            Paragraph("<b>Proyecto</b>", ParagraphStyle("TH2", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)),
+            Paragraph("<b>Etapa</b>", ParagraphStyle("TH7", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)),
+            Paragraph("<b>Estado</b>", ParagraphStyle("TH3", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white, alignment=TA_CENTER)),
+            Paragraph("<b>Prioridad</b>", ParagraphStyle("TH4", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white, alignment=TA_CENTER)),
+            Paragraph("<b>Vencimiento</b>", ParagraphStyle("TH5", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white, alignment=TA_CENTER)),
+            Paragraph("<b>Avance</b>", ParagraphStyle("TH6", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white, alignment=TA_CENTER)),
+        ]
+        rows = [thead]
+        row_styles = []
+
+        for ridx, task in enumerate(tasks_for_user):
+            due_d = to_date(task.due_date)
+            is_overdue = due_d is not None and due_d < today
+            is_today   = due_d is not None and due_d == today
+            bg = COLOR_BG_ROW1 if ridx % 2 == 0 else COLOR_BG_ROW2
+
+            title_style = style_overdue if is_overdue else style_bold
+            proj = project_map.get(task.project_id)
+            proj_name = proj.name if proj else "–"
+
+            if due_d:
+                due_str = due_d.strftime("%d/%m/%Y")
+                if is_overdue:
+                    due_para = Paragraph(f"<b><font color='#ef4444'>⚠ {due_str}</font></b>",
+                                         ParagraphStyle("DU", fontName="Helvetica-Bold", fontSize=8, alignment=TA_CENTER))
+                elif is_today:
+                    due_para = Paragraph(f"<b><font color='#f59e0b'>● {due_str}</font></b>",
+                                         ParagraphStyle("DT", fontName="Helvetica-Bold", fontSize=8, alignment=TA_CENTER))
+                else:
+                    due_para = Paragraph(due_str, ParagraphStyle("DN", fontName="Helvetica", fontSize=8, alignment=TA_CENTER, textColor=COLOR_SUCCESS))
+            else:
+                due_para = Paragraph("–", ParagraphStyle("DNone", fontName="Helvetica", fontSize=8, alignment=TA_CENTER, textColor=COLOR_MUTED))
+
+            pcolor = PRIORITY_COLORS.get(task.priority or "medium", COLOR_MUTED)
+            plabel = PRIORITY_LABELS.get(task.priority or "medium", task.priority or "–")
+            slabel = STATUS_LABELS.get(task.status, task.status or "–")
+
+            stage_name = task.stage.name if task.stage else "–"
+
+            # Barra de progreso (Drawing)
+            pct = max(0, min(100, int(task.progress or 0)))
+            bar_w, bar_h = 17*mm, 3.5*mm
+            bar_fill = COLOR_DANGER if pct < 30 else (COLOR_WARNING if pct < 70 else COLOR_SUCCESS)
+            prog_drawing = Drawing(bar_w, bar_h + 5*mm)
+            # Fondo gris
+            prog_drawing.add(Rect(0, 5*mm - bar_h, bar_w, bar_h,
+                                  fillColor=colors.HexColor("#e5e7eb"), strokeColor=None))
+            # Relleno
+            if pct > 0:
+                prog_drawing.add(Rect(0, 5*mm - bar_h, bar_w * pct / 100, bar_h,
+                                      fillColor=bar_fill, strokeColor=None))
+            # Porcentaje texto
+            prog_drawing.add(String(bar_w / 2, 0, f"{pct}%",
+                                    fontName="Helvetica-Bold", fontSize=7,
+                                    fillColor=colors.HexColor("#374151"),
+                                    textAnchor="middle"))
+
+            rows.append([
+                Paragraph(task.title or "–", title_style),
+                Paragraph(proj_name, style_proj),
+                Paragraph(stage_name, ParagraphStyle("STG", fontName="Helvetica", fontSize=7.5, textColor=colors.HexColor("#4338ca"), leading=10)),
+                Paragraph(slabel, ParagraphStyle("SL", fontName="Helvetica", fontSize=7.5, alignment=TA_CENTER, textColor=COLOR_MUTED)),
+                Paragraph(f"<b><font color='{pcolor.hexval()}'>{plabel}</font></b>",
+                          ParagraphStyle("PL", fontName="Helvetica-Bold", fontSize=7.5, alignment=TA_CENTER)),
+                due_para,
+                prog_drawing,
+            ])
+            row_styles.append(("BACKGROUND", (0, ridx+1), (-1, ridx+1), bg))
+            if is_overdue:
+                row_styles.append(("LEFTPADDING", (0, ridx+1), (0, ridx+1), 6))
+                row_styles.append(("LINEAFTER", (0, ridx+1), (0, ridx+1), 2, COLOR_DANGER))
+
+        task_table = Table(rows, colWidths=col_widths, repeatRows=1)
+        base_style = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4338ca")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (6, 1), (6, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.4, COLOR_BORDER),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [COLOR_BG_ROW1, COLOR_BG_ROW2]),
+        ] + row_styles
+        task_table.setStyle(TableStyle(base_style))
+
+        story.append(KeepTogether([user_header, task_table]))
+        story.append(Spacer(1, 12))
+
+    if not tasks_q:
+        story.append(Paragraph("No hay tareas pendientes.", ParagraphStyle("Empty", fontName="Helvetica", fontSize=12, textColor=COLOR_MUTED, alignment=TA_CENTER)))
+
+    # ── Footer ────────────────────────────────────────────────────────
+    def add_page_number(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(COLOR_MUTED)
+        canvas.drawString(15*mm, 10*mm, f"Sistema de Proyectos de Obra · {today_str}")
+        canvas.drawRightString(PAGE_W - 15*mm, 10*mm, f"Página {doc.page}")
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
+    buf.seek(0)
+
+    from fastapi.responses import StreamingResponse
+    suffix = f"_{filter_user.name.replace(' ', '_').lower()}" if filter_user else ""
+    filename = f"tareas_pendientes{suffix}_{today.strftime('%Y%m%d')}.pdf"
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f"attachment; filename={filename}"})
+
 # ===================== EQUIPOS DE ADMIN =====================
 @app.get("/api/admin/teams")
 async def get_admin_teams(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -2791,3 +3488,318 @@ if __name__ == "__main__":
     # Usar puerto de variable de entorno (Railway) o 8000 por defecto (local)
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+# ===================== SUPERVISIÓN API =====================
+
+# --- Resumen global (todos los proyectos) ---
+
+@app.get("/api/supervision/global/resumen")
+def get_sup_global_resumen(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Devuelve un resumen agregado por proyecto de todos los grupos de supervisión."""
+    # Obtener proyectos a los que tiene acceso el usuario
+    if current_user.is_admin:
+        projects = db.query(Project).filter(Project.is_active == True).all()
+    else:
+        member_project_ids = [m.project_id for m in db.query(ProjectMember).filter(ProjectMember.user_id == current_user.id).all()]
+        owned_ids = [p.id for p in db.query(Project).filter(Project.owner_id == current_user.id).all()]
+        leader_ids = [p.id for p in db.query(Project).filter(Project.leader_id == current_user.id).all()]
+        all_ids = list(set(member_project_ids + owned_ids + leader_ids))
+        projects = db.query(Project).filter(Project.id.in_(all_ids), Project.is_active == True).all()
+
+    result = []
+    for project in projects:
+        compras_grupos = db.query(SupComprasGrupo).filter(SupComprasGrupo.project_id == project.id).all()
+        servicios_grupos = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.project_id == project.id).all()
+
+        total_grupos = len(compras_grupos) + len(servicios_grupos)
+        if total_grupos == 0:
+            continue  # Omitir proyectos sin supervisión
+
+        all_compras_items = db.query(SupComprasItem).filter(
+            SupComprasItem.grupo_id.in_([g.id for g in compras_grupos])
+        ).all() if compras_grupos else []
+        all_servicios_items = db.query(SupServiciosItem).filter(
+            SupServiciosItem.grupo_id.in_([g.id for g in servicios_grupos])
+        ).all() if servicios_grupos else []
+
+        all_items_count = len(all_compras_items) + len(all_servicios_items)
+
+        compras_aprobados = sum(1 for i in all_compras_items if (i.status_compra or '').upper() == 'APROBADO')
+        servicios_aprobados = sum(1 for i in all_servicios_items if (i.status or '').upper() == 'APROBADO')
+        compras_pendientes = sum(1 for i in all_compras_items if (i.status_compra or '').upper() == 'PENDIENTE')
+        servicios_pendientes = sum(1 for i in all_servicios_items if (i.status or '').upper() in ('PENDIENTE', 'POR COTIZAR'))
+
+        # Avance promedio (avance_proyecto si hay tarea, si no avance de checkboxes)
+        def item_avance(item):
+            if hasattr(item, 'procura'):  # compras: 5 checks
+                checks = [item.procura, item.contratado, item.fabricado, item.despacho, item.recepcion]
+            else:  # servicios: 4 checks
+                checks = [item.solicitud, item.contratado, item.fabricado, item.instalado]
+            return round(sum(1 for c in checks if c) / len(checks) * 100)
+
+        all_avances = [item_avance(i) for i in all_compras_items + all_servicios_items]
+        avg_avance = round(sum(all_avances) / len(all_avances)) if all_avances else 0
+
+        # Fecha límite más próxima
+        fechas = sorted(filter(None, [i.fecha_limite for i in all_compras_items + all_servicios_items]))
+        fecha_proxima = fechas[0] if fechas else None
+
+        result.append({
+            "project_id": project.id,
+            "project_name": project.name,
+            "project_color": project.color or "#6366f1",
+            "total_grupos": total_grupos,
+            "compras_grupos": len(compras_grupos),
+            "servicios_grupos": len(servicios_grupos),
+            "total_items": all_items_count,
+            "aprobados": compras_aprobados + servicios_aprobados,
+            "pendientes": compras_pendientes + servicios_pendientes,
+            "avg_avance": avg_avance,
+            "fecha_proxima": fecha_proxima,
+        })
+
+    # Ordenar por avance ascendente (más atrasados primero)
+    result.sort(key=lambda x: x["avg_avance"])
+    return result
+
+# --- Resumen por proyecto ---
+
+@app.get("/api/supervision/{project_id}/resumen", response_model=List[SupResumenItemResponse])
+def get_sup_resumen(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return db.query(SupResumenItem).filter(SupResumenItem.project_id == project_id).order_by(SupResumenItem.position).all()
+
+@app.post("/api/supervision/{project_id}/resumen", response_model=SupResumenItemResponse)
+def create_sup_resumen(project_id: int, item: SupResumenItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db_item = SupResumenItem(**item.dict(), project_id=project_id)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@app.put("/api/supervision/resumen/{item_id}", response_model=SupResumenItemResponse)
+def update_sup_resumen(item_id: int, data: SupResumenItemUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    item = db.query(SupResumenItem).filter(SupResumenItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    for k, v in data.dict(exclude_unset=True).items():
+        setattr(item, k, v)
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.delete("/api/supervision/resumen/{item_id}")
+def delete_sup_resumen(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    item = db.query(SupResumenItem).filter(SupResumenItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
+
+# --- Compras e Importaciones (grupos) ---
+
+@app.get("/api/supervision/{project_id}/compras", response_model=List[SupComprasGrupoResponse])
+def get_sup_compras(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    grupos = db.query(SupComprasGrupo).filter(SupComprasGrupo.project_id == project_id).order_by(SupComprasGrupo.position).all()
+    for grupo in grupos:
+        primary_ids = {item.id for item in grupo.items}
+        extra_items = db.query(SupComprasItem).join(
+            sup_compras_item_grupos,
+            (sup_compras_item_grupos.c.item_id == SupComprasItem.id) &
+            (sup_compras_item_grupos.c.grupo_id == grupo.id)
+        ).filter(SupComprasItem.id.notin_(primary_ids)).all()
+        grupo._merged_items = list(grupo.items) + extra_items
+    return grupos
+
+@app.post("/api/supervision/{project_id}/compras/grupo", response_model=SupComprasGrupoResponse)
+def create_sup_compras_grupo(project_id: int, grupo: SupComprasGrupoCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db_grupo = SupComprasGrupo(**grupo.dict(), project_id=project_id)
+    db.add(db_grupo)
+    db.commit()
+    db.refresh(db_grupo)
+    return db_grupo
+
+@app.put("/api/supervision/compras/grupo/{grupo_id}", response_model=SupComprasGrupoResponse)
+def update_sup_compras_grupo(grupo_id: int, data: SupComprasGrupoUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    grupo = db.query(SupComprasGrupo).filter(SupComprasGrupo.id == grupo_id).first()
+    if not grupo:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    for k, v in data.dict(exclude_unset=True).items():
+        setattr(grupo, k, v)
+    db.commit()
+    db.refresh(grupo)
+    return grupo
+
+@app.delete("/api/supervision/compras/grupo/{grupo_id}")
+def delete_sup_compras_grupo(grupo_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    grupo = db.query(SupComprasGrupo).filter(SupComprasGrupo.id == grupo_id).first()
+    if not grupo:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    db.delete(grupo)
+    db.commit()
+    return {"ok": True}
+
+# --- Compras e Importaciones (items) ---
+
+@app.post("/api/supervision/compras/grupo/{grupo_id}/item", response_model=SupComprasItemResponse)
+def create_sup_compras_item(grupo_id: int, item: SupComprasItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    extra_ids = item.extra_grupo_ids or []
+    item_data = item.dict(exclude={'extra_grupo_ids'})
+    # Si se vincula a una tarea, el avance_proyecto = task.progress (no editable)
+    tid = item_data.get('task_id')
+    if tid:
+        linked_task = db.query(Task).filter(Task.id == tid).first()
+        if linked_task:
+            item_data['avance_proyecto'] = linked_task.progress or 0
+        else:
+            item_data['task_id'] = None
+    db_item = SupComprasItem(**item_data, grupo_id=grupo_id)
+    db.add(db_item)
+    db.flush()  # get db_item.id
+    if extra_ids:
+        extra_grupos = db.query(SupComprasGrupo).filter(SupComprasGrupo.id.in_(extra_ids)).all()
+        db_item.extra_grupos = extra_grupos
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@app.put("/api/supervision/compras/item/{item_id}", response_model=SupComprasItemResponse)
+def update_sup_compras_item(item_id: int, data: SupComprasItemUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    item = db.query(SupComprasItem).filter(SupComprasItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    update_data = data.dict(exclude_unset=True, exclude={'extra_grupo_ids', 'task_id'})
+    # Si task_id viene en el payload, actualizar el vínculo
+    if 'task_id' in data.dict(exclude_unset=True):
+        new_tid = data.task_id
+        if new_tid == 0:
+            new_tid = None  # desvincular
+        item.task_id = new_tid
+        if new_tid:
+            linked_task = db.query(Task).filter(Task.id == new_tid).first()
+            if linked_task:
+                update_data['avance_proyecto'] = linked_task.progress or 0
+    elif item.task_id:
+        # Ya tiene tarea vinculada: no actualizar avance_proyecto desde el formulario
+        update_data.pop('avance_proyecto', None)
+    for k, v in update_data.items():
+        setattr(item, k, v)
+    if data.extra_grupo_ids is not None:
+        extra_grupos = db.query(SupComprasGrupo).filter(SupComprasGrupo.id.in_(data.extra_grupo_ids)).all()
+        item.extra_grupos = extra_grupos
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.delete("/api/supervision/compras/item/{item_id}")
+def delete_sup_compras_item(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    item = db.query(SupComprasItem).filter(SupComprasItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
+
+# --- Contrataciones de Servicios (grupos) ---
+
+@app.get("/api/supervision/{project_id}/servicios", response_model=List[SupServiciosGrupoResponse])
+def get_sup_servicios(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    grupos = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.project_id == project_id).order_by(SupServiciosGrupo.position).all()
+    for grupo in grupos:
+        primary_ids = {item.id for item in grupo.items}
+        extra_items = db.query(SupServiciosItem).join(
+            sup_servicios_item_grupos,
+            (sup_servicios_item_grupos.c.item_id == SupServiciosItem.id) &
+            (sup_servicios_item_grupos.c.grupo_id == grupo.id)
+        ).filter(SupServiciosItem.id.notin_(primary_ids)).all()
+        grupo._merged_items = list(grupo.items) + extra_items
+    return grupos
+
+@app.post("/api/supervision/{project_id}/servicios/grupo", response_model=SupServiciosGrupoResponse)
+def create_sup_servicios_grupo(project_id: int, grupo: SupServiciosGrupoCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db_grupo = SupServiciosGrupo(**grupo.dict(), project_id=project_id)
+    db.add(db_grupo)
+    db.commit()
+    db.refresh(db_grupo)
+    return db_grupo
+
+@app.put("/api/supervision/servicios/grupo/{grupo_id}", response_model=SupServiciosGrupoResponse)
+def update_sup_servicios_grupo(grupo_id: int, data: SupServiciosGrupoUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    grupo = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.id == grupo_id).first()
+    if not grupo:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    for k, v in data.dict(exclude_unset=True).items():
+        setattr(grupo, k, v)
+    db.commit()
+    db.refresh(grupo)
+    return grupo
+
+@app.delete("/api/supervision/servicios/grupo/{grupo_id}")
+def delete_sup_servicios_grupo(grupo_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    grupo = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.id == grupo_id).first()
+    if not grupo:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    db.delete(grupo)
+    db.commit()
+    return {"ok": True}
+
+# --- Contrataciones de Servicios (items) ---
+
+@app.post("/api/supervision/servicios/grupo/{grupo_id}/item", response_model=SupServiciosItemResponse)
+def create_sup_servicios_item(grupo_id: int, item: SupServiciosItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    extra_ids = item.extra_grupo_ids or []
+    item_data = item.dict(exclude={'extra_grupo_ids'})
+    # Si se vincula a una tarea, el avance_proyecto = task.progress (no editable)
+    tid = item_data.get('task_id')
+    if tid:
+        linked_task = db.query(Task).filter(Task.id == tid).first()
+        if linked_task:
+            item_data['avance_proyecto'] = linked_task.progress or 0
+        else:
+            item_data['task_id'] = None
+    db_item = SupServiciosItem(**item_data, grupo_id=grupo_id)
+    db.add(db_item)
+    db.flush()
+    if extra_ids:
+        extra_grupos = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.id.in_(extra_ids)).all()
+        db_item.extra_grupos = extra_grupos
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@app.put("/api/supervision/servicios/item/{item_id}", response_model=SupServiciosItemResponse)
+def update_sup_servicios_item(item_id: int, data: SupServiciosItemUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    item = db.query(SupServiciosItem).filter(SupServiciosItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    update_data = data.dict(exclude_unset=True, exclude={'extra_grupo_ids', 'task_id'})
+    # Si task_id viene en el payload, actualizar el vínculo
+    if 'task_id' in data.dict(exclude_unset=True):
+        new_tid = data.task_id
+        if new_tid == 0:
+            new_tid = None  # desvincular
+        item.task_id = new_tid
+        if new_tid:
+            linked_task = db.query(Task).filter(Task.id == new_tid).first()
+            if linked_task:
+                update_data['avance_proyecto'] = linked_task.progress or 0
+    elif item.task_id:
+        # Ya tiene tarea vinculada: no actualizar avance_proyecto desde el formulario
+        update_data.pop('avance_proyecto', None)
+    for k, v in update_data.items():
+        setattr(item, k, v)
+    if data.extra_grupo_ids is not None:
+        extra_grupos = db.query(SupServiciosGrupo).filter(SupServiciosGrupo.id.in_(data.extra_grupo_ids)).all()
+        item.extra_grupos = extra_grupos
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.delete("/api/supervision/servicios/item/{item_id}")
+def delete_sup_servicios_item(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    item = db.query(SupServiciosItem).filter(SupServiciosItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}

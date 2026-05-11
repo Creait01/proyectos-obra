@@ -1,0 +1,16 @@
+{
+  "servers": {
+    "google-drive": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@piotr-agier/google-drive-mcp"
+      ],
+      "env": {
+        "GOOGLE_CLIENT_ID": "912984493576-2lm5sn7h4ar7oit2i17bphc5uavekalk.apps.googleusercontent.com",
+        "GOOGLE_CLIENT_SECRET": "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"
+      }
+    }
+  }
+}

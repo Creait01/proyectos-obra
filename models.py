@@ -11,6 +11,38 @@ task_assignees = Table(
     Column('user_id', Integer, ForeignKey('users.id'), primary_key=True)
 )
 
+# Tabla de asociación: un ítem de Compras puede pertenecer a múltiples grupos
+sup_compras_item_grupos = Table(
+    'sup_compras_item_grupos',
+    Base.metadata,
+    Column('item_id', Integer, ForeignKey('sup_compras_items.id', ondelete='CASCADE'), primary_key=True),
+    Column('grupo_id', Integer, ForeignKey('sup_compras_grupos.id', ondelete='CASCADE'), primary_key=True)
+)
+
+# Tabla de asociación: un ítem de Servicios puede pertenecer a múltiples grupos
+sup_servicios_item_grupos = Table(
+    'sup_servicios_item_grupos',
+    Base.metadata,
+    Column('item_id', Integer, ForeignKey('sup_servicios_items.id', ondelete='CASCADE'), primary_key=True),
+    Column('grupo_id', Integer, ForeignKey('sup_servicios_grupos.id', ondelete='CASCADE'), primary_key=True)
+)
+
+# Tabla de asociación: una tarea puede vincularse a grupos de Compras de supervisión
+task_sup_compras_grupos = Table(
+    'task_sup_compras_grupos',
+    Base.metadata,
+    Column('task_id', Integer, ForeignKey('tasks.id', ondelete='CASCADE'), primary_key=True),
+    Column('grupo_id', Integer, ForeignKey('sup_compras_grupos.id', ondelete='CASCADE'), primary_key=True)
+)
+
+# Tabla de asociación: una tarea puede vincularse a grupos de Servicios de supervisión
+task_sup_servicios_grupos = Table(
+    'task_sup_servicios_grupos',
+    Base.metadata,
+    Column('task_id', Integer, ForeignKey('tasks.id', ondelete='CASCADE'), primary_key=True),
+    Column('grupo_id', Integer, ForeignKey('sup_servicios_grupos.id', ondelete='CASCADE'), primary_key=True)
+)
+
 class User(Base):
     __tablename__ = "users"
     
@@ -112,6 +144,8 @@ class Task(Base):
     project = relationship("Project", back_populates="tasks")
     stage = relationship("Stage", back_populates="tasks")
     assignees = relationship("User", secondary=task_assignees, back_populates="assigned_tasks")
+    sup_compras_grupos = relationship("SupComprasGrupo", secondary="task_sup_compras_grupos", lazy="select")
+    sup_servicios_grupos = relationship("SupServiciosGrupo", secondary="task_sup_servicios_grupos", lazy="select")
     progress_history = relationship("TaskProgress", back_populates="task", cascade="all, delete-orphan")
     history = relationship("TaskHistory", back_populates="task", cascade="all, delete-orphan", order_by="TaskHistory.created_at.desc()")
 
@@ -197,6 +231,49 @@ class MilestoneAttachment(Base):
 
 
 # ==================== PLANTILLAS ====================
+
+# Tabla de asociación: stage_template ↔ sup_categoria_templates
+stage_template_sup_cats = Table(
+    "stage_template_sup_cats",
+    Base.metadata,
+    Column("stage_template_id", Integer, ForeignKey("stage_templates.id", ondelete="CASCADE"), primary_key=True),
+    Column("sup_cat_template_id", Integer, ForeignKey("sup_categoria_templates.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class SupCategoriaTemplate(Base):
+    """Plantilla de categoría de supervisión (grupo con actividades).
+    Puede ser de tipo COMPRAS o SERVICIOS."""
+    __tablename__ = "sup_categoria_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(300), nullable=False)
+    tipo = Column(String(20), nullable=False)   # COMPRAS | SERVICIOS
+    descripcion = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User")
+    items = relationship("SupCategoriaTemplateItem", back_populates="template",
+                         cascade="all, delete-orphan", order_by="SupCategoriaTemplateItem.position")
+    # Vinculación con plantillas de etapas
+    stage_templates = relationship("StageTemplate", secondary="stage_template_sup_cats",
+                                   back_populates="sup_cat_templates")
+
+
+class SupCategoriaTemplateItem(Base):
+    """Actividad dentro de una plantilla de categoría de supervisión."""
+    __tablename__ = "sup_categoria_template_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("sup_categoria_templates.id", ondelete="CASCADE"), nullable=False)
+    actividad = Column(String(400), nullable=False)
+    prioridad = Column(Integer, nullable=True, default=3)  # 1-5
+    position = Column(Integer, default=0)
+
+    template = relationship("SupCategoriaTemplate", back_populates="items")
+
+
 class StageTemplate(Base):
     """Plantillas de etapas que solo admins pueden crear"""
     __tablename__ = "stage_templates"
@@ -209,6 +286,9 @@ class StageTemplate(Base):
     
     creator = relationship("User")
     stages = relationship("StageTemplateItem", back_populates="template", cascade="all, delete-orphan", order_by="StageTemplateItem.position")
+    # Plantillas de supervisión vinculadas
+    sup_cat_templates = relationship("SupCategoriaTemplate", secondary="stage_template_sup_cats",
+                                     back_populates="stage_templates")
 
 
 class StageTemplateItem(Base):
@@ -237,6 +317,145 @@ class TaskTemplate(Base):
     
     creator = relationship("User")
     tasks = relationship("TaskTemplateItem", back_populates="template", cascade="all, delete-orphan", order_by="TaskTemplateItem.position")
+
+
+# ===================== SUPERVISIÓN =====================
+
+class SupResumenItem(Base):
+    """Resumen de compras e importaciones por rubro (hoja Resumen)"""
+    __tablename__ = "sup_resumen"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    rubro = Column(String(300), nullable=False)
+    status = Column(String(50), nullable=True)           # CONTRATADO, EN PROCESO, PENDIENTE
+    fecha_limite = Column(String(20), nullable=True)     # Fecha límite contratación
+    fecha_llegada = Column(String(20), nullable=True)    # Fecha llegada planificación
+    observacion = Column(Text, nullable=True)
+    avance = Column(Float, default=0)                    # 0-100
+    position = Column(Integer, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = relationship("Project")
+
+
+class SupComprasGrupo(Base):
+    """Grupos (rubros) dentro de Compras e Importaciones"""
+    __tablename__ = "sup_compras_grupos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    nombre = Column(String(300), nullable=False)
+    position = Column(Integer, default=0)
+
+    project = relationship("Project")
+    items = relationship("SupComprasItem", back_populates="grupo", cascade="all, delete-orphan", order_by="SupComprasItem.position")
+
+
+class SupComprasItem(Base):
+    """Ítem individual dentro de un grupo de Compras e Importaciones.
+    Estructura simplificada según hoja COMPRAS E IMPORTACIONES:
+      - actividad / rubro
+      - prioridad (1-5)
+      - 5 checkboxes de seguimiento (procura, contratado, fabricado, despacho, recepcion)
+      - status_compra (APROBADO, PENDIENTE, ...)
+      - observaciones
+      - programacion (FABRICACIÓN, TRÁNSITO, RECEPCIÓN, INSTALACIÓN, ...)
+      - avance: calculado dinámicamente = (#checks marcados / 5) * 100
+    Columnas legacy (proveedor, categoria, fechas, etc.) se conservan en BD por
+    compatibilidad pero ya no se usan en la UI.
+    """
+    __tablename__ = "sup_compras_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    grupo_id = Column(Integer, ForeignKey("sup_compras_grupos.id", ondelete="CASCADE"), nullable=False)
+    actividad = Column(String(400), nullable=False)
+    prioridad = Column(Integer, nullable=True)
+
+    # Seguimiento (checkboxes)
+    procura = Column(Boolean, default=False)
+    contratado = Column(Boolean, default=False)
+    fabricado = Column(Boolean, default=False)
+    despacho = Column(Boolean, default=False)
+    recepcion = Column(Boolean, default=False)
+
+    status_compra = Column(String(50), nullable=True)   # APROBADO, PENDIENTE, EN REVISIÓN, ...
+    observaciones = Column(Text, nullable=True)
+    programacion = Column(String(50), nullable=True)    # FABRICACIÓN, TRÁNSITO, RECEPCIÓN, INSTALACIÓN
+
+    position = Column(Integer, default=0)
+    avance_proyecto = Column(Float, default=0)  # % avance = task.progress cuando task_id está seteado
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+
+    # --- Legacy (no se usa en la nueva UI, se conserva por compat) ---
+    estatus = Column(String(50), nullable=True)
+    proveedor = Column(String(300), nullable=True)
+    categoria = Column(String(100), nullable=True)
+    fecha_llegada = Column(String(20), nullable=True)
+    fecha_limite = Column(String(20), nullable=True)
+    tiempo_prod = Column(String(100), nullable=True)
+    inicio_project = Column(String(20), nullable=True)
+    dias_instalacion = Column(Integer, nullable=True)
+
+    grupo = relationship("SupComprasGrupo", back_populates="items")
+    # Grupos adicionales (many-to-many)
+    extra_grupos = relationship("SupComprasGrupo", secondary="sup_compras_item_grupos", lazy="select")
+    task = relationship("Task", foreign_keys=[task_id], lazy="select")
+
+    @property
+    def avance(self) -> int:
+        checks = [self.procura, self.contratado, self.fabricado, self.despacho, self.recepcion]
+        return int(round(sum(1 for c in checks if c) / 5 * 100))
+
+
+class SupServiciosGrupo(Base):
+    """Grupos dentro de Contrataciones de Servicios"""
+    __tablename__ = "sup_servicios_grupos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    nombre = Column(String(300), nullable=False)
+    position = Column(Integer, default=0)
+
+    project = relationship("Project")
+    items = relationship("SupServiciosItem", back_populates="grupo", cascade="all, delete-orphan", order_by="SupServiciosItem.position")
+
+
+class SupServiciosItem(Base):
+    """Ítem individual dentro de un grupo de Contrataciones de Servicios"""
+    __tablename__ = "sup_servicios_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    grupo_id = Column(Integer, ForeignKey("sup_servicios_grupos.id", ondelete="CASCADE"), nullable=False)
+    actividad = Column(String(400), nullable=False)
+    prioridad = Column(Integer, nullable=True)
+    proveedor = Column(String(300), nullable=True)
+    fecha_limite = Column(String(20), nullable=True)
+    tiempo_prod = Column(String(100), nullable=True)
+    inicio_project = Column(String(20), nullable=True)
+    # 4 seguimiento booleans
+    solicitud = Column(Boolean, default=False)
+    contratado = Column(Boolean, default=False)
+    fabricado = Column(Boolean, default=False)
+    instalado = Column(Boolean, default=False)
+    status = Column(String(50), nullable=True)           # APROBADO, POR COTIZAR, CONTRATADO
+    observaciones = Column(Text, nullable=True)
+    presupuesto_odc = Column(Float, nullable=True)
+    por_contratar = Column(Float, nullable=True)
+    position = Column(Integer, default=0)
+    avance_proyecto = Column(Float, default=0)  # % avance = task.progress cuando task_id está seteado
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+
+    grupo = relationship("SupServiciosGrupo", back_populates="items")
+    # Grupos adicionales (many-to-many)
+    extra_grupos = relationship("SupServiciosGrupo", secondary="sup_servicios_item_grupos", lazy="select")
+    task = relationship("Task", foreign_keys=[task_id], lazy="select")
+
+    @property
+    def avance(self) -> int:
+        checks = [self.solicitud, self.contratado, self.fabricado, self.instalado]
+        return int(round(sum(1 for c in checks if c) / 4 * 100))
+
 
 
 class TaskTemplateItem(Base):
